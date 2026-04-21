@@ -1,4 +1,4 @@
-"""Karma is a tool for building a context for code generation based on your repo and environment.
+"""Kosha is a tool for building a context for code generation based on your repo and environment.
 It uses a vector database to store code snippets and their embeddings, allowing you to search for relevant code based
 on natural language queries.
 The core functionality includes managing the database, updating package metadata, embedding code snippets,
@@ -8,8 +8,8 @@ and performing context-aware searches."""
 
 # %% auto #0
 __all__ = ['cr_instr', 'model', 'strict_skip_folder_re', 'strict_skip_file_re', 'emb_doc', 'emb_query', 'parse', 'repo_root',
-           'mv_skill_md', 'arun', 'env_pkg_versions', 'embedder', 'static_embedder', 'Karma', 'pkg_doc', 'has_init',
-           'embed_chunk', 'process_content', 'count_imp', 'parseq', 'filt2wh']
+           'mv_skill_md', 'arun', 'pkg_trans_deps', 'env_pkg_versions', 'embedder', 'static_embedder', 'Kosha',
+           'pkg_doc', 'has_init', 'embed_chunk', 'process_content', 'count_imp', 'parseq', 'filt2wh']
 
 # %% ../nbs/00_core.ipynb #69029d72f94a2fdc
 import ast, os, re
@@ -56,11 +56,11 @@ def repo_root() -> Path:
 	return first((Path.cwd(), *Path.cwd().parents), lambda p: (p/'.git').exists())
 
 def mv_skill_md(dry_run=True, dir=None) -> None:
-	"Copy bundled SKILL.md to `.agents/skills/karma/` at project root or specified dir."
+	"Copy bundled SKILL.md to `.agents/skills/kosha/` at project root or specified dir."
 	if not (r := dir or repo_root()): return
 	base = Path(__file__).parent if '__file__' in globals() else Path.cwd()
 	if not (src := base.joinpath('SKILL.md')).exists(): return
-	dest = Path(r).joinpath('.agents', 'skills', 'karma', 'SKILL.md')
+	dest = Path(r).joinpath('.agents', 'skills', 'kosha', 'SKILL.md')
 	if dry_run: print(f'Would copy {src} to {dest}')
 	else: dest.mk_write(src.read_text(encoding='utf-8'))
 
@@ -73,11 +73,33 @@ def arun(coro) -> any:
 	import concurrent.futures
 	with concurrent.futures.ThreadPoolExecutor() as pool: return pool.submit(asyncio.run, coro).result()
 
+# %% ../nbs/00_core.ipynb #82af952c
+_req_nm = re.compile(r'^[\w][\w.-]*')
+
+def pkg_trans_deps(seeds:list, depth:int=2) -> L:
+	'BFS over importlib.metadata requires: return seeds + all transitive deps up to depth levels (installed only, no optional extras).'
+	seen, frontier = set(seeds), set(seeds)
+	for _ in range(depth):
+		nxt = set()
+		for pkg in frontier:
+			try:
+				for req in (dist(pkg).requires or []):
+					if 'extra ==' in req: continue
+					if (m := _req_nm.match(req)) and spec(m.group(0)): nxt.add(m.group(0))
+			except Exception: pass
+		nxt -= seen
+		if not nxt: break
+		seen |= nxt; frontier = nxt
+	return L(seen)
+
 # %% ../nbs/00_core.ipynb #c475a3af79bdd694
 @lru_cache(maxsize=1)
-def env_pkg_versions(pyproject=False) -> dict:
-	'Get a dict of installed package versions using importlib.metadata.'
-	return merge(*installed_packages(pyproject=pyproject).map(lambda p: {dist(p).metadata['Name']: dist(p).version}))
+def env_pkg_versions(pyproject=True, depth:int=1) -> dict:
+	'''Get a dict of installed package versions using importlib.metadata.
+	passing depth traverse multiple layers of dependencies'''
+	pkgs = installed_packages(pyproject=pyproject)
+	if pyproject and depth: pkgs = pkg_trans_deps(pkgs, depth)
+	return merge(*pkgs.map(lambda p: {dist(p).metadata['Name']: dist(p).version}))
 
 # %% ../nbs/00_core.ipynb #3ccb8e947caec348
 cr_instr = AttrDict(query="Represent this query for searching relevant code: {text}", document="{text}")
@@ -93,12 +115,12 @@ emb_doc = lambda e:lambda t:e().encode_document(t) if isinstance(e(),FastEncode)
 emb_query = lambda e:lambda t:e().encode_query(t) if isinstance(e(),FastEncode) else e().embed_batch(listify(t))
 
 # %% ../nbs/00_core.ipynb #8511999ac2824a0b
-class Karma:
-	'Karma allows you to build a context for code generation based on your repo and environment.'
+class Kosha:
+	'Kosha allows you to build a context for code generation based on your repo and environment.'
 	def __init__(self, dir: Path = None, install_skill: bool = False, xdg_dir: Path = None):
 		self.root, self.xdg = Path(dir or repo_root() or '.'), xdg_dir or xdg_data_home()
 		if install_skill: mv_skill_md(dir=self.root, dry_run=False)
-		self.cp, self.ce = self.root.joinpath('.karma','code.db'), self.xdg.joinpath('karma','env.db')
+		self.cp, self.ce = self.root.joinpath('.kosha','code.db'), self.xdg.joinpath('kosha','env.db')
 		for p in (self.cp, self.ce): p.parent.mkdir(parents=True, exist_ok=True)
 		self.codedb, self.envdb = database(self.cp), database(self.ce)
 		self.code_st,self.env_st = self.codedb.get_store(path=str,hash=True),self.envdb.get_store(package=str,hash=True)
@@ -128,12 +150,12 @@ def has_init(d: Path) -> bool:
 # %% ../nbs/00_core.ipynb #cd93d2c15ca33a8d
 os.environ['TOKENIZERS_PARALLELISM']='false'  # to suppress warnings from tokenizers
 @patch
-def nuke(self:Karma):
+def nuke(self:Kosha):
 	'Reset the databases by dropping all tables.'
 	for p in (self.cp, self.ce): p.parent.delete()
 
 @patch
-def _is_pkg_ingested(self:Karma, pkg:str) -> bool:
+def _is_pkg_ingested(self:Kosha, pkg:str) -> bool:
 	'Check if a package is already ingested and up-to-date.'
 	ep = self.pkgs(select='name, version', where=f'name={pkg!r}')
 	return (only(ep)['version'] == v(pkg)) if ep else False
@@ -154,7 +176,7 @@ def process_content(store, content:L, embed:bool=True, efn=embedder, sz:int=500)
 
 @patch
 @fdelegates(process_content)
-def process_env(self:Karma, content=None, reembed=False, **kwargs):
+def process_env(self:Kosha, content=None, reembed=False, **kwargs):
 	'Embed all documents in the env store, or only those without embeddings if reembed=False.'
 	content = content or self.env_st(where=f'embedding is NULL' if not reembed else None)
 	return process_content(self.env_st, content, **kwargs)
@@ -176,7 +198,7 @@ def count_imp(files, own:str='') -> Counter:
 
 @patch
 @fdelegates(pkg2chunks)
-def update_pkg(self:Karma, pkg:str, embed=True, exts=code_exts, efn=embedder, **kwargs):
+def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, efn=embedder, **kwargs):
 	'Update package metadata in the packages table.'
 	assert (o:= spec(pkg)), f'pkg {pkg} is not in environment'
 	if self._is_pkg_ingested(pkg) and len(self.env_st(where=f'package={pkg!r}')) > 0: return
@@ -195,7 +217,7 @@ def update_pkg(self:Karma, pkg:str, embed=True, exts=code_exts, efn=embedder, **
 		if rows: self.envdb.t.pkg_deps.insert_all(rows, replace=True)
 
 @patch
-def rm_pkg(self:Karma, pkg:str, ver:str=None):
+def rm_pkg(self:Kosha, pkg:str, ver:str=None):
 	'Remove a package and its code snippets from the database.'
 	wh = f'package={pkg!r} AND version={ver!r}' if ver else f'package={pkg!r}'
 	for t in [self.env_st, self.pkgs]: t.delete(where=wh)
@@ -203,20 +225,20 @@ def rm_pkg(self:Karma, pkg:str, ver:str=None):
 	self.envdb.t.pkg_deps.delete(where=f'from_pkg={pkg!r}')
 
 @patch
-def process_repo(self:Karma, content=None, reembed=False, **kwargs):
+def process_repo(self:Kosha, content=None, reembed=False, **kwargs):
 	'Embed all documents in the code store, or only those without embeddings if reembed=False.'
 	content = content or self.code_st(where=f'embedding is NULL' if not reembed else None)
 	return process_content(self.code_st, content, **kwargs)
 
 @patch
-def update_pkgs(self:Karma, pkgs:str|list, embed=True, exts=code_exts, efn=embedder, **kwargs):
+def update_pkgs(self:Kosha, pkgs:str|list, embed=True, exts=code_exts, efn=embedder, **kwargs):
 	if not (pkgs := set(pkgs).intersection(env_pkg_versions())): return
 	kw = dict(embed=embed,exts=exts,efn=efn, **kwargs)
 	return arun(parallel_async(self.update_pkg, pkgs,**kw))
 
 @patch
 @fdelegates(dir2files)
-def update_repo(self:Karma,
+def update_repo(self:Kosha,
 				dir:Path=None,    # directory to index; defaults to repo root
 				embed:bool=True,  # embed chunks after parsing
 				files:L=None,     # specific paths to (re)index; None = full sync
@@ -248,7 +270,7 @@ def update_repo(self:Karma,
     if rows: self.code_rd.insert_all(rows, replace=True)
 
 @patch
-def prune_old_versions(self:Karma, pkg:str):
+def prune_old_versions(self:Kosha, pkg:str):
 	'Keep only the latest version of a package in the database.'
 	if len(vers := self.pkgs(select='version', where=f'name={pkg!r}')) <= 1: return
 	latest = sorted(vers, key=lambda v: tuple(map(int, v.split('.'))))[-1]
@@ -256,12 +278,12 @@ def prune_old_versions(self:Karma, pkg:str):
 	self.pkgs.delete(where=f'name={pkg!r} AND version<>{latest!r}')
 
 @patch
-def prune_old_pkgs(self:Karma):
+def prune_old_pkgs(self:Kosha):
 	'Keep only the latest version of each package in the database.'
 	for pkg in self.pkgs(select='name').map(lambda d:d['name']): self.prune_old_versions(pkg)
 
 @patch
-def pkgs_in_env(self:Karma, pyproject=False) -> list:
+def pkgs_in_env(self:Kosha, pyproject=False) -> list:
 	'Intersection of the packages table with packages installed in the environment.'
 	st_pkgs, inst_pkgs = L(self.pkgs(select='name, version')), env_pkg_versions(pyproject=pyproject)
 	return st_pkgs.filter(lambda p: p['name'] in inst_pkgs and inst_pkgs[p['name']] == p['version'])
@@ -308,7 +330,7 @@ def filt2wh(filters: dict, store: str = 'code') -> str | None:
 
 # %% ../nbs/00_core.ipynb #fed0d571ef995962
 @patch
-def env_context(self:Karma,
+def env_context(self:Kosha,
 				q:str,               	# query to search (supports key:value filters)
 				emb_q:str=None,     	# query to embed; defaults to bare query after filter parsing
 				wide:bool=False,    	# whether to use wide search
@@ -330,7 +352,7 @@ def env_context(self:Karma,
 	return L(self.envdb.search(pre(raw, wide=wide), emb.tobytes(), columns.split(','), where=wh, **kw)).map(fn)
 
 @patch
-def pkgs2consider(self: Karma, sys_wide=True) -> set:
+def pkgs2consider(self: Kosha, sys_wide=True) -> set:
 	'Determine which packages to consider for search based on the intersection of the packages table and the environment.'
 	ex_pkgs = merge(*L(self.pkgs(select='name, version')).map(lambda d: {d['name']: d['version']}))
 	if sys_wide: return ex_pkgs.keys()
@@ -339,7 +361,7 @@ def pkgs2consider(self: Karma, sys_wide=True) -> set:
 
 # %% ../nbs/00_core.ipynb #12beefe0bbdabfd8
 @patch
-def repo_context(self:Karma,
+def repo_context(self:Kosha,
                 q:str,                          # query to search (supports key:value filters)
                 emb_q:str=None,                 # query to embed; defaults to bare query after filter parsing
                 wide:bool=False,                # use wide (OR) FTS search
@@ -359,20 +381,20 @@ def repo_context(self:Karma,
 	return L(self.codedb.search(pre(raw, wide=wide), emb.tobytes(), columns.split(','), where=wh, **kw)).map(fn)
 
 @patch
-async def awatch_repo(self:Karma, dir:Path=None, **kw):
+async def awatch_repo(self:Kosha, dir:Path=None, **kw):
 	'Async watcher: re-indexes changed files on every watchfiles event.'
 	from watchfiles import awatch
 	dir = Path(dir or self.root)
 	async for changes in awatch(str(dir)): self.update_repo(dir, files=L({c[1] for c in changes}), **kw)
 
 @patch
-def watch_repo(self:Karma, dir:Path=None, **kw):
+def watch_repo(self:Kosha, dir:Path=None, **kw):
 	'Block and watch repo for changes, re-indexing incrementally. Ctrl-C to stop.'
 	arun(self.awatch_repo(dir, **kw))
 
 # %% ../nbs/00_core.ipynb #b739867c9dc3b47e
 @patch
-def pkg_context(self:Karma,
+def pkg_context(self:Kosha,
                 q:str, # the search query
                 limit:int=10, # limits
                 efn=embedder

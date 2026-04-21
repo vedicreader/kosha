@@ -1,11 +1,11 @@
 ---
-name: karma
+name: kosha
 description: >
   Surface repo code and installed package snippets before writing new code.
   Run at the start of any task that touches existing patterns or packages.
 ---
 
-# karma — repo + package memory for coding agents
+# kosha — repo + package memory for coding agents
 
 FTS5 + vector search + call graph over your repo and installed packages. Results include
 callers, callees, and PageRank. No LLMs required.
@@ -14,13 +14,13 @@ callers, callees, and PageRank. No LLMs required.
 
 **One-time per project:**
 ```python
-from karma import Karma
-Karma(install_skill=True)   # writes .agents/skills/karma/SKILL.md
+from kosha import Kosha
+Kosha(install_skill=True)   # writes .agents/skills/kosha/SKILL.md
 ```
 
 **Once per session** (incremental — fast on repeat):
 ```python
-k = Karma()
+k = Kosha()
 k.sync(pkgs=['fasthtml', 'fastcore'])  # repo code + packages + call graph
 ```
 
@@ -147,21 +147,21 @@ Plural and comma-separated values work: `packages:fastcore,litesearch paths:basi
 
 ## Database locations
 
-- `.karma/code.db` — repo code chunks + embeddings (project-local)
-- `.karma/graph.db` — call graph (project-local)
-- `$XDG_DATA_HOME/karma/env.db` — installed packages (global, shared across repos)
+- `.kosha/code.db` — repo code chunks + embeddings (project-local)
+- `.kosha/graph.db` — call graph (project-local)
+- `$XDG_DATA_HOME/kosha/env.db` — installed packages (global, shared across repos)
 
 ## Harness installation
 
 **Project-local** (auto-discovered by most harnesses, commit alongside code):
 ```python
-Karma(install_skill=True)   # → .agents/skills/karma/SKILL.md
+Kosha(install_skill=True)   # → .agents/skills/kosha/SKILL.md
 ```
 
 **Claude Code — global** (available in all projects):
 ```bash
-mkdir -p ~/.claude/skills/karma
-cp .agents/skills/karma/SKILL.md ~/.claude/skills/karma/SKILL.md
+mkdir -p ~/.claude/skills/kosha
+cp .agents/skills/kosha/SKILL.md ~/.claude/skills/kosha/SKILL.md
 ```
 
 **Other harnesses**: place SKILL.md wherever the harness discovers agent skills

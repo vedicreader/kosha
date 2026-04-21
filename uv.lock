@@ -719,11 +719,11 @@ wheels = [
 
 [[package]]
 name = "fastcore"
-version = "1.12.39"
+version = "1.12.40"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/3c/d8/b659655b38bb66f6b7ceb2aa9345cd105fed1f2443758778cfd057375eff/fastcore-1.12.39.tar.gz", hash = "sha256:a179b5255f13a1a5cd87411439ab75eaa565c32fcbc63ed79e236002b69bbc5c", size = 97665 }
+sdist = { url = "https://files.pythonhosted.org/packages/8d/4b/8eebc212a99b1121301fb541d14019a99d84f3f0675c8ac0db771a5be93b/fastcore-1.12.40.tar.gz", hash = "sha256:b2769923110cc790a6f1dd5487767355b7d484ad5fdac0a6f0bbca610bed43cf", size = 98957 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/36/78e3a4044f88a4d7e5b214ff39ae76b925d8d0efafe2559b63062e3a94b8/fastcore-1.12.39-py3-none-any.whl", hash = "sha256:7299fa8ef35edf3db9e1eee452a5454672aceeb75673921686c0768859507b16", size = 102297 },
+    { url = "https://files.pythonhosted.org/packages/79/a0/d0c0d6e9243f96d4c19996cec3352f6a5f7545f415c0fecc89698df3f524/fastcore-1.12.40-py3-none-any.whl", hash = "sha256:78451f840cb19b9de49e88ab616e077d7dcb0d93022f8be1034abb399711e5cb", size = 103592 },
 ]
 
 [[package]]
@@ -1366,7 +1366,7 @@ wheels = [
 ]
 
 [[package]]
-name = "karma"
+name = "kosha"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
@@ -1405,7 +1405,7 @@ wheels = [
 
 [[package]]
 name = "litesearch"
-version = "0.0.22"
+version = "0.0.23"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "chonkie" },
@@ -1423,9 +1423,9 @@ dependencies = [
     { name = "usearch" },
     { name = "yake" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d9/86/f2524f5729131f96dbdbef48f6bfe777bc8b7a6e19da548ea2e5c3e75b49/litesearch-0.0.22.tar.gz", hash = "sha256:f488e09593c7a350cd44f606447abd17f8cf894b6baa7761e04a1eb9c8790754", size = 27962 }
+sdist = { url = "https://files.pythonhosted.org/packages/ab/25/b008f68fa810eb81bc1868af072ffd8d0a8a34a747ffd26d1265332c141a/litesearch-0.0.23.tar.gz", hash = "sha256:7b7a91eae7f778ceaec76fa0b0cf736f7e7b980f3d7e424526f54579cdd4fda0", size = 28096 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/04/00/eb51276bf31995fa9b164d3f2b83eff3ba77856acf54ce43187f715d11bc/litesearch-0.0.22-py3-none-any.whl", hash = "sha256:c21aeda983996371735dfd6c1f159abfd3b531c6d741e51ff88dbae2ff815596", size = 29596 },
+    { url = "https://files.pythonhosted.org/packages/48/da/08123d84695be4419bc471172300769aa14e0daf3ad1b935740ec10bd6cf/litesearch-0.0.23-py3-none-any.whl", hash = "sha256:1854d57bb97493e8fd6adb3baae1372dd3ec174d331e48b1bff58f6017d78cf7", size = 29732 },
 ]
 
 [[package]]
@@ -2257,18 +2257,18 @@ wheels = [
 
 [[package]]
 name = "pdf-oxide"
-version = "0.3.36"
+version = "0.3.37"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f0/91/3330cd2488d8b6e4756222a5059a31f77c8d4eb54e9c0b2e60afc6093511/pdf_oxide-0.3.36.tar.gz", hash = "sha256:591983eaa7ef00c11aecd4f5c63ecc396ef066a0b7d212d3795d33ac9d867e3c", size = 1956609 }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/02/72577ef0a538e147ff6e38e017b81bdb6eeabdfbc8e050370b423de26d44/pdf_oxide-0.3.37.tar.gz", hash = "sha256:7afc0fe4d1de0ab2ee0de6639f9645827885372d43d7fa7f8eef0e9e094b831b", size = 2096609 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3c/96/25fc0c852a93e420b1a130c73dca6f571413845b5abd5e54ecb6af2af581/pdf_oxide-0.3.36-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:e035ddd01a7d25ee91163c3dd34ddc25ac0c1318dfa8559b5b055f8f43f6adbb", size = 4707223 },
-    { url = "https://files.pythonhosted.org/packages/cc/13/3a751b077defe92201f94fa9c44d05958a0f501eb40723202caed7a4bc5b/pdf_oxide-0.3.36-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:5eab625bd39d636124274039fbf631240d0ef8d13a6c4d6c4c2bf3058b9034af", size = 4439924 },
-    { url = "https://files.pythonhosted.org/packages/0f/6e/c2fbce104db7b58c72e26da0c0b2c29a0c561de6cbc3673f387cb45e29a7/pdf_oxide-0.3.36-cp38-abi3-manylinux_2_34_aarch64.whl", hash = "sha256:68a0e92c3e65d6218225e4b69e68768565c962a98433288f2eeee0459302e7df", size = 4664859 },
-    { url = "https://files.pythonhosted.org/packages/d3/92/5cdb14ff51971927e7fcf40d783d7854c36188a265c910199b97a2fcf09f/pdf_oxide-0.3.36-cp38-abi3-manylinux_2_34_x86_64.whl", hash = "sha256:2cd41536dfb0c9c32909cad4f18461e101888add2f3ce2bfbe990f9972178af6", size = 4914138 },
-    { url = "https://files.pythonhosted.org/packages/db/d4/5e67fea0d6b229db69f8e6ac435dcd492e1297c37ead665d8026d397f321/pdf_oxide-0.3.36-cp38-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:26723716c0062956a672cf622371fef2821d2610a2acfe6abc846e16801cc46c", size = 4830956 },
-    { url = "https://files.pythonhosted.org/packages/9e/2c/993ca37bc3b512564bed0e5f409b11e42a5b964570236007cf0e25fbd8d2/pdf_oxide-0.3.36-cp38-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:c5da336731b6895cb86706d5d6cc7b9302cfc98aaa61d79053ce52ba0e580b3c", size = 5153625 },
-    { url = "https://files.pythonhosted.org/packages/27/62/db4de61713e735470e299e384180286d42e52edbb8e766246e3a7c7ac235/pdf_oxide-0.3.36-cp38-abi3-win_amd64.whl", hash = "sha256:005b2f8dff35fb3445af35c539c1658db6b40975e82086d5c25b9a134b591280", size = 4842612 },
-    { url = "https://files.pythonhosted.org/packages/9f/c8/3ee2a61753ff6c4fd23ccdba53f57891935158bb05db1fe42e5a5a437530/pdf_oxide-0.3.36-cp38-abi3-win_arm64.whl", hash = "sha256:1de39bfd611534d7a3f4dad20f71c6e540520d1228541ba5281a13fd73a32d65", size = 4515586 },
+    { url = "https://files.pythonhosted.org/packages/b0/c8/922b8a14eec1c022701011ee6fb16c6a157dff14abafd635f0f10d52490f/pdf_oxide-0.3.37-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:729aad1441f0d3ca9dffb5ca42979d831f34bd1279aa1631aaae987e9bfe8247", size = 4733899 },
+    { url = "https://files.pythonhosted.org/packages/1c/79/6455ebf77a00ad87b1857ff517a548fe06261a0e118d9ce8a0ed3a1e1820/pdf_oxide-0.3.37-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:76610232fd3b9ec1e6c0744324b44b2b8afd8baf584c6de796e1e219671de0e5", size = 4464562 },
+    { url = "https://files.pythonhosted.org/packages/bb/34/a2c6a23456c857c1069a8e45b104bdbd47c2164b531971f65481ee5a6661/pdf_oxide-0.3.37-cp38-abi3-manylinux_2_34_aarch64.whl", hash = "sha256:07a936e532aa01dab3ef463500256fbf4f436f38c2583576c6a907e3abf7bb96", size = 4691615 },
+    { url = "https://files.pythonhosted.org/packages/76/56/4ac0c2541af63414abb55481c0732836e6f48b871cdbdb6be5f4d43ef957/pdf_oxide-0.3.37-cp38-abi3-manylinux_2_34_x86_64.whl", hash = "sha256:58203703f27797fb233d3e815db03b465ed27a8ff320860eb15576b18ff1259b", size = 4935886 },
+    { url = "https://files.pythonhosted.org/packages/f5/55/0bb691be63fc05c9d57b155875fe776e67d453aaa2bf82ab0be0f7f725a8/pdf_oxide-0.3.37-cp38-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:5359dec34fdd2afced7aee11af5a40c547bb2e73225659dada1d3c3aad744a5e", size = 4860200 },
+    { url = "https://files.pythonhosted.org/packages/b9/ba/034545610855691f27cb3120f49f7ac11e8cfc8d7b7b7f516772ee03da29/pdf_oxide-0.3.37-cp38-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:a9239ac618aaa7771af4c51c9b6122d49a00e7f9b4f964ed9454247090c41ff8", size = 5189009 },
+    { url = "https://files.pythonhosted.org/packages/d2/94/547102991570d9e2aa9adf8235b7a53e947140302d6b30512e37572c07cc/pdf_oxide-0.3.37-cp38-abi3-win_amd64.whl", hash = "sha256:6b044fef5269d44a24d24830968740159ccf54a423a90e08d667a94ad2bff724", size = 4873637 },
+    { url = "https://files.pythonhosted.org/packages/aa/84/7c903c9702a6e3a2e2d29315d38d88da6636e705fc75567906f5ddc80616/pdf_oxide-0.3.37-cp38-abi3-win_arm64.whl", hash = "sha256:824b617595d2e14e0b9da8ad542315fd46c59218dee3b6857a2898db050a7adb", size = 4542715 },
 ]
 
 [[package]]

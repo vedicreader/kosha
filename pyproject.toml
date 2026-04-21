@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "karma"
+name = "kosha"
 dynamic = ["version"]
-description = "let your repo have karma. your repo and environment context"
+description = "kosha (कोश) — a treasury of your repo and environment context for coding agents. FTS5 + vector search + call graph, no LLMs required."
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
@@ -22,17 +22,17 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/vedicreader/karma"
-Documentation = "https://vedicreader.github.io/karma/"
+Repository = "https://github.com/vedicreader/kosha"
+Documentation = "https://vedicreader.github.io/kosha/"
 
 [project.entry-points.nbdev]
-karma = "karma._modidx:d"
+kosha = "kosha._modidx:d"
 
 [tool.hatch.version]
-path = "karma/__init__.py"
+path = "kosha/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-include = ["karma"]
+include = ["kosha"]
 
 [tool.nbdev]
 
