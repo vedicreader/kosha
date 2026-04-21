@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "karma"
+dynamic = ["version"]
+description = "let your repo have karma. your repo and environment context"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [{name = "Karthik", email = "karthik.rajgopal@hotmail.com"}]
+keywords = ['repo-context','nbdev','devtool','code graph','code search']
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+]
+dependencies = [
+    "litesearch>=0.0.22",
+    "pyan3>=2.4.3",
+    "watchfiles>=1.1.1",
+]
+
+[project.urls]
+Repository = "https://github.com/vedicreader/karma"
+Documentation = "https://vedicreader.github.io/karma/"
+
+[project.entry-points.nbdev]
+karma = "karma._modidx:d"
+
+[tool.hatch.version]
+path = "karma/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+include = ["karma"]
+
+[tool.nbdev]
+
+[dependency-groups]
+dev = [
+    "nbdev>=3.0.15",
+    "notebook>=7.5.5",
+]

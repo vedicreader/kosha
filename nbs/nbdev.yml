@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "karma"
+  site-url: "https://vedicreader.github.io/karma"
+  description: "let your repo have karma. your repo and environment context"
+  repo-branch: main
+  repo-url: "https://github.com/vedicreader/karma"
