@@ -205,8 +205,9 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, efn=embedder, ve
 	if ep and len(self.env_st(where=f'package={pkg!r}')) > 0: return print(f'package {ep} already loaded.') if verbose else None
 	pkg_par = Path(o.origin).parent.parent
 	mod_fn = lambda p, n: '.'.join(list(Path(p).relative_to(pkg_par).with_suffix('').parts)+[n])
-	meta_fn = lambda d: d['metadata'] | dict(mod_name=mod_fn(d['metadata']['path'],d['metadata']['name']))
-	fn = lambda d: dict(package=pkg, uploaded_at=d['metadata']['uploaded_at'], metadata=meta_fn(d))
+	_get = lambda o,k1,k2: o.get(k1,{}).get(k2,'')
+	meta_fn = lambda d: d['metadata'] | dict(mod_name=mod_fn(_get(d,'metadata','path'),_get(d,'metadata','name')))
+	fn = lambda d: dict(package=pkg, uploaded_at=_get(d,'metadata','uploaded_at'), metadata=meta_fn(d))
 	content, doc = pkg2chunks(pkg, exts=exts, **kwargs).map(lambda d: d | fn(d)), pkg_doc(pkg)
 	ex, cont_hash = _content(self.env_st, where=f'package={pkg!r}', f=_slug), {_slug(d['content']): d for d in content}
 	if del_ids:=set(ex).difference(cont_hash.keys()): self.env_st.delete_where(where='id in ("%s")'%'","'.join(del_ids))
@@ -218,7 +219,7 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, efn=embedder, ve
 		if rows: self.envdb.t.pkg_deps.insert_all(rows, replace=True)
 	if verbose: print(f'updated pkg: {pkg} with {len(ch)} new/changed chunks, {len(ex)-len(ch)} unchanged, '
 		      f'{len(ex)-len(cont_hash)} removed')
-	return self.pkgs.insert(dict(name=pkg, version=v(pkg), summary=doc['metadata']['summary']), ignore=True)
+	return self.pkgs.insert(dict(name=pkg, version=v(pkg), summary=_get(doc,'metadata','summary')), ignore=True)
 
 @patch
 def rm_pkg(self:Kosha, pkg:str, ver:str=None):
@@ -253,30 +254,31 @@ def update_repo(self:Kosha,
                 verbose=True, # verbose
 				**kwargs              # extra args forwarded to dir2files
 				):
-    'Index or update repo code chunks. Pass files= for incremental update (e.g. from watcher).'
-    dir = Path(dir or self.root)
-    if files is None:
-        known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path, uploaded_at') if r['path']}
-        all_files = dir2files(str(dir), strict_skip_file_re, strict_skip_folder_re,exts=exts, **kwargs)
-        to_remove = L(known.keys()).filter(lambda k: k not in all_files.map(str)).concat()
-        ch = L(all_files).filter(lambda f: str(f) not in known or known[str(f)] != f.stat().st_mtime)
-    else: ch,to_remove = L(files).map(Path).partition(lambda f: f.exists() and f.suffix in exts)
-    if to_remove: self.code_st.delete_where(where=f'path in ({",".join(to_remove.map(repr))})')
-    if not ch: return
-    if verbose: print(f'syncing files {ch} .....')
-    o = Path(str(ch[0])).parent
-    while has_init(o): o = o.parent
-    mod_fn = lambda p, n: '.'.join(list(Path(p).relative_to(o).with_suffix('').parts)+[n])
-    meta_fn = lambda d: d['metadata'] | dict(mod_name=mod_fn(d['metadata']['path'],d['metadata']['name']),dir=str(dir))
-    fn = lambda d: dict(path=str(d['metadata']['path']), uploaded_at=d['metadata']['uploaded_at'], metadata=meta_fn(d))
-    content = parallel(file_parse, ch, threadpool=True, progress=True).concat().map(lambda d: d | fn(d))
-    ex, cont_hash = _content(self.code_st, f=_slug), {_slug(d['content']): d for d in content}
-    self.process_repo(filter_keys(cont_hash, not_(in_(ex))).values(), embed, efn=efn)
-    for f in ch: self.codedb.q(f'update {self.code_st.name} set uploaded_at=? where path=?',[f.stat().st_mtime, str(f)])
-    own = Path(dir).resolve().name
-    rows = [dict(from_module=own, to_pkg=dep, n_files=n) for dep,n in count_imp(ch,own).items() if spec(dep)]
-    if rows: self.code_rd.insert_all(rows, replace=True)
-    if verbose: print('synced repo')
+	'Index or update repo code chunks. Pass files= for incremental update (e.g. from watcher).'
+	dir = Path(dir or self.root)
+	if files is None:
+		known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path, uploaded_at') if r['path']}
+		all_files = dir2files(str(dir), strict_skip_file_re, strict_skip_folder_re,exts=exts, **kwargs)
+		to_remove = L(known.keys()).filter(lambda k: k not in all_files.map(str)).concat()
+		ch = L(all_files).filter(lambda f: str(f) not in known or known[str(f)] != f.stat().st_mtime)
+	else: ch,to_remove = L(files).map(Path).partition(lambda f: f.exists() and f.suffix in exts)
+	if to_remove: self.code_st.delete_where(where=f'path in ({",".join(to_remove.map(repr))})')
+	if not ch: return
+	if verbose: print(f'syncing files {ch} .....')
+	o = Path(str(ch[0])).parent
+	while has_init(o): o = o.parent
+	mod_fn = lambda p, n: '.'.join(list(Path(p).relative_to(o).with_suffix('').parts)+[n])
+	_get = lambda m,k1,k2: m.get(k1,{}).get(k2,'')
+	meta_fn = lambda d: d['metadata'] | dict(mod_name=mod_fn(_get(d,'metadata','path'),_get(d,'metadata','name')))
+	fn = lambda d: dict(path=_get(d,'metadata','path'),uploaded_at=_get(d,'metadata','uploaded_at'),metadata=meta_fn(d))
+	content = parallel(file_parse, ch, threadpool=True, progress=True).concat().map(lambda d: d | fn(d))
+	ex, cont_hash = _content(self.code_st, f=_slug), {_slug(d['content']): d for d in content}
+	self.process_repo(filter_keys(cont_hash, not_(in_(ex))).values(), embed, efn=efn)
+	for f in ch: self.codedb.q(f'update {self.code_st.name} set uploaded_at=? where path=?',[f.stat().st_mtime, str(f)])
+	own = Path(dir).resolve().name
+	rows = [dict(from_module=own, to_pkg=dep, n_files=n) for dep,n in count_imp(ch,own).items() if spec(dep)]
+	if rows: self.code_rd.insert_all(rows, replace=True)
+	if verbose: print('synced repo')
 
 @patch
 def prune_old_versions(self:Kosha, pkg:str):
