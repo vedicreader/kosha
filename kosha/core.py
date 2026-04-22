@@ -226,7 +226,8 @@ def rm_pkg(self:Kosha, pkg:str, ver:str=None):
 	wh = f'package={pkg!r} AND version={ver!r}' if ver else f'package={pkg!r}'
 	for t in [self.env_st, self.pkgs]: t.delete(where=wh)
 	self.pkg_st.delete_where(where=f"json_extract(metadata,'$.name')={pkg!r}")
-	self.envdb.t.pkg_deps.delete(where=f'from_pkg={pkg!r}')
+	self.env_pd.delete_where(where=f'from_pkg={pkg!r}')
+	self.pkgs.delete_where(where=f'name={pkg!r}')
 
 @patch
 def process_repo(self:Kosha, content=None, reembed=False, **kwargs):
@@ -281,14 +282,15 @@ def update_repo(self:Kosha,
 def prune_old_versions(self:Kosha, pkg:str):
 	'Keep only the latest version of a package in the database.'
 	if len(vers := self.pkgs(select='version', where=f'name={pkg!r}')) <= 1: return
-	latest = sorted(vers, key=lambda v: tuple(map(int, v.split('.'))))[-1]
-	self.env_st.delete(where=f'package={pkg!r} AND version<>{latest!r}')
-	self.pkgs.delete(where=f'name={pkg!r} AND version<>{latest!r}')
+	latest = sorted(L(vers).attrgot('version'), key=lambda v: tuple(map(int, v.split('.'))))[-1]
+	je = lambda k, o='=', v='': f"json_extract(metadata, '$.{k}') {o} {v!r}"
+	self.env_st.delete_where(where=f"{je('name')}={pkg!r} AND {je('version')}<>{latest!r}")
+	self.pkgs.delete_where(where=f'name={pkg!r} AND version<>{latest!r}')
 
 @patch
 def prune_old_pkgs(self:Kosha):
 	'Keep only the latest version of each package in the database.'
-	for pkg in self.pkgs(select='name').map(lambda d:d['name']): self.prune_old_versions(pkg)
+	L(self.pkgs(select='name')).attrgot('name').map(self.prune_old_versions)
 
 @patch
 def pkgs_in_env(self:Kosha, pyproject=False) -> list:
