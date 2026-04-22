@@ -236,7 +236,7 @@ def process_repo(self:Kosha, content=None, reembed=False, **kwargs):
 	return process_content(self.code_st, content, **kwargs)
 
 @patch
-def update_pkgs(self:Kosha, pkgs:str|list, embed=True, exts=code_exts, efn=embedder, verbose=True, **kwargs):
+def update_pkgs(self:Kosha, pkgs:str|list=None, embed=True, exts=code_exts, efn=embedder, verbose=True, **kwargs):
 	pkgs = set(pkgs).intersection(env_pkg_versions(pyproject=False)) if pkgs else set(env_pkg_versions())
 	if verbose: print(f'loading pkgs {pkgs} ......')
 	kw = dict(embed=embed, exts=exts, efn=efn, verbose=verbose, **kwargs)
