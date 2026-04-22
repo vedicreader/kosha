@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.6
+async and pkg name fix
+
+
+
 ## 0.0.5
 pkgs and sync in sync
 
