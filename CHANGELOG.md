@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.4
+tqdm and prune pkgs
+
+
+
 ## 0.0.3
 doc fix 
 
