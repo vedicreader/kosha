@@ -150,3 +150,10 @@ checklink/cookies.txt
 
 # Quarto
 .quarto
+
+# kosha runtime databases
+.kosha/
+nbs/kosha/
+kosha/env.db
+kosha/env.db-shm
+kosha/env.db-wal
