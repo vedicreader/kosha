@@ -9,7 +9,7 @@ and performing context-aware searches."""
 # %% auto #0
 __all__ = ['cr_instr', 'model', 'strict_skip_folder_re', 'strict_skip_file_re', 'emb_doc', 'emb_query', 'parse', 'repo_root',
            'mv_skill_md', 'arun', 'pkg_trans_deps', 'env_pkg_versions', 'embedder', 'static_embedder', 'Kosha',
-           'pkg_doc', 'has_init', 'embed_chunk', 'process_content', 'count_imp', 'parseq', 'filt2wh']
+           'pkg_url', 'pkg_doc', 'has_init', 'embed_chunk', 'process_content', 'count_imp', 'parseq', 'filt2wh']
 
 # %% ../nbs/00_core.ipynb #69029d72f94a2fdc
 import ast, os, re
@@ -132,6 +132,18 @@ class Kosha:
 		self.env_pd.create(from_pkg=str, to_pkg=str, n_modules=int, if_not_exists=True, pk=['from_pkg','to_pkg'])
 		self.code_rd.create(from_module=str, to_pkg=str, n_files=int, if_not_exists=True, pk=['from_module','to_pkg'])
 
+# %% ../nbs/00_core.ipynb #pkg_url_a1b2c3d4
+def pkg_url(pkg: str) -> str | None:
+    "Return best web URL for pkg from importlib.metadata: Source Code > Repository > Home-page > first Project-URL."
+    m = meta(pkg)
+    urls = {}
+    for e in (m.get_all('Project-URL') or []):
+        label, _, u = e.partition(',')
+        urls[label.strip().lower()] = u.strip()
+    return (urls.get('source code') or urls.get('repository') or urls.get('source') or
+            urls.get('github') or m.get('Home-page') or next(iter(urls.values()), None))
+
+
 # %% ../nbs/00_core.ipynb #pkg_store_helpers_a1b2
 def pkg_doc(pkg) -> dict:
 	'Build pkg_store content dict: content=summary+readme, metadata=json.'
@@ -141,7 +153,8 @@ def pkg_doc(pkg) -> dict:
 	summary = _get('Summary')
 	cont = summary+'\n'+(m.get_payload() or _get('Description') or '')[:2000].strip()
 	return dict(content=cont,
-	            metadata=dict(name=pkg, version=v(pkg), keywords=_get('Keywords'), requires=reqs, summary=summary))
+	            metadata=dict(name=pkg, version=v(pkg), keywords=_get('Keywords'), requires=reqs, summary=summary, url=pkg_url(pkg)))
+
 
 # %% ../nbs/00_core.ipynb #5e6e5dace1c5fe8d
 def has_init(d: Path) -> bool:

@@ -130,6 +130,7 @@ Plural and comma-separated values work: `packages:fastcore,litesearch paths:basi
 | `k.short_path(a, b)` | Shortest call chain between two nodes |
 | `k.neighbors(node, depth=2)` | All nodes within N hops |
 | `k.graph.ranked(k=10, module='pkg')` | Top-k nodes by PageRank |
+| `k.public_api(module='pkg', min_callees=0)` | Public entry points (in_degree=0) with docstrings |
 | `k.gn(where='node like "%X%"')` | Direct graph_nodes table query |
 | `k.ge(where='caller like "%X%"')` | Direct graph_edges table query |
 
@@ -144,6 +145,7 @@ Plural and comma-separated values work: `packages:fastcore,litesearch paths:basi
 | `k.task_context(q, depth)` | Packages + dep stack |
 | `k.watch_repo()` | Live incremental re-index on file changes |
 | `k.nuke()` | Drop all databases |
+| `pkg_url(pkg)` | Best web URL for an installed package (from importlib.metadata) |
 
 ## Database locations
 

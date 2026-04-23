@@ -452,6 +452,28 @@ def short_paths(self:Kosha):
 	'Shortest paths helper: shortest paths between all pairs in top-k nodes.'
 	return self.graph.short_paths
 
+# %% ../nbs/01_graph.ipynb #public_api_f1e2d3
+def _row_docstring(k: Kosha, mod_name: str) -> str | None:
+    "Look up mod_name in code_st then env_st; parse docstring from stored content."
+    for st in (k.code_st, k.env_st):
+        rows = st(where=f"json_extract(metadata,'$.mod_name')={mod_name!r}", limit=1)
+        if rows:
+            try:
+                node = ast.parse(rows[0]['content']).body[0]
+                return ast.get_docstring(node)
+            except Exception: pass
+    return None
+
+@patch
+def public_api(self: Kosha, module: str = None, min_callees: int = 0, limit: int = 50) -> L:
+    'Public entry points: in_degree=0, no private prefix, with docstrings from code_st/env_st.'
+    where = f'in_degree=0 AND out_degree>={min_callees}'
+    kw = dict(where=where, limit=limit * 3)
+    if module: kw['where'] += f' AND node LIKE ?'; kw['where_args'] = [f'{module}.%']
+    rows = L(self.gn(**kw)).filter(lambda r: not r['node'].split('.')[-1].startswith('_'))[:limit]
+    return rows.map(lambda r: r | dict(docstring=_row_docstring(self, r['node'])))
+
+
 # %% ../nbs/01_graph.ipynb #6f57bfb4
 @patch
 def sync(self: Kosha, pkgs=None, dir=None, emb=embedder, verbose=True, in_parallel=False) -> 'Kosha':
@@ -475,7 +497,7 @@ def context(self: Kosha,
 			**kw                  # forwarded to env_context / repo_context
 ) -> L:
 	'Fan-out semantic search: parse filters, run repo + env searches, merge with chained RRF.'
-	def _tag(res, pref): return L(res).map(lambda r: r | dict(_src_id=f'{pref}:{r.get('rowid', id(r))}'))
+	def _tag(res, pref): return L(res).map(lambda r: r | dict(_src_id=f'{pref}:{r.get("rowid", id(r))}'))
 	items = []
 	if repo: items.append(('repo', bind(self.repo_context, q, limit=limit*2, columns=columns, **kw)))
 	if env: items.append(('env', bind(self.env_context, q, limit=limit*2, columns=columns,sys_wide=sys_wide, **kw)))
