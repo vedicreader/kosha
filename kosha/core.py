@@ -115,6 +115,19 @@ def static_embedder(emb_model='minishlab/potion-retrieval-32M'): return AutoEmbe
 emb_doc = lambda e:lambda t:e().encode_document(t) if isinstance(e(),FastEncode) else e().embed_batch(listify(t))
 emb_query = lambda e:lambda t:e().encode_query(t) if isinstance(e(),FastEncode) else e().embed_batch(listify(t))
 
+# %% ../nbs/00_core.ipynb #81c4d7ee76694c73
+def _load_ignore(root):
+	"Load .koshaignore; returns a spec with .match_file(path) or None if absent."
+	p = Path(root) / '.koshaignore'
+	if not p.exists(): return None
+	try:
+		import pathspec; return pathspec.PathSpec.from_lines('gitwildmatch', p.read_text().splitlines())
+	except ImportError:
+		import fnmatch
+		pats = [l.strip() for l in p.read_text().splitlines() if l.strip() and not l.startswith('#')]
+		return type('S',(),{'match_file':lambda _,path,ps=pats: any(fnmatch.fnmatch(Path(path).name,g) for g in ps)})()
+
+
 # %% ../nbs/00_core.ipynb #8511999ac2824a0b
 class Kosha:
 	'Kosha allows you to build a context for code generation based on your repo and environment.'
@@ -197,7 +210,7 @@ def count_imp(files, own:str='') -> Counter:
 
 @patch
 @fdelegates(pkg2chunks)
-def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, efn=embedder, verbose=True, **kwargs):
+def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, efn=embedder, verbose=True, force=False, **kwargs):
 	'Update package metadata in the packages table.'
 	assert (o:= spec(pkg)), f'pkg {pkg} is not in environment'
 	if verbose: print(f'updating pkg: {pkg} ...')
@@ -219,6 +232,8 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, efn=embedder, ve
 		if rows: self.envdb.t.pkg_deps.insert_all(rows, replace=True)
 	if verbose: print(f'updated pkg: {pkg} with {len(ch)} new/changed chunks, {len(ex)-len(ch)} unchanged, '
 		      f'{len(ex)-len(cont_hash)} removed')
+	after = len(self.env_st(select='id', where=f'package={pkg!r}'))
+	if after < len(ex)*0.8 and len(ex) > 0 and not force: raise ValueError(f'sync would drop {len(ex)-after} chunks; pass force=True')
 	return self.pkgs.insert(dict(name=pkg, version=v(pkg), summary=_get(doc,'metadata','summary')), ignore=True)
 
 @patch
@@ -252,13 +267,16 @@ def update_repo(self:Kosha,
                 exts:str=code_exts,
                 efn=embedder,       # embedding function to use for code snippets
                 verbose=True, # verbose
+                force:bool=False, # skip shrink guard if True
 				**kwargs              # extra args forwarded to dir2files
 				):
 	'Index or update repo code chunks. Pass files= for incremental update (e.g. from watcher).'
 	dir = Path(dir or self.root)
+	before = len(self.code_st(select='id'))
 	if files is None:
 		known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path, uploaded_at') if r['path']}
 		all_files = dir2files(str(dir), strict_skip_file_re, strict_skip_folder_re,exts=exts, **kwargs)
+		if (ign := _load_ignore(dir)): all_files = all_files.filter(lambda f: not ign.match_file(str(f)))
 		to_remove = L(known.keys()).filter(lambda k: k not in all_files.map(str)).concat()
 		ch = L(all_files).filter(lambda f: str(f) not in known or known[str(f)] != f.stat().st_mtime)
 	else: ch,to_remove = L(files).map(Path).partition(lambda f: f.exists() and f.suffix in exts)
@@ -278,6 +296,8 @@ def update_repo(self:Kosha,
 	own = Path(dir).resolve().name
 	rows = [dict(from_module=own, to_pkg=dep, n_files=n) for dep,n in count_imp(ch,own).items() if spec(dep)]
 	if rows: self.code_rd.insert_all(rows, replace=True)
+	after = len(self.code_st(select='id'))
+	if after < before*0.8 and before > 0 and not force: raise ValueError(f'sync would drop {before-after} chunks; pass force=True')
 	if verbose: print('synced repo')
 
 @patch

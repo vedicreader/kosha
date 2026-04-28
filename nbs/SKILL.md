@@ -166,3 +166,58 @@ cp .agents/skills/kosha/SKILL.md ~/.claude/skills/kosha/SKILL.md
 
 **Other harnesses**: place SKILL.md wherever the harness discovers agent skills
 (`.agents/skills/`, `.continue/skills/`, or configure path in harness settings).
+
+## Pattern 0 — Persistent kernel (recommended for repeated queries)
+
+Start once at session open — kosha, embedder, and graph stay loaded:
+```bash
+kosha sync --pkgs fasthtml,fastcore   # index once, ~30 s
+kosha serve                           # starts stdin/stdout kernel
+```
+
+Then send Python directly; the `k` object is already live:
+```python
+k.context("render a table package:fasthtml", limit=10)
+k.report()
+```
+
+The embedder loads once (~400 ms). Subsequent queries: ~5 ms.
+State persists across all tool calls until you close the kernel.
+
+## Pattern 4 — Structural report
+
+After syncing, generate KOSHA_REPORT.md (no LLM needed):
+```bash
+kosha report
+# or in-kernel:
+k.report()
+```
+
+Sections: load-bearing nodes · god nodes · deep callees · co-dispatch groups
+· entry points · cross-module dependency matrix · communities (if run)
+
+## CLI
+
+| Command | Purpose |
+|---------|---------|
+| `kosha sync [--pkgs a,b]` | Index repo + packages + graph |
+| `kosha search <query>` | Semantic + keyword search |
+| `kosha ni <node>` | Node info (callers, callees, pagerank) |
+| `kosha path <a> <b>` | Shortest call chain |
+| `kosha report` | Write KOSHA_REPORT.md |
+| `kosha serve` | Persistent stdin/stdout kernel |
+| `kosha install [--harness claude]` | Install SKILL.md globally |
+| `kosha ignore add <pattern>` | Add pattern to .koshaignore |
+
+## Harness installation (updated)
+
+**Via CLI** (recommended):
+```bash
+kosha install --harness claude   # global Claude Code
+kosha install --harness copilot  # project-local (.agents/skills/)
+```
+
+**Manual**:
+```python
+Kosha(install_skill=True)   # → .agents/skills/kosha/SKILL.md
+```

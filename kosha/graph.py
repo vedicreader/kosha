@@ -13,6 +13,8 @@ from fastcore.all import Path, L, patch, parallel_async, tuplify, first, fdelega
 from .core import arun, Kosha, embedder, parse, has_init, env_pkg_versions
 from pyan.analyzer import CallGraphVisitor
 from pyan.anutils import Scope, ExecuteInInnerScope
+from json import loads as jl
+
 
 # %% ../nbs/01_graph.ipynb #eb2b59dfd7c9a091
 try:
@@ -411,6 +413,55 @@ def sync(self: CodeGraph, dir=None, pkgs=None) -> 'CodeGraph':
 	self.sync_dir(dir) and self.sync_pkgs(pkgs)
 	return self
 
+# %% ../nbs/01_graph.ipynb #94e77134c3224ec4
+@patch
+def add_semantic_edges(self:CodeGraph, store, threshold:float=0.82, weight:float=0.5):
+	"Infer semantic edges from embedding similarity; inserts kind='inferred_semantic'."
+	try: import numpy as np
+	except ImportError: print('numpy required for add_semantic_edges'); return self
+	fn = lambda r: jl(r['metadata']) if isinstance(r.get('metadata'),str) else (r.get('metadata') or {})
+	data = L(store(select='metadata,embedding')).filter(lambda r: r.get('embedding'))
+	if not data: return self
+	metas = data.map(fn)
+	embs = np.array([np.frombuffer(r['embedding'],dtype='float32') for r in data])
+	norms = np.linalg.norm(embs, axis=1, keepdims=True); en = embs / np.where(norms, norms, 1)
+	nm2i = {m['mod_name']:i for i,m in enumerate(metas) if m.get('mod_name')}
+	gn = L(self.db.t.graph_nodes(select='node')).attrgot('node').filter(lambda n: n in nm2i)
+	rows = []
+	for nd in gn:
+		i = nm2i[nd]; sims = en @ en[i]; sims[i] = -1
+		for j in sims.argsort()[::-1][:5].tolist():
+			if sims[j] >= threshold and (nb := metas[j].get('mod_name')) and nb != nd:
+				rows.append({'caller':nd,'callee':nb,'kind':'inferred_semantic','confidence':round(float(sims[j])*weight,4)})
+	if rows: self.ge.insert_all(rows, ignore=True)
+	return self
+
+
+# %% ../nbs/01_graph.ipynb #953f8af4b2e0425a
+@patch
+def communities(self:CodeGraph, method:str='leiden') -> dict:
+	"Cluster nodes; upsert community_id into graph_nodes. Returns {node: community_id}."
+	try: import networkx as nx
+	except ImportError: print('networkx required for communities'); return {}
+	G = nx.DiGraph()
+	for r in self.db.t.graph_edges(select='caller,callee,confidence,kind'):
+		w = r['confidence'] * (0.5 if r['kind']=='inferred_semantic' else 1.0)
+		G.add_edge(r['caller'], r['callee'], weight=w)
+	if not G.nodes(): return {}
+	try:
+		import leidenalg, igraph as ig
+		g = ig.Graph.from_networkx(G)
+		part = leidenalg.find_partition(g, leidenalg.ModularityVertexPartition)
+		cmap = {g.vs[i]['_nx_name']:pid for pid,grp in enumerate(part) for i in grp}
+	except ImportError:
+		try: import community; cmap = community.best_partition(G.to_undirected())
+		except ImportError: print('python-louvain or leidenalg required for communities'); return {}
+	try: self.db.q("ALTER TABLE graph_nodes ADD COLUMN community INTEGER")
+	except Exception: pass  # column already exists
+	for nd, cid in cmap.items(): self.db.q("UPDATE graph_nodes SET community=? WHERE node=?", [cid, nd])
+	return cmap
+
+
 # %% ../nbs/01_graph.ipynb #27493762895c4be6
 @patch(as_prop=True)
 def graph(self: Kosha) -> CodeGraph:
@@ -472,6 +523,7 @@ def context(self: Kosha,
 			graph: bool = True,
             columns:str='content,metadata',
             sys_wide=True,
+            rerank:str='none',    # 'pagerank' to boost by structural centrality
 			**kw                  # forwarded to env_context / repo_context
 ) -> L:
 	'Fan-out semantic search: parse filters, run repo + env searches, merge with chained RRF.'
@@ -484,7 +536,11 @@ def context(self: Kosha,
 	rrf = bind(rrf_merge, limit=limit*2, id_key='_src_id')
 	res = L(L(results[1:]).reduce(lambda m,rs: rrf(m,rs), results[0]))
 	if not graph: return res[:limit]
-	return dict2obj(res.map(lambda r : r | self.ni(r['metadata']['mod_name'])))[:limit]
+	res = dict2obj(res.map(lambda r : r | self.ni(r['metadata']['mod_name'])))
+	if rerank == 'pagerank':
+		import math
+		res = L(sorted(res, key=lambda r: -(r.get('_rrf',0) * (1 + 0.3 * math.log1p(r.get('pagerank',0))))))
+	return res[:limit]
 
 # %% ../nbs/01_graph.ipynb #pkg_deps_task_context_c3d4
 @patch

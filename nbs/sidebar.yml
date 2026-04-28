@@ -4,3 +4,5 @@ website:
       - index.ipynb
       - 00_core.ipynb
       - 01_graph.ipynb
+      - 02_cli.ipynb
+      - 03_report.ipynb

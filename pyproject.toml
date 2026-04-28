@@ -20,7 +20,16 @@ dependencies = [
     "litesearch>=0.0.22",
     "pyan3>=2.4.3",
     "watchfiles>=1.1.1",
+    "networkx>=3.0",
 ]
+
+[project.optional-dependencies]
+community = ["python-louvain>=0.16"]
+ignore = ["pathspec>=0.12"]
+kernel = ["clikernel>=0.1"]
+
+[project.scripts]
+kosha = "kosha.cli:main"
 
 [project.urls]
 Repository = "https://github.com/vedicreader/kosha"
@@ -46,4 +55,6 @@ lib_path = "kosha"
 dev = [
     "nbdev>=3.0.15",
     "notebook>=7.5.5",
+    "python-louvain>=0.16",
+    "pathspec>=0.12",
 ]
