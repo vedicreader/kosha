@@ -152,6 +152,24 @@ def dyn_edges(src:str, module:str) -> list[dict]:
 	        sum(L(tree.body).filter(lambda n: isinstance(n,ast.Assign))
 	            .map(lambda n: _co_edges(n, module, top)), []))
 
+def _build_imap(sources=None, filenames=None, root=None):
+	'Build {module: {local_name: qualified_name}} for resolving None-namespace callee nodes.'
+	srcs = {}
+	if filenames:
+		fn = lambda p: '.'.join(Path(p).relative_to(root).with_suffix('').parts)
+		srcs = {fn(p): Path(p).read_text(errors='replace') for p in filenames}
+	else: srcs = sources or {}
+	res = {}
+	for mod, src in srcs.items():
+		try: tree = ast.parse(src)
+		except: continue
+		imp = {}
+		for n in ast.walk(tree):
+			if isinstance(n, ast.ImportFrom) and n.module:
+				for a in n.names: imp[a.asname or a.name] = f"{n.module}.{a.name}"
+		res[mod] = imp
+	return res
+
 def static_edges(sources:dict[str,str]=None, filenames:list[str]=None, root:str=None) -> tuple[list[dict], dict]:
 	"Static call edges via pyan3. Provide either filenames+root or sources dict."
 	assert bool(filenames) ^ bool(sources), 'Provide one of sources or filenames, but not both'
@@ -161,9 +179,18 @@ def static_edges(sources:dict[str,str]=None, filenames:list[str]=None, root:str=
 		if filenames: v=CallGraphVisitor(filenames, root=root)
 		else: v= CallGraphVisitor.from_sources(tuplify((s,m) for m,s in sources.items()))
 		v.postprocess()
-		return ([_e(f'{c.namespace}.{c.name}', f'{t.namespace}.{t.name}', 'static', 1.0)
+		imap = _build_imap(sources=sources, filenames=filenames, root=root)
+		def _callee(c, t):
+			if t.namespace and t.namespace != '*': return f'{t.namespace}.{t.name}'
+			if t.namespace is None:
+				parts = c.namespace.split('.')
+				for i in range(len(parts), 0, -1):
+					if (m := '.'.join(parts[:i])) in imap and t.name in imap[m]:
+						return imap[m][t.name]
+			return None
+		return ([_e(f'{c.namespace}.{c.name}', cl, 'static', 1.0)
 		         for c,ts in v.uses_edges.items() if c.namespace and c.namespace != '*'
-		         for t in ts if '^^^' not in (t.name or '')],
+		         for t in ts if '^^^' not in (t.name or '') and (cl := _callee(c,t))],
 		        {f"{n.namespace}.{n.name}":
 			         {'node':f"{n.namespace}.{n.name}",
 			          'flavor':str(n.flavor).split('.')[-1].lower(), 'file':n.filename or ''}
