@@ -22,6 +22,15 @@ Kosha(install_skill=True)   # writes .agents/skills/kosha/SKILL.md
 ```python
 k = Kosha()
 k.sync(pkgs=['fasthtml', 'fastcore'])  # repo code + packages + call graph
+# Or sync all pyproject.toml deps including transitive:
+k.sync(in_parallel=True, depth=2)
+```
+
+**Fast re-sync after package changes** (avoids re-embedding already-indexed rows):
+```python
+from kosha import env_pkg_versions
+k.update_pkgs(set(env_pkg_versions()), embed=False, force=True)  # update files, skip embedding
+k.process_env()                                                    # embed only new rows (embedding IS NULL)
 ```
 
 ## Orchestration patterns
@@ -58,27 +67,22 @@ for r in results:
 ```python
 from itertools import combinations
 
-# Step 1: identify relevant packages + dependency tree
-tc = k.task_context('your task description', depth=2)
-# tc['packages']   — ranked packages relevant to the query
-# tc['dep_layers'] — BFS dep layers ordered by coupling strength
-
-# Step 2: find key functions, enriched with graph data
+# Step 1: find key functions, enriched with graph data
 results = k.context('your task description', limit=20, graph=True)
 
-# Step 3: map call chains between the top results
+# Step 2: map call chains between the top results
 nodes = [r['metadata']['mod_name'] for r in results[:8]]
 paths = [p for a, b in combinations(nodes, 2) if (p := k.short_path(a, b))]
 paths.sort(key=len)   # shortest = tightest coupling
 
-# Step 4: drill into join points
+# Step 3: drill into join points
 for node in nodes[:5]:
     info = k.ni(node)
     # info['callers']       — who calls this → where to hook in upstream
     # info['callees']       — what it calls → what you can reuse downstream
     # info['co_dispatched'] — registered peers → pattern to follow for new routes/handlers
 
-# Step 5: write a plan grounded in mod_name + lineno
+# Step 4: write a plan grounded in mod_name + lineno
 for r in results[:5]:
     m = r['metadata']
     print(f"{m['mod_name']}  line {m.get('lineno', '?')}  pagerank={r.get('pagerank', 0):.5f}")
@@ -122,6 +126,11 @@ for r in results[:5]:
 
 Plural and comma-separated values work: `packages:fastcore,litesearch paths:basics,core`
 
+`env_context` also **auto-detects package names** from plain query tokens — words in the query that
+match installed package names are automatically added as package filters. So
+`k.context('payments page monsterui fasthtml', repo=False)` restricts to monsterui and fasthtml
+results when those packages are installed, and returns nothing if they are not.
+
 ## Graph API
 
 | Call | Returns |
@@ -130,7 +139,10 @@ Plural and comma-separated values work: `packages:fastcore,litesearch paths:basi
 | `k.short_path(a, b)` | Shortest call chain between two nodes |
 | `k.neighbors(node, depth=2)` | All nodes within N hops |
 | `k.graph.ranked(k=10, module='pkg')` | Top-k nodes by PageRank |
-| `k.public_api(module='pkg', min_callees=0)` | Public entry points (in_degree=0) with docstrings |
+| `k.public_api(pkg)` | Public API entries for pkg (respects `__all__` + `@patch` methods) |
+| `k.public_api('pkg.module')` | Public API scoped to a submodule |
+| `k.api_call_paths(from_pkg, to_pkg, k=15)` | Dict `{to_node: path}` of shortest call paths from `from_pkg` public API to `to_pkg` public API |
+| `k.top_nodes(pkg, k=5)` | Top-k public API nodes for pkg ranked by PageRank |
 | `k.gn(where='node like "%X%"')` | Direct graph_nodes table query |
 | `k.ge(where='caller like "%X%"')` | Direct graph_edges table query |
 
@@ -138,11 +150,15 @@ Plural and comma-separated values work: `packages:fastcore,litesearch paths:basi
 
 | Method | Purpose |
 |--------|---------|
-| `k.sync(pkgs, dir)` | One-shot sync: repo + packages + graph |
+| `k.sync(pkgs, dir, in_parallel)` | One-shot sync: repo + packages + graph; `in_parallel=True` for concurrent sync |
 | `k.context(q, limit, graph)` | Fan-out search, graph-enriched |
 | `k.repo_context(q, limit)` | Repo only |
-| `k.env_context(q, limit)` | Packages only |
-| `k.task_context(q, depth)` | Packages + dep stack |
+| `k.env_context(q, limit)` | Packages only; auto-detects package names in query tokens |
+| `k.dep_stack(seeds, depth)` | BFS over pkg_deps from seed packages, ordered by coupling strength |
+| `k.update_pkgs(pkgs, embed, force)` | Re-sync package files; `embed=False` skips embedding (fast metadata-only update) |
+| `k.process_env()` | Embed only env rows with `embedding IS NULL` |
+| `env_pkg_versions(pyproject, depth)` | Dict `{pkg: version}` for installed packages; traverses transitive deps if `depth > 0` |
+| `pkg_trans_deps(seeds, depth)` | BFS over importlib.metadata requires; returns seeds + all transitive deps |
 | `k.watch_repo()` | Live incremental re-index on file changes |
 | `k.nuke()` | Drop all databases |
 | `pkg_url(pkg)` | Best web URL for an installed package (from importlib.metadata) |

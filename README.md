@@ -163,21 +163,44 @@ k.gn(where='node like "%stripe%"')    # graph_nodes
 k.ge(where='caller like "%route%"')   # graph_edges
 ```
 
-## Composing a plan — the full workflow
+## API discovery
 
-The highest-value pattern strings `task_context` → `context` →
-`short_path` → `ni` together. Each step narrows the search space and
-adds structural evidence before you write a line of code.
+Two functions for quickly surfacing what a package exposes.
 
-**Step 1** — discover the landscape
+**`pkg_url(pkg)`** — returns the best web URL for an installed package
+from its metadata (Source Code \> Repository \> Home-page). Useful when
+you need to fetch docs or browse source.
+
+**`k.public_api(module, min_callees, limit)`** — queries the code graph
+for public entry points: functions with `in_degree=0` (nothing in the
+indexed code calls them externally) and no underscore prefix. Returns
+each node’s name, graph metrics, and docstring pulled from the indexed
+content.
 
 ``` python
-tc = k.task_context('add webhook verification to the payments flow', depth=2)
-# tc['packages']   → which packages are involved
-# tc['dep_layers'] → what each package pulls in; use to decide what to pass to sync()
+from kosha import pkg_url
+
+# Package web URL — useful for WebFetch or browsing docs
+pkg_url('fastcore')   # → 'https://github.com/fastai/fastcore'
+pkg_url('httpx')      # → 'https://github.com/encode/httpx'
+
+# Public API surface from the call graph
+# Returns functions with in_degree=0 (no internal callers) + their docstrings
+api = k.public_api(module='fastcore', min_callees=1, limit=20)
+for fn in api:
+    print(fn['node'], '|', fn.get('docstring', '')[:60])
+
+# Without module filter — all public entry points across everything indexed
+all_entry_points = k.public_api(min_callees=0)
 ```
 
-**Step 2** — find the key functions (graph-enriched)
+## Composing a plan — the full workflow
+
+The highest-value pattern strings `context` → `short_path` → `ni`
+together. Each step narrows the search space and adds structural
+evidence before you write a line of code.
+
+**Step 1** — find the key functions (graph-enriched)
 
 ``` python
 results = k.context('webhook signature verification payments', limit=20, graph=True)
@@ -185,7 +208,7 @@ results = k.context('webhook signature verification payments', limit=20, graph=T
 key = sorted(results, key=lambda r: -r.get('pagerank', 0))
 ```
 
-**Step 3** — map the call chains
+**Step 2** — map the call chains
 
 ``` python
 from itertools import combinations
@@ -194,7 +217,7 @@ paths = [p for a, b in combinations(nodes, 2) if (p := k.short_path(a, b))]
 paths.sort(key=len)   # shortest = tightest coupling between your key nodes
 ```
 
-**Step 4** — drill into the join points
+**Step 3** — drill into the join points
 
 ``` python
 for node in nodes[:5]:
@@ -204,7 +227,7 @@ for node in nodes[:5]:
     # co_dispatched → pattern to follow when adding a new handler alongside existing ones
 ```
 
-**Step 5** — write your plan, grounded in `mod_name:lineno`
+**Step 4** — write your plan, grounded in `mod_name:lineno`
 
 ``` python
 for r in key[:5]:
