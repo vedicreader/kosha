@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.7
+public_api, cross pkg api pathsand moreapi_paths
+
+
+
 ## 0.0.6
 async and pkg name fix
 
