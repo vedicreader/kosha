@@ -169,6 +169,36 @@ results when those packages are installed, and returns nothing if they are not.
 - `.kosha/graph.db` — call graph (project-local)
 - `$XDG_DATA_HOME/kosha/env.db` — installed packages (global, shared across repos)
 
+## CLI
+
+Shell access to all kosha functionality. Default output is markdown; `--as_json` for JSON piping.
+
+```bash
+kosha sync                                      # index repo + env + call graph
+kosha context "embed a query" --limit 10        # fan-out search
+kosha context "embed a query" --as_json         # JSON output for piping
+kosha repo-context "parse filters"              # repo only
+kosha env-context "fastcore store_attr"         # packages only
+kosha ni "kosha.core.Kosha"                     # node info: callers, callees, pagerank
+kosha public-api fastcore                       # public API for a package
+kosha api-paths kosha litesearch --k 10         # call paths between packages
+kosha dep-stack --seeds kosha --depth 2         # BFS dependency layers
+kosha top-nodes fastcore --k 5                  # top PageRank nodes
+kosha watch                                     # live re-index (blocking)
+```
+
+## pyskills
+
+kosha registers as a [pyskill](https://github.com/AnswerDotAI/pyskills) for Python-native LLM hosts (e.g. solveit):
+
+```python
+from pyskills.core import list_pyskills, doc
+list_pyskills()        # discovers 'kosha.skill' without importing it
+import kosha.skill
+doc(kosha.skill)       # full API overview
+doc(kosha.skill.Kosha) # class detail with all method signatures
+```
+
 ## Harness installation
 
 **Project-local** (auto-discovered by most harnesses, commit alongside code):

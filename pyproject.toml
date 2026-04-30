@@ -19,6 +19,7 @@ dependencies = [
     "fastprogress>=1.1.5",
     "litesearch>=0.0.22",
     "pyan3>=2.4.3",
+    "pyskills>=0.0.4",
     "watchfiles>=1.1.1",
 ]
 
@@ -28,6 +29,12 @@ Documentation = "https://vedicreader.github.io/kosha/"
 
 [project.entry-points.nbdev]
 kosha = "kosha._modidx:d"
+
+[project.entry-points.pyskills]
+kosha = "kosha.skill"
+
+[project.scripts]
+kosha = "kosha.cli:main"
 
 [tool.hatch.version]
 path = "kosha/__init__.py"

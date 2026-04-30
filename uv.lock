@@ -1402,12 +1402,13 @@ wheels = [
 
 [[package]]
 name = "koshas"
-version = "0.0.6"
+version = "0.0.7"
 source = { editable = "." }
 dependencies = [
     { name = "fastprogress" },
     { name = "litesearch" },
     { name = "pyan3" },
+    { name = "pyskills" },
     { name = "watchfiles" },
 ]
 
@@ -1422,6 +1423,7 @@ requires-dist = [
     { name = "fastprogress", specifier = ">=1.1.5" },
     { name = "litesearch", specifier = ">=0.0.22" },
     { name = "pyan3", specifier = ">=2.4.3" },
+    { name = "pyskills", specifier = ">=0.0.4" },
     { name = "watchfiles", specifier = ">=1.1.1" },
 ]
 
@@ -2544,6 +2546,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e7/82/28175b2414effca1cdac8dc99f76d660e7a4fb0ceefa4b4ab8f5f6742925/pyproject_hooks-1.2.0.tar.gz", hash = "sha256:1e859bd5c40fae9448642dd871adf459e5e2084186e8d2c2a79a824c970da1f8", size = 19228 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bd/24/12818598c362d7f300f18e74db45963dbcb85150324092410c8b49405e42/pyproject_hooks-1.2.0-py3-none-any.whl", hash = "sha256:9e5c6bfa8dcc30091c74b0cf803c81fdd29d94f01992a7707bc97babb1141913", size = 10216 },
+]
+
+[[package]]
+name = "pyskills"
+version = "0.0.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "fastcore" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c5/d6/c4b5492fc6d68995836e3fe38965c6a1fd1c6e73ae2e98ad5ce7078b263d/pyskills-0.0.6.tar.gz", hash = "sha256:edd6790dea554a4c768e4ee8827c23003163877a76b2a1a5a7235b84e81af443", size = 22846 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/2d/1c26173b92b5dcf951cc4d8b7b8eac64bd27c1a1cd3ead9127a4f64d812c/pyskills-0.0.6-py3-none-any.whl", hash = "sha256:5fde4ba0be0e0d39350c107b81c168437456c2d96bcfb4d7caf68db022812ae7", size = 21869 },
 ]
 
 [[package]]

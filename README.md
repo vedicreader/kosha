@@ -264,3 +264,71 @@ Place `SKILL.md` wherever the harness discovers agent skills. Common
 locations: - `.agents/skills/kosha/SKILL.md` — general convention -
 `.continue/skills/kosha/SKILL.md` — Continue.dev - Configure in harness
 settings if the path differs
+
+## CLI
+
+kosha ships a `kosha` command for shell-based harnesses (GitHub Copilot,
+Claude Code hooks, scripts). Default output is readable markdown; add
+`--as_json` for JSON piping.
+
+``` bash
+# Sync repo + all pyproject.toml deps into .kosha/ databases
+kosha sync
+
+# Fan-out search (repo + env + graph enrichment)
+kosha context "embed a query" --limit 10
+kosha context "embed a query" --limit 5 --as_json | jq '.[].metadata.mod_name'
+
+# Repo-only / env-only
+kosha repo-context "parse filters"
+kosha env-context "fastcore store_attr"
+
+# Node info — callers, callees, co_dispatched, pagerank
+kosha ni "kosha.core.Kosha"
+kosha ni "fastcore.basics.merge" --as_json
+
+# Package public API (respects __all__ + @patch methods)
+kosha public-api fastcore
+kosha public-api kosha.graph
+
+# Shortest call-graph paths between two packages
+kosha api-paths kosha litesearch --k 10
+
+# BFS dependency layers ordered by coupling strength
+kosha dep-stack --seeds kosha --depth 2
+
+# Top PageRank nodes in a package's public API
+kosha top-nodes fastcore --k 5
+
+# Live incremental re-index (blocking, Ctrl-C to stop)
+kosha watch
+```
+
+## pyskills integration
+
+kosha registers itself as a
+[pyskill](https://github.com/AnswerDotAI/pyskills) — a Python-native
+plugin that LLM hosts (e.g. solveit) can discover and load without
+importing upfront.
+
+``` python
+from pyskills.core import list_pyskills, doc
+
+# Discovery — no import needed
+list_pyskills()   # → {'kosha.skill': 'kosha — FTS5 + vector search...', ...}
+
+# Load and inspect
+import kosha.skill
+doc(kosha.skill)          # module overview: Kosha class + all allowed methods
+doc(kosha.skill.Kosha)    # class detail: __init__, all public methods with signatures
+
+# Use normally
+from kosha.skill import Kosha
+k = Kosha()
+k.sync()
+k.context("how does routing work")
+```
+
+The `allow({Kosha: ...})` declaration in `kosha.skill` tells pyskills
+hosts which methods are safe to call in sandboxed environments — all
+public methods are permitted.
