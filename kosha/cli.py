@@ -248,7 +248,6 @@ def find_similar_cli(
     if as_json: print(json.dumps(_to_json(results)))
     else: _print_results(results)
 
-
 # %% ../nbs/03_cli.ipynb #cell-surprising
 @call_parse
 def surprising(

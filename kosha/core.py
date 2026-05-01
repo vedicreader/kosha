@@ -358,7 +358,7 @@ def update_repo(self:Kosha,
 	ex = L() if force else _content(self.code_st, where=f'path IN ({pl})', f=_slug)
 	cont_hash = {_slug(d['content']): d for d in content}
 	if dids := set(ex).difference(cont_hash.keys()): self.code_st.delete_where(where='id in ("%s")' % '","'.join(dids))
-	self.process_repo(filter_keys(cont_hash, not_(in_(ex))).values(), embed, efn=efn)
+	self.process_repo(filter_keys(cont_hash, not_(in_(ex))).values(), embed=embed, efn=efn)
 	for f in ch: self.codedb.q(f'update {self.code_st.name} set uploaded_at=? where path=?',[f.stat().st_mtime, str(f)])
 	own = Path(dir).resolve().name
 	rows = [dict(from_module=own, to_pkg=dep, n_files=n) for dep,n in count_imp(ch,own).items() if spec(dep)]
@@ -516,7 +516,6 @@ def find_similar(self: Kosha,
     emb = row['embedding']
     fn = lambda r: r | dict(metadata=jl(r['metadata'])) if isinstance(r.get('metadata'), str) else r
     results = []
-    if repo: results += list(self.codedb.search('', emb, ['content','metadata'], limit=k+2))
-    if env:  results += list(self.envdb.search('', emb, ['content','metadata'], limit=k+2))
+    if repo: results += list(self.codedb.t.store.vec_search(emb, columns=['content','metadata'], limit=k+2))
+    if env:  results += list(self.envdb.t.store.vec_search(emb, columns=['content','metadata'], limit=k+2))
     return L(results).map(fn).filter(lambda r: r.get('metadata',{}).get('mod_name') != node)[:k]
-

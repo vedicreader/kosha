@@ -633,8 +633,8 @@ def graph_diff(self: Kosha, snapshot_path: str = None) -> dict:
     'Delta since last snapshot: new/removed nodes+edges, top PageRank shifts. Call after sync().'
     import json as _json
     sp = Path(snapshot_path or (Path(self.root) / '.kosha' / 'graph_snapshot.json'))
-    cur_nodes = {r['node']: r['pagerank'] for r in self.graph.gn.all()}
-    cur_edges = {(r['caller'], r['callee'], r['kind']) for r in self.graph.ge.all()}
+    cur_nodes = {r['node']: r['pagerank'] for r in self.graph.gn()}
+    cur_edges = {(r['caller'], r['callee'], r['kind']) for r in self.graph.ge()}
     if not sp.exists():
         sp.write_text(_json.dumps({'nodes': cur_nodes, 'edges': [list(e) for e in cur_edges]}))
         return dict(new_nodes=[], removed_nodes=[], new_edges=[], removed_edges=[], pagerank_shifts=[])
@@ -652,13 +652,12 @@ def graph_diff(self: Kosha, snapshot_path: str = None) -> dict:
     return dict(new_nodes=new_nodes, removed_nodes=removed_nodes,
                 new_edges=new_edges, removed_edges=removed_edges, pagerank_shifts=shifts[:20])
 
-
 # %% ../nbs/01_graph.ipynb #surprising-conn-c3d4
 @patch
 def surprising_connections(self: Kosha, top_n: int = 10, use_embeddings: bool = True) -> L:
     'Unexpected cross-module call relationships ranked by structural + embedding-distance surprise.'
     import numpy as np
-    nodes = {r['node']: r for r in self.graph.gn.all()}
+    nodes = {r['node']: r for r in self.graph.gn()}
 
     def _emb(name):
         je = f"json_extract(metadata,'$.mod_name')={name!r}"
@@ -672,7 +671,7 @@ def surprising_connections(self: Kosha, top_n: int = 10, use_embeddings: bool = 
         return float(1 - np.dot(a, b) / n) if n > 0 else 1.0
 
     cross_edges = [(e['caller'], e['callee'], e['kind'], e['confidence'])
-                   for e in self.graph.ge.all()
+                   for e in self.graph.ge()
                    if e['caller'].split('.')[0] != e['callee'].split('.')[0]
                    or e['confidence'] < 0.9]
     involved = {n for e in cross_edges for n in (e[0], e[1])}
@@ -690,4 +689,3 @@ def surprising_connections(self: Kosha, top_n: int = 10, use_embeddings: bool = 
                                    surprise_score=round(score, 3))))
     scored.sort(key=lambda x: x[0], reverse=True)
     return L(s[1] for s in scored[:top_n])
-
