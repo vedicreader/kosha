@@ -499,3 +499,24 @@ def pkg_context(self:Kosha,
 	emb = emb_query(efn)(q).tobytes()
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if isinstance(r.get('metadata'), str) else r
 	return L(self.envdb.search(q, emb, columns=['content','metadata'], table_name='pkg_store', limit=limit)).map(fn)
+
+# %% ../nbs/00_core.ipynb #find-similar-e5f6
+@patch
+def find_similar(self: Kosha,
+                 node: str,        # fully-qualified node name e.g. 'fastcore.basics.merge'
+                 k: int = 10,      # number of similar nodes to return
+                 repo: bool = True,
+                 env: bool = True
+                 ) -> L:
+    'Embedding-space semantic neighbors: code doing similar things without a call-graph edge.'
+    je = lambda v: f"json_extract(metadata,'$.mod_name')={v!r}"
+    row = (first(self.code_st(select='embedding', where=je(node))) or
+           first(self.env_st(select='embedding', where=je(node))))
+    if not row or not row.get('embedding'): return L()
+    emb = row['embedding']
+    fn = lambda r: r | dict(metadata=jl(r['metadata'])) if isinstance(r.get('metadata'), str) else r
+    results = []
+    if repo: results += list(self.codedb.search('', emb, ['content','metadata'], limit=k+2))
+    if env:  results += list(self.envdb.search('', emb, ['content','metadata'], limit=k+2))
+    return L(results).map(fn).filter(lambda r: r.get('metadata',{}).get('mod_name') != node)[:k]
+

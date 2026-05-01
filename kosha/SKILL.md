@@ -92,6 +92,34 @@ for r in results[:5]:
 > groups, plugin registrations, handler tables). Tells you where to add a new handler without
 > reading all the glue code.
 
+### Pattern 4 — Onboard an unfamiliar codebase (first session)
+*New repo, new package, or starting fresh after a long break.*
+
+```python
+k = Kosha(); k.sync()
+
+# 1. Find the most structurally load-bearing nodes
+hubs = k.top_nodes('mypackage', k=5)
+for node in hubs:
+    info = k.ni(node)
+    print(node, '| callers:', list(info['callers'])[:3])
+
+# 2. Discover hidden coupling — the architectural gotchas
+for s in k.surprising_connections(top_n=5):
+    print(s['caller'], '→', s['callee'],
+          f"kind={s['kind']} surprise={s['surprise_score']} emb_dist={s['embedding_distance']}")
+
+# 3. What changed since last session?
+d = k.graph_diff()
+if d['new_nodes']: print('New entry points:', d['new_nodes'][:5])
+
+# 4. Find semantic peers for a key function (cross-package, embedding-space)
+peers = k.find_similar('mypackage.core.process', k=5)
+# → surfaces analogous patterns in fastcore, litesearch, etc. that graphify can't find
+for p in peers:
+    print(p['metadata'].get('mod_name'), p['content'][:80])
+```
+
 ## What a graph-enriched result looks like
 
 ```python
@@ -146,6 +174,17 @@ results when those packages are installed, and returns nothing if they are not.
 | `k.gn(where='node like "%X%"')` | Direct graph_nodes table query |
 | `k.ge(where='caller like "%X%"')` | Direct graph_edges table query |
 
+## Analytical methods (graphify-inspired + embedding-enhanced)
+
+| Call | Returns |
+|------|---------|
+| `k.graph_diff()` | Delta since last sync: new/removed nodes+edges, PageRank shifts |
+| `k.find_similar(node, k=10)` | k most embedding-similar nodes — semantic peers with no call-graph edge required |
+| `k.surprising_connections(top_n=10)` | Cross-module edges ranked by structural + semantic (embedding distance) surprise |
+
+`find_similar` is kosha's unique advantage: because every chunk has a CodeRankEmbed vector, it surfaces
+parallel implementations and analogous patterns across packages that graphify (AST-only) cannot find.
+
 ## Full API
 
 | Method | Purpose |
@@ -185,6 +224,39 @@ kosha api-paths kosha litesearch --k 10         # call paths between packages
 kosha dep-stack --seeds kosha --depth 2         # BFS dependency layers
 kosha top-nodes fastcore --k 5                  # top PageRank nodes
 kosha watch                                     # live re-index (blocking)
+kosha diff                                      # show graph delta since last sync
+kosha find-similar fastcore.basics.merge --k 5 # semantic peers (embedding-space neighbors)
+kosha surprising --top_n 10                     # surprising cross-module connections
+kosha daemon                                    # persistent kernel (see Daemon mode below)
+```
+
+## Daemon mode (recommended for harnesses)
+
+Avoids the ~3-5s embedding model cold-start on every CLI call. Start once per session; all
+subsequent `kosha` calls route through the warm process.
+
+```bash
+kosha daemon   # blocks; reads newline-delimited JSON from stdin, writes to stdout
+```
+
+Protocol:
+```
+→ stdin:  {"cmd":"context","args":{"query":"your task","limit":15,"graph":true}}
+← stdout: {"ok":true,"result":[...]}
+
+→ stdin:  {"cmd":"graph_diff","args":{}}
+← stdout: {"ok":true,"result":{"new_nodes":[...],"removed_nodes":[...],"pagerank_shifts":[...]}}
+
+→ stdin:  {"cmd":"find_similar","args":{"node":"fastcore.basics.merge","k":5}}
+← stdout: {"ok":true,"result":[...]}
+```
+
+Available daemon commands: `sync`, `context`, `repo_context`, `env_context`, `ni`,
+`graph_diff`, `find_similar`, `surprising`, `top_nodes`, `public_api`, `api_call_paths`.
+
+**Claude Code — session-start hook** (warm daemon for all kosha calls in a session):
+```json
+{ "hooks": { "SessionStart": [{ "command": "kosha daemon &" }] } }
 ```
 
 ## pyskills

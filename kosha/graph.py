@@ -528,11 +528,14 @@ def public_api(self: Kosha,
 	patch_ = self.ge(select='callee',where="kind='patch' AND caller LIKE ?",where_args=[f'{pkg}.%'])
 	wh, kw = je('public_api',v='1'), dict(where_args=None)
 	if patch_:
-		wh += f" OR %s"%je('mod_name','in',f'({','.join('?'*len(patch_))})')
+		_ph = '(%s)' % ','.join('?' * len(patch_))
+		wh += ' OR ' + je('mod_name','in',_ph)
 		kw = dict(where_args=L(patch_).attrgot('callee'))
+	_dir_cond = je('dir','like',repr(pkg_))
 	er = self.env_st(where=f"package={pkg_!r} AND ({wh})",limit=limit,**kw)
-	rr = self.code_st(where=f'{je('dir','like',f'{pkg_!r}')} AND {wh}',limit=limit,**kw)
+	rr = self.code_st(where=f'{_dir_cond} AND {wh}',limit=limit,**kw)
 	return L(er+rr).map(fn).map(lambda r: {m: _get(r,m) for m in meta_cols.split(',')})[:limit]
+
 
 # %% ../nbs/01_graph.ipynb #6f57bfb4
 @patch
@@ -593,7 +596,8 @@ def dep_stack(self:Kosha, seeds:list=None, depth:int=1, no_sys_pkg=True, allow:l
 	fn=lambda p: p['tgt'] not in seen and (not no_sys_pkg or is_sys_pkg(p['tgt'])) and (not allow or p['tgt'] in allow)
 	for _ in range(depth):
 		if not frontier: break
-		kw = dict(where=f'from_pkg IN ({','.join('?'*len(frontier))})', where_args=list(frontier))
+		_pl = ','.join('?'*len(frontier))
+		kw = dict(where=f'from_pkg IN ({_pl})', where_args=list(frontier))
 		nxt = set(L(self.env_pd(select='to_pkg tgt,n_modules n',**kw)).filter(fn).attrgot('tgt'))
 		if not nxt: break
 		layers+=[nxt]
@@ -621,3 +625,69 @@ def api_call_paths(self:Kosha,
 	paths = {}
 	for fp in f: paths = paths | self.graph._bfs(fp, set(a))
 	return filter_keys(paths, in_(a))
+
+
+# %% ../nbs/01_graph.ipynb #graph-diff-a1b2
+@patch
+def graph_diff(self: Kosha, snapshot_path: str = None) -> dict:
+    'Delta since last snapshot: new/removed nodes+edges, top PageRank shifts. Call after sync().'
+    import json as _json
+    sp = Path(snapshot_path or (Path(self.root) / '.kosha' / 'graph_snapshot.json'))
+    cur_nodes = {r['node']: r['pagerank'] for r in self.graph.gn.all()}
+    cur_edges = {(r['caller'], r['callee'], r['kind']) for r in self.graph.ge.all()}
+    if not sp.exists():
+        sp.write_text(_json.dumps({'nodes': cur_nodes, 'edges': [list(e) for e in cur_edges]}))
+        return dict(new_nodes=[], removed_nodes=[], new_edges=[], removed_edges=[], pagerank_shifts=[])
+    prev = _json.loads(sp.read_text())
+    prev_nodes, prev_edges = prev['nodes'], {tuple(e) for e in prev['edges']}
+    new_nodes     = [n for n in cur_nodes  if n not in prev_nodes]
+    removed_nodes = [n for n in prev_nodes if n not in cur_nodes]
+    new_edges     = [list(e) for e in cur_edges  if e not in prev_edges]
+    removed_edges = [list(e) for e in prev_edges if e not in cur_edges]
+    shifts = sorted(
+        [(n, prev_nodes[n], cur_nodes[n]) for n in cur_nodes
+         if n in prev_nodes and abs(cur_nodes[n] - prev_nodes[n]) > 1e-5],
+        key=lambda x: abs(x[2]-x[1]), reverse=True)
+    sp.write_text(_json.dumps({'nodes': cur_nodes, 'edges': [list(e) for e in cur_edges]}))
+    return dict(new_nodes=new_nodes, removed_nodes=removed_nodes,
+                new_edges=new_edges, removed_edges=removed_edges, pagerank_shifts=shifts[:20])
+
+
+# %% ../nbs/01_graph.ipynb #surprising-conn-c3d4
+@patch
+def surprising_connections(self: Kosha, top_n: int = 10, use_embeddings: bool = True) -> L:
+    'Unexpected cross-module call relationships ranked by structural + embedding-distance surprise.'
+    import numpy as np
+    nodes = {r['node']: r for r in self.graph.gn.all()}
+
+    def _emb(name):
+        je = f"json_extract(metadata,'$.mod_name')={name!r}"
+        r = (first(self.code_st(select='embedding', where=je)) or
+             first(self.env_st(select='embedding', where=je)))
+        if r and r.get('embedding'): return np.frombuffer(r['embedding'], dtype=np.float32)
+
+    def _cos_dist(a, b):
+        if a is None or b is None: return None
+        n = np.linalg.norm(a) * np.linalg.norm(b)
+        return float(1 - np.dot(a, b) / n) if n > 0 else 1.0
+
+    cross_edges = [(e['caller'], e['callee'], e['kind'], e['confidence'])
+                   for e in self.graph.ge.all()
+                   if e['caller'].split('.')[0] != e['callee'].split('.')[0]
+                   or e['confidence'] < 0.9]
+    involved = {n for e in cross_edges for n in (e[0], e[1])}
+    embs = {n: _emb(n) for n in involved} if use_embeddings else {}
+    scored = []
+    for caller, callee, kind, conf in cross_edges:
+        cross = caller.split('.')[0] != callee.split('.')[0]
+        tgt = nodes.get(callee)
+        score = (1 - conf) + (0.4 if cross else 0) + (min(tgt['pagerank']*200, 0.5) if tgt else 0)
+        emb_dist = _cos_dist(embs.get(caller), embs.get(callee)) if use_embeddings else None
+        if emb_dist: score += emb_dist * 0.5
+        scored.append((score, dict(caller=caller, callee=callee, kind=kind, confidence=conf,
+                                   cross_module=cross,
+                                   embedding_distance=round(emb_dist, 3) if emb_dist is not None else None,
+                                   surprise_score=round(score, 3))))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return L(s[1] for s in scored[:top_n])
+
