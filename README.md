@@ -24,14 +24,14 @@ Kosha(install_skill=True)   # writes .agents/skills/kosha/SKILL.md
 
 Commit `.agents/skills/kosha/SKILL.md` so every contributor — human and AI — picks up the skill automatically.
 
-## Sync (once per session)
+## Sync (once per session, re-run when things change)
 
 ```python
 k = Kosha()                                       # auto-detects git repo root
 k.sync(pkgs=['fasthtml', 'fastcore', 'litesearch'])
 ```
 
-Subsequent calls are incremental — only changed files and new package versions are re-indexed. Indexes:
+Subsequent calls are incremental — only changed files and new package versions are re-indexed. **Re-run `k.sync()` whenever the env or repo changes materially**: after `uv add` / `pip install` / version bumps, after pulling or merging significant code changes, or when results look stale. Calling it too often is harmless; calling it too rarely silently feeds the agent stale context. Indexes:
 
 - `.kosha/code.db` — repo chunks + embeddings (project-local)
 - `.kosha/graph.db` — call graph (project-local)
@@ -43,21 +43,14 @@ The high-value pattern: **inventory → disambiguate → narrow → trace.** Ski
 
 ### Step 1 — Inventory
 
-Build a map of what's installed and what each package exposes. The underlying calls (`pkgs_in_env`, `dep_stack`, `public_api`) are all indexed SQLite reads, sub-second on typical envs — cheap enough to rebuild every session. The `.kosha/env_map.md` file is written for humans / shell harnesses to grep, not as a correctness cache (a cache without invalidation goes silently stale when packages change).
+Query the indexes directly to see what's installed and what each package exposes. `pkgs_in_env`, `dep_stack`, and `public_api` are all indexed SQLite reads, sub-second on typical envs — no cache file is needed. (A markdown cache without invalidation goes silently stale when packages change, and the reads are already fast enough that no cache is earning its keep.)
 
 ``` python
-from pathlib import Path
-
 pkgs   = k.pkgs_in_env(pyproject=True)                              # [{name, version}, ...]
 layers = k.dep_stack(seeds=[p['name'] for p in pkgs], depth=2)      # BFS, by coupling
-lines = [f'# Env map\n## Layers'] + [f'- L{i}: {sorted(l)}' for i,l in enumerate(layers)]
 for p in pkgs:
-    api = k.public_api(p['name'], limit=30)
-    lines += [f"\n## {p['name']} ({p['version']})  — {pkg_url(p['name'])}"]
-    lines += [f"- `{r['mod_name']}` — {(r.get('docstring') or '').splitlines()[0][:80]}"
-              for r in api]
-env_map = '\n'.join(lines)
-Path('.kosha/env_map.md').write_text(env_map)   # for humans / shell harnesses to grep
+    api = k.public_api(p['name'], limit=30)                         # public surface + docstrings
+    # use `pkgs`, `layers`, `api` directly — no intermediate file needed
 ```
 
 ### Step 2 — Disambiguate
