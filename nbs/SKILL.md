@@ -1,170 +1,162 @@
 ---
 name: kosha
 description: >
-  Surface repo code and installed package snippets before writing new code.
-  Run at the start of any task that touches existing patterns or packages.
+  Repo + installed-package memory (FTS5 + vector + call graph). Invoke at the
+  start of any task that touches existing repo code or third-party package APIs.
 ---
 
 # kosha — repo + package memory for coding agents
 
-FTS5 + vector search + call graph over your repo and installed packages. Results include
-callers, callees, and PageRank. No LLMs required.
-
 ## Setup
 
-**One-time per project:**
 ```python
 from kosha import Kosha
-Kosha(install_skill=True)   # writes .agents/skills/kosha/SKILL.md
+Kosha(install_skill=True)        # one-time per project: writes .agents/skills/kosha/SKILL.md
+k = Kosha(); k.sync()             # once per session — incremental on repeat
 ```
 
-**Once per session** (incremental — fast on repeat):
+## The four-step workflow
+
+Run the steps in order. Skip any step that doesn't apply (see *When to skip* below).
+
+### Step 1 — Inventory (cache once per project)
+
+Build a map of **what's installed and what each package exposes**, then write it to
+`.kosha/env_map.md` so future sessions read the file instead of re-querying.
+
 ```python
-k = Kosha()
-k.sync(pkgs=['fasthtml', 'fastcore'])  # repo code + packages + call graph
+from pathlib import Path
+cache = Path('.kosha/env_map.md')
+if cache.exists():
+    env_map = cache.read_text()                       # reuse — no DB hits
+else:
+    pkgs   = k.pkgs_in_env(pyproject=True)            # [{name, version}, ...]
+    layers = k.dep_stack(seeds=[p['name'] for p in pkgs], depth=2)  # BFS, ordered by coupling
+    lines  = [f"# Env map\n## Layers\n"] + [f"- L{i}: {sorted(l)}" for i,l in enumerate(layers)]
+    for p in pkgs:
+        api = k.public_api(p['name'], limit=30)        # public surface + docstrings
+        lines += [f"\n## {p['name']} ({p['version']})"] + \
+                 [f"- `{r['mod_name']}` — {(r.get('docstring') or '').splitlines()[0][:80]}" for r in api]
+    cache.write_text('\n'.join(lines))
+    env_map = cache.read_text()
 ```
 
-## Orchestration patterns
+### Step 2 — Disambiguate (ask the user when packages overlap)
 
-### Pattern 1 — Quick lookup
-*Simple "how does X work?" questions about existing code or packages.*
+If the task names a domain ("payments", "ui", "http client") and several installed
+packages could plausibly serve it, **ask the user which to use** before searching deeper.
 
 ```python
-results = k.context('how do I embed a query', limit=10)
+hits = k.env_context('toast notification', limit=30, graph=False)   # cheap, no graph enrichment
+by_pkg = {}
+for r in hits: by_pkg.setdefault(r['metadata'].get('package'), []).append(r)
+candidates = sorted(by_pkg, key=lambda p: -len(by_pkg[p]))[:4]
+# If len(candidates) > 1 with comparable hit counts, present them to the user and wait.
+# Otherwise, proceed to Step 3 with the single dominant package.
+```
+
+### Step 3 — Narrow (one graph-enriched call)
+
+Once the package set is known, run `context()` **once** with a `package:` filter.
+The result is already enriched with `pagerank`, `callers`, `callees`, `co_dispatched` —
+do **not** loop and call `ni()` afterwards.
+
+```python
+results = k.context('toast notification package:monsterui', limit=10)
 for r in results:
-    print(r['metadata']['mod_name'], r['content'][:120])
-```
-
-### Pattern 2 — Before writing code
-*Any task that adds or modifies behaviour. Run before touching files.*
-
-```python
-# 1. Get relevant snippets enriched with call graph
-results = k.context('your task description', limit=15, graph=True)
-
-# 2. Read structural position of each result
-for r in results:
-    print(r['metadata']['mod_name'],
-          '| pagerank:', r['pagerank'],
-          '| callers:', r['callers'],
-          '| callees:', r['callees'])
-
-# 3. Write code that fits the existing patterns
-```
-
-### Pattern 3 — Full structural plan
-*Complex tasks, unfamiliar codebases, anything touching multiple modules.*
-
-```python
-from itertools import combinations
-
-# Step 1: identify relevant packages + dependency tree
-tc = k.task_context('your task description', depth=2)
-# tc['packages']   — ranked packages relevant to the query
-# tc['dep_layers'] — BFS dep layers ordered by coupling strength
-
-# Step 2: find key functions, enriched with graph data
-results = k.context('your task description', limit=20, graph=True)
-
-# Step 3: map call chains between the top results
-nodes = [r['metadata']['mod_name'] for r in results[:8]]
-paths = [p for a, b in combinations(nodes, 2) if (p := k.short_path(a, b))]
-paths.sort(key=len)   # shortest = tightest coupling
-
-# Step 4: drill into join points
-for node in nodes[:5]:
-    info = k.ni(node)
-    # info['callers']       — who calls this → where to hook in upstream
-    # info['callees']       — what it calls → what you can reuse downstream
-    # info['co_dispatched'] — registered peers → pattern to follow for new routes/handlers
-
-# Step 5: write a plan grounded in mod_name + lineno
-for r in results[:5]:
     m = r['metadata']
-    print(f"{m['mod_name']}  line {m.get('lineno', '?')}  pagerank={r.get('pagerank', 0):.5f}")
+    print(f"{m['mod_name']}  L{m.get('lineno','?')}  pr={r.get('pagerank',0):.4f}  "
+          f"callers={list(r['callers'])[:2]}  callees={list(r['callees'])[:2]}")
 ```
 
-> **`co_dispatched`** — functions assigned together in the same list/dict at module level (route
-> groups, plugin registrations, handler tables). Tells you where to add a new handler without
-> reading all the glue code.
-
-## What a graph-enriched result looks like
+### Step 4 — Trace (only when you need cross-package or entry-point info)
 
 ```python
-{
-  'content':  'def merge(*ds):\n    "Merge all dicts"\n    return {k:v for d in ds ...}',
-  'metadata': {
-      'mod_name': 'fastcore.basics.merge',   # fully-qualified — use for ni() / short_path()
-      'path':     '/path/to/fastcore/basics.py',
-      'lineno':   655,
-      'type':     'FunctionDef',
-      'package':  'fastcore',                # env results only
-  },
-  # structural position
-  'pagerank':      0.00027,  # centrality — higher = more load-bearing
-  'in_degree':     8,        # number of callers
-  'out_degree':    12,       # number of callees
-  'callers':       ['fastcore.script.call_parse._f', ...],
-  'callees':       ['fastcore.basics.NS.__iter__', ...],
-  'co_dispatched': [],
-}
+k.api_call_paths('myapp', 'fasthtml', k=15)   # how myapp reaches into fasthtml
+k.short_path('myapp.routes.checkout', 'stripe.Webhook.construct_event')  # specific pair
+k.top_nodes('fasthtml', k=5)                  # entry points to read first when learning a pkg
+k.neighbors('myapp.payments.verify', depth=2) # everything within 2 hops
 ```
+
+## When to skip steps
+
+| Situation | Steps to run |
+|---|---|
+| Trivial "how does X work" lookup in a known package | Step 3 only |
+| First time working in this repo / env | 1 → 3 |
+| Task names a domain, multiple packages could fit | 1 → 2 → 3 |
+| Task spans packages, or you need entry points | 1 → 3 → 4 |
 
 ## Filter syntax
 
+Add `key:value` tokens anywhere in a query. Plurals + comma lists supported.
+
 | Token | Example | Effect |
-|-------|---------|--------|
+|---|---|---|
 | `package:name` | `package:fasthtml` | Restrict env search to one package |
 | `file:glob` | `file:routes*` | Restrict repo results by filename |
 | `path:pattern` | `path:api/*` | Restrict repo results by path |
 | `lang:ext` | `lang:py` | Filter by language |
 | `type:node` | `type:FunctionDef` | Filter by AST node type |
 
-Plural and comma-separated values work: `packages:fastcore,litesearch paths:basics,core`
+`env_context` also auto-detects bare package names appearing as plain query tokens
+(`'render table fasthtml'` → adds `package:fasthtml`).
 
-## Graph API
+## Result fields
 
-| Call | Returns |
-|------|---------|
-| `k.ni(node)` | Full node info: meta + callers + callees + co_dispatched |
-| `k.short_path(a, b)` | Shortest call chain between two nodes |
-| `k.neighbors(node, depth=2)` | All nodes within N hops |
-| `k.graph.ranked(k=10, module='pkg')` | Top-k nodes by PageRank |
-| `k.public_api(module='pkg', min_callees=0)` | Public entry points (in_degree=0) with docstrings |
-| `k.gn(where='node like "%X%"')` | Direct graph_nodes table query |
-| `k.ge(where='caller like "%X%"')` | Direct graph_edges table query |
+Each result from `context()` is a dict. Inspect with `dir(r)` / `r.keys()`. Fields:
 
-## Full API
+- `content` — the code snippet
+- `metadata` — `{mod_name, path, lineno, type, package?, docstring?}`
+- `pagerank`, `in_degree`, `out_degree` — graph centrality
+- `callers`, `callees` — adjacent nodes in the call graph
+- `co_dispatched` — siblings registered together (route groups, handler tables) — follow this pattern when adding a new handler
 
-| Method | Purpose |
-|--------|---------|
-| `k.sync(pkgs, dir)` | One-shot sync: repo + packages + graph |
-| `k.context(q, limit, graph)` | Fan-out search, graph-enriched |
-| `k.repo_context(q, limit)` | Repo only |
-| `k.env_context(q, limit)` | Packages only |
-| `k.task_context(q, depth)` | Packages + dep stack |
-| `k.watch_repo()` | Live incremental re-index on file changes |
-| `k.nuke()` | Drop all databases |
-| `pkg_url(pkg)` | Best web URL for an installed package (from importlib.metadata) |
+## API
+
+| Call | Purpose |
+|---|---|
+| `k.sync(pkgs=None, dir=None, in_parallel=False, force=False)` | Index repo + env packages + call graph |
+| `k.context(q, limit=50, graph=True)` | Fan-out repo+env search, graph-enriched |
+| `k.repo_context(q)` / `k.env_context(q)` | Single-store search |
+| `k.pkgs_in_env(pyproject=True)` | Indexed packages (intersect with installed env) |
+| `k.public_api(pkg, limit=200)` | Public API entries (`__all__` + `@patch`) with docstrings |
+| `k.top_nodes(pkg, k=5)` | Top public-API nodes by PageRank |
+| `k.dep_stack(seeds, depth=1)` | BFS dep layers, ordered by coupling |
+| `k.api_call_paths(from_pkg, to_pkg, k=15)` | Shortest call paths between two packages' public APIs |
+| `k.ni(node)` | Node info: callers, callees, co_dispatched, pagerank |
+| `k.short_path(a, b)` / `k.neighbors(node, depth)` | Direct graph traversal |
+| `k.graph.ranked(k=10, module='pkg')` | Top nodes by PageRank |
+| `k.gn(where=...)` / `k.ge(where=...)` | Direct `graph_nodes` / `graph_edges` queries |
+| `k.watch_repo()` / `k.nuke()` | Live re-index / drop databases |
+| `pkg_url(pkg)` | Best web URL for an installed package (for WebFetch) |
+
+## CLI
+
+For shell harnesses (Copilot CLI, Claude Code hooks). Markdown by default; `--as_json` for piping.
+
+```bash
+kosha sync
+kosha context "embed a query" --limit 10
+kosha context "embed a query" --as_json | jq '.[].metadata.mod_name'
+kosha public-api fastcore
+kosha api-paths kosha litesearch --k 10
+kosha ni "fastcore.basics.merge"
+# Full list: kosha (no args) prints all subcommands
+```
 
 ## Database locations
 
 - `.kosha/code.db` — repo code chunks + embeddings (project-local)
 - `.kosha/graph.db` — call graph (project-local)
-- `$XDG_DATA_HOME/kosha/env.db` — installed packages (global, shared across repos)
+- `$XDG_DATA_HOME/kosha/env.db` — installed packages (shared across repos)
 
-## Harness installation
+## Harness install
 
-**Project-local** (auto-discovered by most harnesses, commit alongside code):
-```python
-Kosha(install_skill=True)   # → .agents/skills/kosha/SKILL.md
-```
-
-**Claude Code — global** (available in all projects):
 ```bash
-mkdir -p ~/.claude/skills/kosha
-cp .agents/skills/kosha/SKILL.md ~/.claude/skills/kosha/SKILL.md
+# Project-local (default; auto-discovered by Claude Code, Continue.dev, Cursor, Copilot):
+#   .agents/skills/kosha/SKILL.md   ← written by Kosha(install_skill=True)
+# Claude Code global (all projects on this machine):
+mkdir -p ~/.claude/skills/kosha && cp .agents/skills/kosha/SKILL.md ~/.claude/skills/kosha/
+# Other harnesses: place SKILL.md at the path the harness scans (e.g. .continue/skills/kosha/).
 ```
-
-**Other harnesses**: place SKILL.md wherever the harness discovers agent skills
-(`.agents/skills/`, `.continue/skills/`, or configure path in harness settings).
