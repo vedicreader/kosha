@@ -19,26 +19,25 @@ k = Kosha(); k.sync()             # once per session — incremental on repeat
 
 Run the steps in order. Skip any step that doesn't apply (see *When to skip* below).
 
-### Step 1 — Inventory (cache once per project)
+### Step 1 — Inventory (rebuild per session)
 
-Build a map of **what's installed and what each package exposes**, then write it to
-`.kosha/env_map.md` so future sessions read the file instead of re-querying.
+Build a map of **what's installed and what each package exposes**. The calls below
+are all indexed SQLite reads — sub-second on typical envs, so rebuild every session
+rather than caching. Writing `.kosha/env_map.md` is for humans / shell harnesses to
+grep, not a correctness cache (a cache without invalidation goes silently stale when
+the user runs `uv add` / bumps a version / `k.sync()`s new code).
 
 ```python
 from pathlib import Path
-cache = Path('.kosha/env_map.md')
-if cache.exists():
-    env_map = cache.read_text()                       # reuse — no DB hits
-else:
-    pkgs   = k.pkgs_in_env(pyproject=True)            # [{name, version}, ...]
-    layers = k.dep_stack(seeds=[p['name'] for p in pkgs], depth=2)  # BFS, ordered by coupling
-    lines  = [f"# Env map\n## Layers\n"] + [f"- L{i}: {sorted(l)}" for i,l in enumerate(layers)]
-    for p in pkgs:
-        api = k.public_api(p['name'], limit=30)        # public surface + docstrings
-        lines += [f"\n## {p['name']} ({p['version']})"] + \
-                 [f"- `{r['mod_name']}` — {(r.get('docstring') or '').splitlines()[0][:80]}" for r in api]
-    cache.write_text('\n'.join(lines))
-    env_map = cache.read_text()
+pkgs   = k.pkgs_in_env(pyproject=True)            # [{name, version}, ...]
+layers = k.dep_stack(seeds=[p['name'] for p in pkgs], depth=2)  # BFS, ordered by coupling
+lines  = [f"# Env map\n## Layers\n"] + [f"- L{i}: {sorted(l)}" for i,l in enumerate(layers)]
+for p in pkgs:
+    api = k.public_api(p['name'], limit=30)        # public surface + docstrings
+    lines += [f"\n## {p['name']} ({p['version']})"] + \
+             [f"- `{r['mod_name']}` — {(r.get('docstring') or '').splitlines()[0][:80]}" for r in api]
+env_map = '\n'.join(lines)
+Path('.kosha/env_map.md').write_text(env_map)      # for humans / shell harnesses to grep
 ```
 
 ### Step 2 — Disambiguate (ask the user when packages overlap)

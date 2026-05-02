@@ -43,25 +43,21 @@ The high-value pattern: **inventory → disambiguate → narrow → trace.** Ski
 
 ### Step 1 — Inventory
 
-Build a map of what's installed and what each package exposes, then cache it to `.kosha/env_map.md` so future sessions read the file instead of re-querying.
+Build a map of what's installed and what each package exposes. The underlying calls (`pkgs_in_env`, `dep_stack`, `public_api`) are all indexed SQLite reads, sub-second on typical envs — cheap enough to rebuild every session. The `.kosha/env_map.md` file is written for humans / shell harnesses to grep, not as a correctness cache (a cache without invalidation goes silently stale when packages change).
 
 ``` python
 from pathlib import Path
 
-cache = Path('.kosha/env_map.md')
-if cache.exists():
-    env_map = cache.read_text()           # reuse — no DB hits
-else:
-    pkgs   = k.pkgs_in_env(pyproject=True)                              # [{name, version}, ...]
-    layers = k.dep_stack(seeds=[p['name'] for p in pkgs], depth=2)      # BFS, by coupling
-    lines = [f'# Env map\n## Layers'] + [f'- L{i}: {sorted(l)}' for i,l in enumerate(layers)]
-    for p in pkgs:
-        api = k.public_api(p['name'], limit=30)
-        lines += [f"\n## {p['name']} ({p['version']})  — {pkg_url(p['name'])}"]
-        lines += [f"- `{r['mod_name']}` — {(r.get('docstring') or '').splitlines()[0][:80]}"
-                  for r in api]
-    cache.write_text('\n'.join(lines))
-    env_map = cache.read_text()
+pkgs   = k.pkgs_in_env(pyproject=True)                              # [{name, version}, ...]
+layers = k.dep_stack(seeds=[p['name'] for p in pkgs], depth=2)      # BFS, by coupling
+lines = [f'# Env map\n## Layers'] + [f'- L{i}: {sorted(l)}' for i,l in enumerate(layers)]
+for p in pkgs:
+    api = k.public_api(p['name'], limit=30)
+    lines += [f"\n## {p['name']} ({p['version']})  — {pkg_url(p['name'])}"]
+    lines += [f"- `{r['mod_name']}` — {(r.get('docstring') or '').splitlines()[0][:80]}"
+              for r in api]
+env_map = '\n'.join(lines)
+Path('.kosha/env_map.md').write_text(env_map)   # for humans / shell harnesses to grep
 ```
 
 ### Step 2 — Disambiguate
