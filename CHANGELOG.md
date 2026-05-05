@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.10
+claude install, where_to_add , skill fix, status
+
+
+
 ## 0.0.9
 skills and index
 
