@@ -5,7 +5,7 @@ Default output is readable markdown; pass `--as-json` for JSON (piping/harnesses
 
 # %% auto #0
 __all__ = ['CMDS', 'sync', 'context', 'repo_context', 'env_context', 'ni', 'watch', 'public_api', 'api_paths', 'dep_stack',
-           'top_nodes', 'main']
+           'top_nodes', 'status', 'where_to_add', 'daemon', 'install', 'main']
 
 # %% ../nbs/03_cli.ipynb #cell-imports
 import json, sys
@@ -151,9 +151,11 @@ def api_paths(
     if as_json: print(json.dumps(_to_json(paths)))
     else:
         print(f"\n## Call paths: {from_pkg} \u2192 {to_pkg}  ({len(paths)} targets reached)")
+        if not paths: print("  (no paths found)")
+        _arr = ' → '
         for target, path in sorted(paths.items(), key=lambda x: len(x[1])):
             print(f"\n  \u2192 {target}  (hops: {len(path)})")
-            print(f"    {' \u2192 '.join(path)}")
+            print(f"    {_arr.join(path)}")
 
 # %% ../nbs/03_cli.ipynb #cell-dep-stack
 @call_parse
@@ -188,18 +190,88 @@ def top_nodes(
         print(f"\n## Top {k} nodes: {pkg}")
         for node in nodes: print(f"  {node}")
 
+# %% ../nbs/03_cli.ipynb #103087ed
+@call_parse
+def status(as_json:bool=False):
+    "Show index freshness: file/pkg/node counts, stale files, and stale packages."
+    s = Kosha().status()
+    if as_json: print(json.dumps(s))
+    else:
+        stale_f = f" ({s['stale_files']} stale)" if s['stale_files'] else ""
+        stale_p = f"  stale pkgs: {s['stale_pkgs']}" if s['stale_pkgs'] else ""
+        print(f"files: {s['files']}{stale_f}  packages: {s['packages']}  graph nodes: {s['graph_nodes']}{stale_p}")
+
+
+# %% ../nbs/03_cli.ipynb #0c775df3
+@call_parse
+def where_to_add(
+    description:str,    # what you want to add
+    limit:int=5,        # max results
+    as_json:bool=False, # output JSON
+):
+    "Find likely insertion points for new code matching description."
+    results = Kosha().where_to_add(description, limit=limit)
+    if as_json: print(json.dumps(_to_json(results)))
+    else:
+        for r in results:
+            co = ', '.join(r['co_dispatched'][:3])
+            print(f"  {r['path']}:{r['insert_after']}  ({r['node']})")
+            if co: print(f"    peers: {co}")
+
+
+# %% ../nbs/03_cli.ipynb #cell-daemon
+_DISPATCH = {
+    'context':        lambda k, a: k.context(**a),
+    'repo_context':   lambda k, a: k.repo_context(**a),
+    'env_context':    lambda k, a: k.env_context(**a),
+    'ni':             lambda k, a: k.ni(a['mod_name']),
+    'top_nodes':      lambda k, a: k.top_nodes(**a),
+    'public_api':     lambda k, a: k.public_api(**a),
+    'api_call_paths': lambda k, a: k.api_call_paths(**a),
+    'sync':           lambda k, a: (k.sync(**a), 'synced')[1],
+    'status':         lambda k, a: k.status(),
+    'where_to_add':   lambda k, a: k.where_to_add(**a),
+}
+
+@call_parse
+def daemon():
+    "Persistent kosha kernel. Reads newline-delimited JSON from stdin, writes results to stdout."
+    k = Kosha()
+    print(json.dumps({"ok": True, "status": "ready"}), flush=True)
+    for line in sys.stdin:
+        if not (line := line.strip()): continue
+        try:
+            req = json.loads(line)
+            fn = _DISPATCH[req['cmd']]
+            print(json.dumps({"ok": True, "result": _to_json(fn(k, req.get('args', {})))}), flush=True)
+        except Exception as e:
+            print(json.dumps({"ok": False, "error": str(e)}), flush=True)
+
+
+# %% ../nbs/03_cli.ipynb #cli-install-a1b2
+@call_parse
+def install():
+    "Install kosha SKILL.md to .agents/skills/kosha/ and .claude/skills/kosha/."
+    from .core import mv_skill_md, repo_root
+    mv_skill_md(dry_run=False, dir=repo_root())
+
+
 # %% ../nbs/03_cli.ipynb #cell-cmds
 CMDS = {
-    'sync':         sync,
-    'context':      context,
-    'repo-context': repo_context,
-    'env-context':  env_context,
-    'ni':           ni,
-    'watch':        watch,
-    'public-api':   public_api,
-    'api-paths':    api_paths,
-    'dep-stack':    dep_stack,
-    'top-nodes':    top_nodes,
+    'sync':           sync,
+    'context':        context,
+    'repo-context':   repo_context,
+    'env-context':    env_context,
+    'ni':             ni,
+    'watch':          watch,
+    'public-api':     public_api,
+    'api-paths':      api_paths,
+    'dep-stack':      dep_stack,
+    'top-nodes':      top_nodes,
+    'daemon':         daemon,
+    'status':         status,
+    'where-to-add':   where_to_add,
+    'install':         install,
 }
 
 def main():
@@ -210,3 +282,4 @@ def main():
         sys.exit(0 if len(sys.argv) < 2 else 1)
     cmd = sys.argv.pop(1)
     CMDS[cmd]()
+

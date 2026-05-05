@@ -11,7 +11,7 @@ from json import loads as jl
 from collections import defaultdict
 from litesearch import *
 from fastcore.all import (Path, L, patch, parallel_async, tuplify, first, fdelegates, globtastic, bind, true, dict2obj,
-                          listify, filter_keys, in_, filter_values)
+                          listify, filter_keys, merge, in_)
 from .core import arun, Kosha, embedder, parse, has_init, env_pkg_versions
 from pyan.analyzer import CallGraphVisitor
 from pyan.anutils import Scope, ExecuteInInnerScope
@@ -528,11 +528,14 @@ def public_api(self: Kosha,
 	patch_ = self.ge(select='callee',where="kind='patch' AND caller LIKE ?",where_args=[f'{pkg}.%'])
 	wh, kw = je('public_api',v='1'), dict(where_args=None)
 	if patch_:
-		wh += f" OR %s"%je('mod_name','in',f'({','.join('?'*len(patch_))})')
+		_ph = '(%s)' % ','.join('?' * len(patch_))
+		wh += ' OR ' + je('mod_name','in',_ph)
 		kw = dict(where_args=L(patch_).attrgot('callee'))
+	_dir_cond = je('dir','like',repr(pkg_))
 	er = self.env_st(where=f"package={pkg_!r} AND ({wh})",limit=limit,**kw)
-	rr = self.code_st(where=f'{je('dir','like',f'{pkg_!r}')} AND {wh}',limit=limit,**kw)
+	rr = self.code_st(where=f'{_dir_cond} AND {wh}',limit=limit,**kw)
 	return L(er+rr).map(fn).map(lambda r: {m: _get(r,m) for m in meta_cols.split(',')})[:limit]
+
 
 # %% ../nbs/01_graph.ipynb #6f57bfb4
 @patch
@@ -563,6 +566,7 @@ def context(self: Kosha,
 			repo: bool = True,
 			env: bool = True,
 			graph: bool = True,
+			compact: bool = False, # return slim dicts (mod_name, signature, docstring, lineno) instead of full chunks
             columns:str='content,metadata',
             sys_wide=True,
 			**kw                  # forwarded to env_context / repo_context
@@ -576,8 +580,11 @@ def context(self: Kosha,
 	results = results.map(lambda r: _tag(r[1], r[0]))
 	rrf = bind(rrf_merge, limit=limit*2, id_key='_src_id')
 	res = L(L(results[1:]).reduce(lambda m,rs: rrf(m,rs), results[0]))
+	if compact:
+		meta = lambda r: filter_keys(r['metadata'],in_(['mod_name','docstring','lineno','path']))
+		return res.map(lambda r:meta(r)|dict(sig=(r['content'].splitlines()[0])))[:limit]
 	if not graph: return res[:limit]
-	return dict2obj(res.map(lambda r : r | self.ni(r['metadata']['mod_name'])))[:limit]
+	return dict2obj(res.map(lambda r: r | self.ni(r['metadata']['mod_name'])))[:limit]
 
 # %% ../nbs/01_graph.ipynb #pkg_deps_task_context_c3d4
 def is_sys_pkg(pkg:str) -> bool:
@@ -593,7 +600,8 @@ def dep_stack(self:Kosha, seeds:list=None, depth:int=1, no_sys_pkg=True, allow:l
 	fn=lambda p: p['tgt'] not in seen and (not no_sys_pkg or is_sys_pkg(p['tgt'])) and (not allow or p['tgt'] in allow)
 	for _ in range(depth):
 		if not frontier: break
-		kw = dict(where=f'from_pkg IN ({','.join('?'*len(frontier))})', where_args=list(frontier))
+		_pl = ','.join('?'*len(frontier))
+		kw = dict(where=f'from_pkg IN ({_pl})', where_args=list(frontier))
 		nxt = set(L(self.env_pd(select='to_pkg tgt,n_modules n',**kw)).filter(fn).attrgot('tgt'))
 		if not nxt: break
 		layers+=[nxt]
@@ -621,3 +629,40 @@ def api_call_paths(self:Kosha,
 	paths = {}
 	for fp in f: paths = paths | self.graph._bfs(fp, set(a))
 	return filter_keys(paths, in_(a))
+
+
+# %% ../nbs/01_graph.ipynb #3aaa2197
+@patch
+def status(self: Kosha) -> dict:
+	'Index freshness: file/pkg/node counts and stale file count.'
+	known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path,uploaded_at') if r['path']}
+	stale = sum(1 for p, mt in known.items() if Path(p).exists() and Path(p).stat().st_mtime != mt)
+	pkgs=merge(*L(self.pkgs(select='name,version')).map(lambda r: {r['name']: r['version']}))
+	e = env_pkg_versions(pyproject=False)
+	pkgs = filter_keys(pkgs, in_(e))
+	sp = [k for k in pkgs if pkgs[k] != e[k]]
+	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale, stale_pkgs=sp)
+
+# %% ../nbs/01_graph.ipynb #8d82814f
+@patch
+def where_to_add(self: Kosha, description: str, limit: int = 5) -> L:
+	'Likely insertion points for new code: file + line from top context results + co_dispatched peers.'
+	results = self.context(description, graph=True, limit=limit)
+	je = lambda v: f"json_extract(metadata,'$.mod_name')={v!r}"
+	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if 'metadata' in r else r
+	locfn = lambda m: dict(path=m.get('path'),lineno=m.get('lineno'),end_lineno=m.get('end_lineno') or m.get('lineno'))
+	def _loc(n):
+		r = L(self.code_st(select='metadata', where=je(n), limit=1)).map(fn)
+		return dict(node=n) | locfn(r[0]['metadata']) if r else {}
+	out, seen = [], set()
+	for r in results:
+		mod = r['metadata'].get('mod_name', '')
+		if not mod or mod in seen: continue
+		seen.add(mod)
+		loc = _loc(mod)
+		if not loc or not loc['path']: continue
+		co = list(r.get('co_dispatched', []))
+		peer_ends = [p['end_lineno'] for c in co if (p := _loc(c)) and p['path'] == loc['path'] and p['end_lineno']]
+		insert_after = max([loc['end_lineno'] or 0] + peer_ends, default=loc['lineno'])
+		out+=[dict(node=mod,path=loc['path'],insert_after=insert_after,co_dispatched=co,pagerank=r.get('pagerank',0))]
+	return L(out)

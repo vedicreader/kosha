@@ -60,13 +60,14 @@ def repo_root() -> Path:
 	return first((Path.cwd(), *Path.cwd().parents), lambda p: (p/'.git').exists())
 
 def mv_skill_md(dry_run=True, dir=None) -> None:
-	"Copy bundled SKILL.md to `.agents/skills/kosha/` at project root or specified dir."
-	if not (r := dir or repo_root()): return
+	'Copy bundled SKILL.md to skill directories.'
 	base = Path(__file__).parent if '__file__' in globals() else Path.cwd()
 	if not (src := base.joinpath('SKILL.md')).exists(): return
-	dest = Path(r).joinpath('.agents', 'skills', 'kosha', 'SKILL.md')
-	if dry_run: print(f'Would copy {src} to {dest}')
-	else: dest.mk_write(src.read_text(encoding='utf-8'))
+	root = dir or repo_root() or '.'
+	ts = [Path(root)/'.agents/skills/kosha/SKILL.md', Path('.claude/skills/kosha/SKILL.md')]
+	if dry_run: print(f'Copying {src} to: {list(map(str,ts))}')
+	else: [p.mk_write(src.read_text(encoding='utf-8'))for p in ts]
+	print(f'Installed → {list(map(str,ts))}')
 
 # %% ../nbs/00_core.ipynb #8b67e1dd013da45b
 def arun(coro) -> any:
@@ -77,7 +78,7 @@ def arun(coro) -> any:
 	import concurrent.futures
 	with concurrent.futures.ThreadPoolExecutor() as pool: return L(pool.submit(asyncio.run, coro).result())
 
-# %% ../nbs/00_core.ipynb #82af952c
+# %% ../nbs/00_core.ipynb #e5909953befa8a39
 _req_nm = re.compile(r'^[\w][\w.-]*')
 
 def pkg_trans_deps(seeds:list, depth:int=2) -> L:
@@ -96,7 +97,7 @@ def pkg_trans_deps(seeds:list, depth:int=2) -> L:
 		seen |= nxt; frontier = nxt
 	return L(seen)
 
-# %% ../nbs/00_core.ipynb #c475a3af79bdd694
+# %% ../nbs/00_core.ipynb #9fab4c1d39a247e3
 def env_pkg_versions(pyproject=True, depth:int=1) -> dict:
 	'''Get a dict of installed package versions using importlib.metadata.
 	passing depth traverse multiple layers of dependencies'''
@@ -115,7 +116,8 @@ def embedder(
     emb_model=model  # model config AttrDict (model name, onnx_path, prompt instructions)
 ) -> 'FastEncode':
     "Load or return cached CodeRankEmbed ONNX document embedder (24h TTL)."
-    return FastEncode(emb_model, parallel=8, batch_size=64)
+    try: return FastEncode(emb_model, parallel=8, batch_size=64)
+    except Exception: return FastEncode(emb_model, parallel=1, batch_size=64)
 
 @timed_cache(3600*24)
 def static_embedder(
