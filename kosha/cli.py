@@ -193,12 +193,13 @@ def top_nodes(
 # %% ../nbs/03_cli.ipynb #103087ed
 @call_parse
 def status(as_json:bool=False):
-    "Show index freshness: file/pkg/node counts and stale file count."
+    "Show index freshness: file/pkg/node counts, stale files, and stale packages."
     s = Kosha().status()
     if as_json: print(json.dumps(s))
     else:
-        stale = f" ({s['stale_files']} stale)" if s['stale_files'] else ""
-        print(f"files: {s['files']}{stale}  packages: {s['packages']}  graph nodes: {s['graph_nodes']}")
+        stale_f = f" ({s['stale_files']} stale)" if s['stale_files'] else ""
+        stale_p = f"  stale pkgs: {s['stale_pkgs']}" if s['stale_pkgs'] else ""
+        print(f"files: {s['files']}{stale_f}  packages: {s['packages']}  graph nodes: {s['graph_nodes']}{stale_p}")
 
 
 # %% ../nbs/03_cli.ipynb #0c775df3

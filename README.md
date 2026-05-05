@@ -61,7 +61,8 @@ k.status()
     {'files': 3, 'packages': 81, 'graph_nodes': 78502, 'stale_files': 0}
 
 Re-run `k.sync()` after `uv add`, version bumps, or significant code
-changes. If `stale_files > 0`, sync before querying.
+changes. If `stale_files > 0` or `stale_pkgs` is non-empty, sync before
+querying.
 
 ## 1 — Check before implementing
 

@@ -7,11 +7,11 @@ __all__ = ['CodeGraph', 'dyn_edges', 'static_edges', 'is_sys_pkg']
 
 # %% ../nbs/01_graph.ipynb #ff995efe
 import ast, re, os
-from json import loads as jl, dumps as jd
+from json import loads as jl
 from collections import defaultdict
 from litesearch import *
 from fastcore.all import (Path, L, patch, parallel_async, tuplify, first, fdelegates, globtastic, bind, true, dict2obj,
-                          listify, filter_keys, in_)
+                          listify, filter_keys, merge, in_)
 from .core import arun, Kosha, embedder, parse, has_init, env_pkg_versions
 from pyan.analyzer import CallGraphVisitor
 from pyan.anutils import Scope, ExecuteInInnerScope
@@ -637,7 +637,11 @@ def status(self: Kosha) -> dict:
 	'Index freshness: file/pkg/node counts and stale file count.'
 	known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path,uploaded_at') if r['path']}
 	stale = sum(1 for p, mt in known.items() if Path(p).exists() and Path(p).stat().st_mtime != mt)
-	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale)
+	pkgs=merge(*L(self.pkgs(select='name,version')).map(lambda r: {r['name']: r['version']}))
+	e = env_pkg_versions(pyproject=False)
+	pkgs = filter_keys(pkgs, in_(e))
+	sp = [k for k in pkgs if pkgs[k] != e[k]]
+	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale, stale_pkgs=sp)
 
 # %% ../nbs/01_graph.ipynb #8d82814f
 @patch

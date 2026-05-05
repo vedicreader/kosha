@@ -39,7 +39,7 @@ Every coding task runs through the same questions. Use kosha to answer them befo
 `context(q, graph=True)` is the right default for any task that touches more than one module.
 `env_context` is for package-only searches (no repo results, faster).
 
-**Check status first.** If `stale_files > 0`, run `k.sync()` before querying — stale results look like missing results.
+**Check status first.** If `stale_files > 0` or `stale_pkgs` is non-empty, run `k.sync()` before querying — stale results look like missing results.
 
 ---
 
@@ -238,7 +238,7 @@ Available commands: `sync`, `context`, `repo_context`, `env_context`, `ni`, `top
 
 | Method | When to use |
 |--------|-------------|
-| `k.status()` | Start of session — check index freshness before querying |
+| `k.status()` | Start of session — returns `{files, packages, graph_nodes, stale_files, stale_pkgs}` |
 | `k.context(q, graph=True)` | Default: any task touching existing code |
 | `k.context(q, compact=True)` | Triage many results — returns slim dicts, no full code bodies |
 | `k.env_context(q)` | Package-only; faster when repo results aren't needed |
