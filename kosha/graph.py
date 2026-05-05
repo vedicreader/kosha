@@ -7,11 +7,11 @@ __all__ = ['CodeGraph', 'dyn_edges', 'static_edges', 'is_sys_pkg']
 
 # %% ../nbs/01_graph.ipynb #ff995efe
 import ast, re, os
-from json import loads as jl
+from json import loads as jl, dumps as jd
 from collections import defaultdict
 from litesearch import *
 from fastcore.all import (Path, L, patch, parallel_async, tuplify, first, fdelegates, globtastic, bind, true, dict2obj,
-                          listify, filter_keys, in_, filter_values)
+                          listify, filter_keys, in_)
 from .core import arun, Kosha, embedder, parse, has_init, env_pkg_versions
 from pyan.analyzer import CallGraphVisitor
 from pyan.anutils import Scope, ExecuteInInnerScope
@@ -566,6 +566,7 @@ def context(self: Kosha,
 			repo: bool = True,
 			env: bool = True,
 			graph: bool = True,
+			compact: bool = False, # return slim dicts (mod_name, signature, docstring, lineno) instead of full chunks
             columns:str='content,metadata',
             sys_wide=True,
 			**kw                  # forwarded to env_context / repo_context
@@ -579,8 +580,11 @@ def context(self: Kosha,
 	results = results.map(lambda r: _tag(r[1], r[0]))
 	rrf = bind(rrf_merge, limit=limit*2, id_key='_src_id')
 	res = L(L(results[1:]).reduce(lambda m,rs: rrf(m,rs), results[0]))
+	if compact:
+		meta = lambda r: filter_keys(r['metadata'],in_(['mod_name','docstring','lineno','path']))
+		return res.map(lambda r:meta(r)|dict(sig=(r['content'].splitlines()[0])))[:limit]
 	if not graph: return res[:limit]
-	return dict2obj(res.map(lambda r : r | self.ni(r['metadata']['mod_name'])))[:limit]
+	return dict2obj(res.map(lambda r: r | self.ni(r['metadata']['mod_name'])))[:limit]
 
 # %% ../nbs/01_graph.ipynb #pkg_deps_task_context_c3d4
 def is_sys_pkg(pkg:str) -> bool:
@@ -627,67 +631,34 @@ def api_call_paths(self:Kosha,
 	return filter_keys(paths, in_(a))
 
 
-# %% ../nbs/01_graph.ipynb #graph-diff-a1b2
+# %% ../nbs/01_graph.ipynb #3aaa2197
 @patch
-def graph_diff(self: Kosha, snapshot_path: str = None) -> dict:
-    'Delta since last snapshot: new/removed nodes+edges, top PageRank shifts. Call after sync().'
-    import json as _json
-    sp = Path(snapshot_path or (Path(self.root) / '.kosha' / 'graph_snapshot.json'))
-    cur_nodes = {r['node']: r['pagerank'] for r in self.graph.gn.all()}
-    cur_edges = {(r['caller'], r['callee'], r['kind']) for r in self.graph.ge.all()}
-    if not sp.exists():
-        sp.write_text(_json.dumps({'nodes': cur_nodes, 'edges': [list(e) for e in cur_edges]}))
-        return dict(new_nodes=[], removed_nodes=[], new_edges=[], removed_edges=[], pagerank_shifts=[])
-    prev = _json.loads(sp.read_text())
-    prev_nodes, prev_edges = prev['nodes'], {tuple(e) for e in prev['edges']}
-    new_nodes     = [n for n in cur_nodes  if n not in prev_nodes]
-    removed_nodes = [n for n in prev_nodes if n not in cur_nodes]
-    new_edges     = [list(e) for e in cur_edges  if e not in prev_edges]
-    removed_edges = [list(e) for e in prev_edges if e not in cur_edges]
-    shifts = sorted(
-        [(n, prev_nodes[n], cur_nodes[n]) for n in cur_nodes
-         if n in prev_nodes and abs(cur_nodes[n] - prev_nodes[n]) > 1e-5],
-        key=lambda x: abs(x[2]-x[1]), reverse=True)
-    sp.write_text(_json.dumps({'nodes': cur_nodes, 'edges': [list(e) for e in cur_edges]}))
-    return dict(new_nodes=new_nodes, removed_nodes=removed_nodes,
-                new_edges=new_edges, removed_edges=removed_edges, pagerank_shifts=shifts[:20])
+def status(self: Kosha) -> dict:
+	'Index freshness: file/pkg/node counts and stale file count.'
+	known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path,uploaded_at') if r['path']}
+	stale = sum(1 for p, mt in known.items() if Path(p).exists() and Path(p).stat().st_mtime != mt)
+	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale)
 
-
-# %% ../nbs/01_graph.ipynb #surprising-conn-c3d4
+# %% ../nbs/01_graph.ipynb #8d82814f
 @patch
-def surprising_connections(self: Kosha, top_n: int = 10, use_embeddings: bool = True) -> L:
-    'Unexpected cross-module call relationships ranked by structural + embedding-distance surprise.'
-    import numpy as np
-    nodes = {r['node']: r for r in self.graph.gn.all()}
-
-    def _emb(name):
-        je = f"json_extract(metadata,'$.mod_name')={name!r}"
-        r = (first(self.code_st(select='embedding', where=je)) or
-             first(self.env_st(select='embedding', where=je)))
-        if r and r.get('embedding'): return np.frombuffer(r['embedding'], dtype=np.float32)
-
-    def _cos_dist(a, b):
-        if a is None or b is None: return None
-        n = np.linalg.norm(a) * np.linalg.norm(b)
-        return float(1 - np.dot(a, b) / n) if n > 0 else 1.0
-
-    cross_edges = [(e['caller'], e['callee'], e['kind'], e['confidence'])
-                   for e in self.graph.ge.all()
-                   if e['caller'].split('.')[0] != e['callee'].split('.')[0]
-                   or e['confidence'] < 0.9]
-    involved = {n for e in cross_edges for n in (e[0], e[1])}
-    embs = {n: _emb(n) for n in involved} if use_embeddings else {}
-    scored = []
-    for caller, callee, kind, conf in cross_edges:
-        cross = caller.split('.')[0] != callee.split('.')[0]
-        tgt = nodes.get(callee)
-        score = (1 - conf) + (0.4 if cross else 0) + (min(tgt['pagerank']*200, 0.5) if tgt else 0)
-        emb_dist = _cos_dist(embs.get(caller), embs.get(callee)) if use_embeddings else None
-        if emb_dist: score += emb_dist * 0.5
-        scored.append((score, dict(caller=caller, callee=callee, kind=kind, confidence=conf,
-                                   cross_module=cross,
-                                   embedding_distance=round(emb_dist, 3) if emb_dist is not None else None,
-                                   surprise_score=round(score, 3))))
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return L(s[1] for s in scored[:top_n])
-
+def where_to_add(self: Kosha, description: str, limit: int = 5) -> L:
+	'Likely insertion points for new code: file + line from top context results + co_dispatched peers.'
+	results = self.context(description, graph=True, limit=limit)
+	je = lambda v: f"json_extract(metadata,'$.mod_name')={v!r}"
+	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if 'metadata' in r else r
+	locfn = lambda m: dict(path=m.get('path'),lineno=m.get('lineno'),end_lineno=m.get('end_lineno') or m.get('lineno'))
+	def _loc(n):
+		r = L(self.code_st(select='metadata', where=je(n), limit=1)).map(fn)
+		return dict(node=n) | locfn(r[0]['metadata']) if r else {}
+	out, seen = [], set()
+	for r in results:
+		mod = r['metadata'].get('mod_name', '')
+		if not mod or mod in seen: continue
+		seen.add(mod)
+		loc = _loc(mod)
+		if not loc or not loc['path']: continue
+		co = list(r.get('co_dispatched', []))
+		peer_ends = [p['end_lineno'] for c in co if (p := _loc(c)) and p['path'] == loc['path'] and p['end_lineno']]
+		insert_after = max([loc['end_lineno'] or 0] + peer_ends, default=loc['lineno'])
+		out+=[dict(node=mod,path=loc['path'],insert_after=insert_after,co_dispatched=co,pagerank=r.get('pagerank',0))]
+	return L(out)

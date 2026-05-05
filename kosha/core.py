@@ -60,13 +60,14 @@ def repo_root() -> Path:
 	return first((Path.cwd(), *Path.cwd().parents), lambda p: (p/'.git').exists())
 
 def mv_skill_md(dry_run=True, dir=None) -> None:
-	"Copy bundled SKILL.md to `.agents/skills/kosha/` at project root or specified dir."
-	if not (r := dir or repo_root()): return
+	'Copy bundled SKILL.md to skill directories.'
 	base = Path(__file__).parent if '__file__' in globals() else Path.cwd()
 	if not (src := base.joinpath('SKILL.md')).exists(): return
-	dest = Path(r).joinpath('.agents', 'skills', 'kosha', 'SKILL.md')
-	if dry_run: print(f'Would copy {src} to {dest}')
-	else: dest.mk_write(src.read_text(encoding='utf-8'))
+	root = dir or repo_root() or '.'
+	ts = [Path(root)/'.agents/skills/kosha/SKILL.md', Path('.claude/skills/kosha/SKILL.md')]
+	if dry_run: print(f'Copying {src} to: {list(map(str,ts))}')
+	else: [p.mk_write(src.read_text(encoding='utf-8'))for p in ts]
+	print(f'Installed → {list(map(str,ts))}')
 
 # %% ../nbs/00_core.ipynb #8b67e1dd013da45b
 def arun(coro) -> any:
@@ -77,7 +78,7 @@ def arun(coro) -> any:
 	import concurrent.futures
 	with concurrent.futures.ThreadPoolExecutor() as pool: return L(pool.submit(asyncio.run, coro).result())
 
-# %% ../nbs/00_core.ipynb #82af952c
+# %% ../nbs/00_core.ipynb #e5909953befa8a39
 _req_nm = re.compile(r'^[\w][\w.-]*')
 
 def pkg_trans_deps(seeds:list, depth:int=2) -> L:
@@ -96,7 +97,7 @@ def pkg_trans_deps(seeds:list, depth:int=2) -> L:
 		seen |= nxt; frontier = nxt
 	return L(seen)
 
-# %% ../nbs/00_core.ipynb #c475a3af79bdd694
+# %% ../nbs/00_core.ipynb #9fab4c1d39a247e3
 def env_pkg_versions(pyproject=True, depth:int=1) -> dict:
 	'''Get a dict of installed package versions using importlib.metadata.
 	passing depth traverse multiple layers of dependencies'''
@@ -115,7 +116,8 @@ def embedder(
     emb_model=model  # model config AttrDict (model name, onnx_path, prompt instructions)
 ) -> 'FastEncode':
     "Load or return cached CodeRankEmbed ONNX document embedder (24h TTL)."
-    return FastEncode(emb_model, parallel=8, batch_size=64)
+    try: return FastEncode(emb_model, parallel=8, batch_size=64)
+    except Exception: return FastEncode(emb_model, parallel=1, batch_size=64)
 
 @timed_cache(3600*24)
 def static_embedder(
@@ -499,24 +501,3 @@ def pkg_context(self:Kosha,
 	emb = emb_query(efn)(q).tobytes()
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if isinstance(r.get('metadata'), str) else r
 	return L(self.envdb.search(q, emb, columns=['content','metadata'], table_name='pkg_store', limit=limit)).map(fn)
-
-# %% ../nbs/00_core.ipynb #find-similar-e5f6
-@patch
-def find_similar(self: Kosha,
-                 node: str,        # fully-qualified node name e.g. 'fastcore.basics.merge'
-                 k: int = 10,      # number of similar nodes to return
-                 repo: bool = True,
-                 env: bool = True
-                 ) -> L:
-    'Embedding-space semantic neighbors: code doing similar things without a call-graph edge.'
-    je = lambda v: f"json_extract(metadata,'$.mod_name')={v!r}"
-    row = (first(self.code_st(select='embedding', where=je(node))) or
-           first(self.env_st(select='embedding', where=je(node))))
-    if not row or not row.get('embedding'): return L()
-    emb = row['embedding']
-    fn = lambda r: r | dict(metadata=jl(r['metadata'])) if isinstance(r.get('metadata'), str) else r
-    results = []
-    if repo: results += list(self.codedb.search('', emb, ['content','metadata'], limit=k+2))
-    if env:  results += list(self.envdb.search('', emb, ['content','metadata'], limit=k+2))
-    return L(results).map(fn).filter(lambda r: r.get('metadata',{}).get('mod_name') != node)[:k]
-

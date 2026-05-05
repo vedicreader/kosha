@@ -5,7 +5,7 @@ Default output is readable markdown; pass `--as-json` for JSON (piping/harnesses
 
 # %% auto #0
 __all__ = ['CMDS', 'sync', 'context', 'repo_context', 'env_context', 'ni', 'watch', 'public_api', 'api_paths', 'dep_stack',
-           'top_nodes', 'daemon', 'diff', 'find_similar_cli', 'surprising', 'main']
+           'top_nodes', 'status', 'where_to_add', 'daemon', 'install', 'main']
 
 # %% ../nbs/03_cli.ipynb #cell-imports
 import json, sys
@@ -151,10 +151,11 @@ def api_paths(
     if as_json: print(json.dumps(_to_json(paths)))
     else:
         print(f"\n## Call paths: {from_pkg} \u2192 {to_pkg}  ({len(paths)} targets reached)")
+        if not paths: print("  (no paths found)")
+        _arr = ' → '
         for target, path in sorted(paths.items(), key=lambda x: len(x[1])):
             print(f"\n  \u2192 {target}  (hops: {len(path)})")
-            _arr = ' → '
-        print(f"    {_arr.join(path)}")
+            print(f"    {_arr.join(path)}")
 
 # %% ../nbs/03_cli.ipynb #cell-dep-stack
 @call_parse
@@ -189,19 +190,46 @@ def top_nodes(
         print(f"\n## Top {k} nodes: {pkg}")
         for node in nodes: print(f"  {node}")
 
+# %% ../nbs/03_cli.ipynb #103087ed
+@call_parse
+def status(as_json:bool=False):
+    "Show index freshness: file/pkg/node counts and stale file count."
+    s = Kosha().status()
+    if as_json: print(json.dumps(s))
+    else:
+        stale = f" ({s['stale_files']} stale)" if s['stale_files'] else ""
+        print(f"files: {s['files']}{stale}  packages: {s['packages']}  graph nodes: {s['graph_nodes']}")
+
+
+# %% ../nbs/03_cli.ipynb #0c775df3
+@call_parse
+def where_to_add(
+    description:str,    # what you want to add
+    limit:int=5,        # max results
+    as_json:bool=False, # output JSON
+):
+    "Find likely insertion points for new code matching description."
+    results = Kosha().where_to_add(description, limit=limit)
+    if as_json: print(json.dumps(_to_json(results)))
+    else:
+        for r in results:
+            co = ', '.join(r['co_dispatched'][:3])
+            print(f"  {r['path']}:{r['insert_after']}  ({r['node']})")
+            if co: print(f"    peers: {co}")
+
+
 # %% ../nbs/03_cli.ipynb #cell-daemon
 _DISPATCH = {
     'context':        lambda k, a: k.context(**a),
     'repo_context':   lambda k, a: k.repo_context(**a),
     'env_context':    lambda k, a: k.env_context(**a),
     'ni':             lambda k, a: k.ni(a['mod_name']),
-    'graph_diff':     lambda k, a: k.graph_diff(),
-    'find_similar':   lambda k, a: k.find_similar(**a),
-    'surprising':     lambda k, a: k.surprising_connections(**a),
     'top_nodes':      lambda k, a: k.top_nodes(**a),
     'public_api':     lambda k, a: k.public_api(**a),
     'api_call_paths': lambda k, a: k.api_call_paths(**a),
     'sync':           lambda k, a: (k.sync(**a), 'synced')[1],
+    'status':         lambda k, a: k.status(),
+    'where_to_add':   lambda k, a: k.where_to_add(**a),
 }
 
 @call_parse
@@ -219,52 +247,12 @@ def daemon():
             print(json.dumps({"ok": False, "error": str(e)}), flush=True)
 
 
-# %% ../nbs/03_cli.ipynb #cell-diff
+# %% ../nbs/03_cli.ipynb #cli-install-a1b2
 @call_parse
-def diff(as_json:bool=False):
-    "Show delta between current graph and last snapshot (run after kosha sync)."
-    k = Kosha()
-    d = k.graph_diff()
-    if as_json: print(json.dumps(_to_json(d)))
-    else:
-        print(f"New nodes ({len(d['new_nodes'])}): {', '.join(d['new_nodes'][:10])}")
-        print(f"Removed  ({len(d['removed_nodes'])}): {', '.join(d['removed_nodes'][:10])}")
-        print(f"New edges: {len(d['new_edges'])}  Removed edges: {len(d['removed_edges'])}")
-        _arr = ' → '
-        for node, old, new in d['pagerank_shifts'][:5]:
-            print(f"  PageRank shift: {node}  {old:.5f}{_arr}{new:.5f}")
-
-
-# %% ../nbs/03_cli.ipynb #cell-find-similar
-@call_parse
-def find_similar_cli(
-    node:str,           # fully-qualified node e.g. fastcore.basics.merge
-    k:int=10,           # number of similar nodes
-    as_json:bool=False, # output JSON
-):
-    "Find k most embedding-similar nodes (semantic peers, not call-graph neighbors)."
-    ko = Kosha()
-    results = ko.find_similar(node, k=k)
-    if as_json: print(json.dumps(_to_json(results)))
-    else: _print_results(results)
-
-
-# %% ../nbs/03_cli.ipynb #cell-surprising
-@call_parse
-def surprising(
-    top_n:int=10,             # number of surprising connections to show
-    no_embeddings:bool=False, # skip embedding distance scoring (faster)
-    as_json:bool=False,       # output JSON
-):
-    "Show top surprising cross-module call relationships by structural + semantic surprise score."
-    k = Kosha()
-    results = k.surprising_connections(top_n=top_n, use_embeddings=not no_embeddings)
-    if as_json: print(json.dumps(_to_json(results)))
-    else:
-        _arr = ' → '
-        for s in results:
-            emb = f" emb_dist={s['embedding_distance']}" if s.get('embedding_distance') is not None else ''
-            print(f"{s['caller']}{_arr}{s['callee']}  kind={s['kind']} surprise={s['surprise_score']}{emb}")
+def install():
+    "Install kosha SKILL.md to .agents/skills/kosha/ and .claude/skills/kosha/."
+    from .core import mv_skill_md, repo_root
+    mv_skill_md(dry_run=False, dir=repo_root())
 
 
 # %% ../nbs/03_cli.ipynb #cell-cmds
@@ -280,9 +268,9 @@ CMDS = {
     'dep-stack':      dep_stack,
     'top-nodes':      top_nodes,
     'daemon':         daemon,
-    'diff':           diff,
-    'find-similar':   find_similar_cli,
-    'surprising':     surprising,
+    'status':         status,
+    'where-to-add':   where_to_add,
+    'install':         install,
 }
 
 def main():
