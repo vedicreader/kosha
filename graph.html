@@ -1,0 +1,1984 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="CodeGraph: call-graph layer for kosha, backed by graph.db. Augments semantic search with structural traversal.">
+
+<title>graph – koshas</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-de52dc3353fe04aa4d07820b7139bd46.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="styles.css">
+<meta property="og:title" content="graph – koshas">
+<meta property="og:description" content="CodeGraph: call-graph layer for kosha, backed by graph.db. Augments semantic search with structural traversal.">
+<meta property="og:site_name" content="koshas">
+<meta name="twitter:title" content="graph – koshas">
+<meta name="twitter:description" content="CodeGraph: call-graph layer for kosha, backed by graph.db. Augments semantic search with structural traversal.">
+<meta name="twitter:card" content="summary">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">koshas</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./graph.html">graph</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">kosha</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./core.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">core</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./graph.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">graph</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./skill.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">skill</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./cli.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">cli</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#codegraph" id="toc-codegraph" class="nav-link active" data-scroll-target="#codegraph">CodeGraph</a></li>
+  <li><a href="#dyn_edges" id="toc-dyn_edges" class="nav-link" data-scroll-target="#dyn_edges">dyn_edges</a></li>
+  <li><a href="#static_edges" id="toc-static_edges" class="nav-link" data-scroll-target="#static_edges">static_edges</a></li>
+  <li><a href="#codegraph.from_sources" id="toc-codegraph.from_sources" class="nav-link" data-scroll-target="#codegraph.from_sources">CodeGraph.from_sources</a></li>
+  <li><a href="#codegraph.from_pkg" id="toc-codegraph.from_pkg" class="nav-link" data-scroll-target="#codegraph.from_pkg">CodeGraph.from_pkg</a></li>
+  <li><a href="#codegraph.from_file" id="toc-codegraph.from_file" class="nav-link" data-scroll-target="#codegraph.from_file">CodeGraph.from_file</a></li>
+  <li><a href="#codegraph.from_dir" id="toc-codegraph.from_dir" class="nav-link" data-scroll-target="#codegraph.from_dir">CodeGraph.from_dir</a></li>
+  <li><a href="#codegraph.process_files" id="toc-codegraph.process_files" class="nav-link" data-scroll-target="#codegraph.process_files">CodeGraph.process_files</a></li>
+  <li><a href="#codegraph.node_info" id="toc-codegraph.node_info" class="nav-link" data-scroll-target="#codegraph.node_info">CodeGraph.node_info</a></li>
+  <li><a href="#codegraph.edge_kinds" id="toc-codegraph.edge_kinds" class="nav-link" data-scroll-target="#codegraph.edge_kinds">CodeGraph.edge_kinds</a></li>
+  <li><a href="#codegraph.short_paths" id="toc-codegraph.short_paths" class="nav-link" data-scroll-target="#codegraph.short_paths">CodeGraph.short_paths</a></li>
+  <li><a href="#codegraph.short_path" id="toc-codegraph.short_path" class="nav-link" data-scroll-target="#codegraph.short_path">CodeGraph.short_path</a></li>
+  <li><a href="#codegraph.ranked" id="toc-codegraph.ranked" class="nav-link" data-scroll-target="#codegraph.ranked">CodeGraph.ranked</a></li>
+  <li><a href="#codegraph.co_dispatched" id="toc-codegraph.co_dispatched" class="nav-link" data-scroll-target="#codegraph.co_dispatched">CodeGraph.co_dispatched</a></li>
+  <li><a href="#codegraph.neighbors" id="toc-codegraph.neighbors" class="nav-link" data-scroll-target="#codegraph.neighbors">CodeGraph.neighbors</a></li>
+  <li><a href="#codegraph.callees" id="toc-codegraph.callees" class="nav-link" data-scroll-target="#codegraph.callees">CodeGraph.callees</a></li>
+  <li><a href="#codegraph.callers" id="toc-codegraph.callers" class="nav-link" data-scroll-target="#codegraph.callers">CodeGraph.callers</a></li>
+  <li><a href="#codegraph.file2nodes" id="toc-codegraph.file2nodes" class="nav-link" data-scroll-target="#codegraph.file2nodes">CodeGraph.file2nodes</a></li>
+  <li><a href="#codegraph.sync" id="toc-codegraph.sync" class="nav-link" data-scroll-target="#codegraph.sync">CodeGraph.sync</a></li>
+  <li><a href="#codegraph.sync_pkgs" id="toc-codegraph.sync_pkgs" class="nav-link" data-scroll-target="#codegraph.sync_pkgs">CodeGraph.sync_pkgs</a></li>
+  <li><a href="#codegraph.sync_dir" id="toc-codegraph.sync_dir" class="nav-link" data-scroll-target="#codegraph.sync_dir">CodeGraph.sync_dir</a></li>
+  <li><a href="#kosha.short_paths" id="toc-kosha.short_paths" class="nav-link" data-scroll-target="#kosha.short_paths">Kosha.short_paths</a></li>
+  <li><a href="#kosha.short_path" id="toc-kosha.short_path" class="nav-link" data-scroll-target="#kosha.short_path">Kosha.short_path</a></li>
+  <li><a href="#kosha.neighbors" id="toc-kosha.neighbors" class="nav-link" data-scroll-target="#kosha.neighbors">Kosha.neighbors</a></li>
+  <li><a href="#kosha.ni" id="toc-kosha.ni" class="nav-link" data-scroll-target="#kosha.ni">Kosha.ni</a></li>
+  <li><a href="#kosha.ge" id="toc-kosha.ge" class="nav-link" data-scroll-target="#kosha.ge">Kosha.ge</a></li>
+  <li><a href="#kosha.gn" id="toc-kosha.gn" class="nav-link" data-scroll-target="#kosha.gn">Kosha.gn</a></li>
+  <li><a href="#kosha.graphdb" id="toc-kosha.graphdb" class="nav-link" data-scroll-target="#kosha.graphdb">Kosha.graphdb</a></li>
+  <li><a href="#kosha.graph" id="toc-kosha.graph" class="nav-link" data-scroll-target="#kosha.graph">Kosha.graph</a></li>
+  <li><a href="#kosha.public_api" id="toc-kosha.public_api" class="nav-link" data-scroll-target="#kosha.public_api">Kosha.public_api</a></li>
+  <li><a href="#kosha.context" id="toc-kosha.context" class="nav-link" data-scroll-target="#kosha.context">Kosha.context</a></li>
+  <li><a href="#kosha.sync" id="toc-kosha.sync" class="nav-link" data-scroll-target="#kosha.sync">Kosha.sync</a></li>
+  <li><a href="#kosha.api_call_paths" id="toc-kosha.api_call_paths" class="nav-link" data-scroll-target="#kosha.api_call_paths">Kosha.api_call_paths</a></li>
+  <li><a href="#kosha.top_nodes" id="toc-kosha.top_nodes" class="nav-link" data-scroll-target="#kosha.top_nodes">Kosha.top_nodes</a></li>
+  <li><a href="#kosha.dep_stack" id="toc-kosha.dep_stack" class="nav-link" data-scroll-target="#kosha.dep_stack">Kosha.dep_stack</a></li>
+  <li><a href="#is_sys_pkg" id="toc-is_sys_pkg" class="nav-link" data-scroll-target="#is_sys_pkg">is_sys_pkg</a></li>
+  <li><a href="#kosha.status" id="toc-kosha.status" class="nav-link" data-scroll-target="#kosha.status">Kosha.status</a></li>
+  <li><a href="#kosha.where_to_add" id="toc-kosha.where_to_add" class="nav-link" data-scroll-target="#kosha.where_to_add">Kosha.where_to_add</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/vedicreader/kosha/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div><div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="graph.html.md"><i class="bi bi-file-code"></i>CommonMark</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">graph</h1>
+</div>
+
+<div>
+  <div class="description">
+    CodeGraph: call-graph layer for kosha, backed by graph.db. Augments semantic search with structural traversal.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<hr>
+<section id="codegraph" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph">CodeGraph</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> CodeGraph(</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    path:<span class="bu">str</span> <span class="op">|</span> pathlib.Path<span class="op">=</span><span class="st">':memory:'</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Call graph builder and query engine. Uses pyan3 for static analysis and custom AST parsing for dynamic edges.</em> Stores everything in a SQLite database.</p>
+<div id="ddf72a78" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="va">self</span> <span class="op">=</span> CodeGraph(<span class="st">':memory:'</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>tables <span class="op">=</span> {r[<span class="dv">0</span>] <span class="cf">for</span> r <span class="kw">in</span> <span class="va">self</span>.db.execute(<span class="st">"SELECT name FROM sqlite_master WHERE type='table'"</span>)}</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> {<span class="st">'graph_edges'</span>,<span class="st">'graph_nodes'</span>,<span class="st">'co_dispatch'</span>,<span class="st">'file_index'</span>} <span class="op">&lt;=</span> tables, <span class="ss">f"Missing tables: </span><span class="sc">{</span>tables<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"schema ok:"</span>, tables)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>schema ok: {'co_dispatch', 'graph_nodes', 'file_index', 'graph_edges'}</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="dyn_edges" class="level3">
+<h3 class="anchored" data-anchor-id="dyn_edges">dyn_edges</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> dyn_edges(</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    src:<span class="bu">str</span>, module:<span class="bu">str</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">list</span>:</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>All dynamic dispatch edges: decorator, connect_body, registration, co_dispatch.</em></p>
+<div id="5ec9494a" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>_SRC <span class="op">=</span> <span class="st">'''</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="st">import flask</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="st">app = flask.Flask(__name__)</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="st">@app.route('/hello')</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="st">def hello(): pass</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="st">def setup(other_app):</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="st">    other_app.register(hello)</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="st">'''</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>edges <span class="op">=</span> dyn_edges(_SRC, <span class="st">'mymod'</span>)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>kinds <span class="op">=</span> {e[<span class="st">'kind'</span>] <span class="cf">for</span> e <span class="kw">in</span> edges}</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="st">'decorator'</span> <span class="kw">in</span> kinds, <span class="ss">f"Expected decorator edge, got: </span><span class="sc">{</span>edges<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="st">'registration'</span> <span class="kw">in</span> kinds, <span class="ss">f"Expected registration edge, got: </span><span class="sc">{</span>edges<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> dyn_edges(<span class="st">'def (broken'</span>, <span class="st">'bad'</span>) <span class="op">==</span> L()</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"_dyn_edges ok:"</span>, edges)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>_dyn_edges ok: [{'caller': 'mymod.app', 'callee': 'mymod.hello', 'kind': 'decorator', 'confidence': 0.75}, {'caller': 'mymod.setup', 'callee': 'mymod.hello', 'kind': 'connect_body', 'confidence': 0.9}, {'caller': 'mymod.other_app', 'callee': 'mymod.hello', 'kind': 'registration', 'confidence': 0.75}]</code></pre>
+</div>
+</div>
+<div id="8ee7882fd080161b" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>_DELEGATES_SRC <span class="op">=</span> <span class="st">'''</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="st">from fastcore.all import delegates</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="st">def target(x, y, z=1): pass</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="st">@delegates(target)</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="st">def wrapper_pos(**kw): pass</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="st">@delegates(to=target)</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="st">def wrapper_kw(**kw): pass</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="st">@delegates</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="st">def bare(**kw): pass</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="st">@delegates()</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="st">def empty(**kw): pass</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="st">'''</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>dyn_edges(_DELEGATES_SRC, <span class="st">'mymod'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'caller': 'mymod.wrapper_pos',
+  'callee': 'mymod.target',
+  'kind': 'delegates',
+  'confidence': 0.85},
+ {'caller': 'mymod.wrapper_kw',
+  'callee': 'mymod.to=target',
+  'kind': 'delegates',
+  'confidence': 0.85}]</code></pre>
+</div>
+</div>
+<div id="5be8eac4f3e4fec3" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>_PATCH_SRC <span class="op">=</span> <span class="st">'''</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="st">from fastcore.all import patch, delegates</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="st">from apswutils.db import Database, Table, View</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="st">@patch</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="st">def basic(self:Database, x): pass</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="st">@patch(as_prop=True)</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="st">def prop(self:Database): pass</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="st">@patch(cls_method=True)</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="st">def cls_m(cls:Database): pass</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="st">@patch</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="st">def no_ann(self): pass</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a><span class="st">@patch</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="st">def union_m(self:Table|View): pass</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a><span class="st">'''</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>dyn_edges(_PATCH_SRC, <span class="st">'mymod'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'caller': 'mymod.Database',
+  'callee': 'mymod.basic',
+  'kind': 'patch',
+  'confidence': 0.9},
+ {'caller': 'mymod.Database',
+  'callee': 'mymod.prop',
+  'kind': 'patch',
+  'confidence': 0.9},
+ {'caller': 'mymod.Database',
+  'callee': 'mymod.cls_m',
+  'kind': 'patch',
+  'confidence': 0.9},
+ {'caller': 'mymod.Table',
+  'callee': 'mymod.union_m',
+  'kind': 'patch',
+  'confidence': 0.9},
+ {'caller': 'mymod.View',
+  'callee': 'mymod.union_m',
+  'kind': 'patch',
+  'confidence': 0.9}]</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="static_edges" class="level3">
+<h3 class="anchored" data-anchor-id="static_edges">static_edges</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> static_edges(</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    sources:<span class="bu">dict</span><span class="op">=</span><span class="va">None</span>, filenames:<span class="bu">list</span><span class="op">=</span><span class="va">None</span>, root:<span class="bu">str</span><span class="op">=</span><span class="va">None</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">tuple</span>:</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Static call edges via pyan3. Provide either filenames+root or sources dict.</em></p>
+<div id="89b26c38158c0ebf" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>edges, meta <span class="op">=</span> static_edges({<span class="st">"mod"</span>: <span class="st">"def foo(): pass</span><span class="ch">\n</span><span class="st">def bar(): foo()"</span>})</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>meta</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'mod.foo': {'node': 'mod.foo', 'flavor': 'function', 'file': 'mod'},
+ 'mod.foo.^^^argument^^^': {'node': 'mod.foo.^^^argument^^^',
+  'flavor': 'unspecified',
+  'file': 'mod'},
+ 'mod.bar.^^^argument^^^': {'node': 'mod.bar.^^^argument^^^',
+  'flavor': 'unspecified',
+  'file': 'mod'},
+ 'mod.bar': {'node': 'mod.bar', 'flavor': 'function', 'file': 'mod'}}</code></pre>
+</div>
+</div>
+<div id="1aec30705628f686" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">all</span>(k <span class="kw">in</span> edges[<span class="dv">0</span>] <span class="cf">for</span> k <span class="kw">in</span> (<span class="st">'caller'</span>,<span class="st">'callee'</span>,<span class="st">'kind'</span>,<span class="st">'confidence'</span>))</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">all</span>(e[<span class="st">'kind'</span>] <span class="op">==</span> <span class="st">'static'</span> <span class="cf">for</span> e <span class="kw">in</span> edges)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="9e948a9d5388a3d2" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>static_edges({<span class="st">"bad"</span>: <span class="st">"def (: !!!"</span>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>pyan3 static analysis failed: invalid syntax (bad, line 1)</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre><code>([], {})</code></pre>
+</div>
+</div>
+<div id="e25b8a35d1a809a9" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> textwrap <span class="im">import</span> dedent</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>_src1 <span class="op">=</span> dedent(<span class="st">'''</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="st">class Database:</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="st">    def query(self): pass</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="st">'''</span>)</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>_src2 <span class="op">=</span> dedent(<span class="st">'''</span></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a><span class="st">from mod1 import Database</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a><span class="st">def use_db():</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a><span class="st">    db = Database()</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a><span class="st">    db.query()</span></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a><span class="st">'''</span>)</span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>_edges, _ <span class="op">=</span> static_edges({<span class="st">"mod1"</span>: _src1, <span class="st">"mod2"</span>: _src2})</span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="kw">not</span> <span class="bu">any</span>(e[<span class="st">'callee'</span>].startswith(<span class="st">'None.'</span>) <span class="cf">for</span> e <span class="kw">in</span> _edges), <span class="op">\</span></span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>    <span class="ss">f"None namespace callees found: </span><span class="sc">{</span>[e[<span class="st">'callee'</span>] <span class="cf">for</span> e <span class="kw">in</span> _edges <span class="cf">if</span> e[<span class="st">'callee'</span>].startswith(<span class="st">'None.'</span>)]<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'cross-module callee fix ok:'</span>, [e[<span class="st">'callee'</span>] <span class="cf">for</span> e <span class="kw">in</span> _edges])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>cross-module callee fix ok: ['mod1.Database', 'mod1.Database.query']</code></pre>
+</div>
+</div>
+<div id="915751e09fb77617" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>static_edges(filenames<span class="op">=</span>[<span class="st">'/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'</span>], root<span class="op">=</span>Path(<span class="st">'/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages'</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>([{'caller': 'litesearch.core._dtype_suffix',
+   'callee': 'litesearch.core._dtype_suffixes',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.query',
+   'callee': 'fastcore.all.Iterable',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.query',
+   'callee': 'apswutils.utils.cursor_row2dict',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.query',
+   'callee': 'fastcore.all.Union',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.query',
+   'callee': 'fastcore.all.Generator',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.query',
+   'callee': 'fastcore.all.Optional',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.query',
+   'callee': 'fastcore.all.patch',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.query',
+   'callee': 'fastlite.Database',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.get_store',
+   'callee': 'fastlite.Database',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.get_store',
+   'callee': 'fastcore.all.patch',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.vec_search',
+   'callee': 'apswutils.db.Table',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.vec_search',
+   'callee': 'fastcore.all.ifnone',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.vec_search',
+   'callee': 'litesearch.core._dtype_suffix',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.vec_search',
+   'callee': 'fastcore.all.patch',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.rrf_merge',
+   'callee': 'fastcore.all.merge',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.database',
+   'callee': 'usearch.sqlite_path',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.database',
+   'callee': 'fastlite.Database',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.database',
+   'callee': 'fastcore.all.Path',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.search',
+   'callee': 'litesearch.core.rrf_merge',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.search',
+   'callee': 'fastcore.all.merge',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.search',
+   'callee': 'fastlite.Database',
+   'kind': 'static',
+   'confidence': 1.0},
+  {'caller': 'litesearch.core.search',
+   'callee': 'fastcore.all.patch',
+   'kind': 'static',
+   'confidence': 1.0}],
+ {'litesearch.core.str': {'node': 'litesearch.core.str',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core._dtype_suffix.str': {'node': 'litesearch.core._dtype_suffix.str',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.query.str': {'node': 'litesearch.core.query.str',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.get_store.str': {'node': 'litesearch.core.get_store.str',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.vec_search.str': {'node': 'litesearch.core.vec_search.str',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.vec_search.listcomp.0.str': {'node': 'litesearch.core.vec_search.listcomp.0.str',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.rrf_merge.str': {'node': 'litesearch.core.rrf_merge.str',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.rrf_merge.lambda.0.str': {'node': 'litesearch.core.rrf_merge.lambda.0.str',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.database.str': {'node': 'litesearch.core.database.str',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.search.str': {'node': 'litesearch.core.search.str',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.__all__': {'node': 'litesearch.core.__all__',
+   'flavor': 'name',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastcore.all.first': {'node': 'fastcore.all.first',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastcore.all.dict2obj': {'node': 'fastcore.all.dict2obj',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastcore.all.L': {'node': 'fastcore.all.L',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastcore.all.Path': {'node': 'fastcore.all.Path',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastcore.all.Generator': {'node': 'fastcore.all.Generator',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastcore.all.patch': {'node': 'fastcore.all.patch',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastcore.all.Optional': {'node': 'fastcore.all.Optional',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastcore.all.Union': {'node': 'fastcore.all.Union',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastcore.all.Iterable': {'node': 'fastcore.all.Iterable',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastcore.all.merge': {'node': 'fastcore.all.merge',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastcore.all.delegates': {'node': 'fastcore.all.delegates',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastcore.all.ifnone': {'node': 'fastcore.all.ifnone',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastlite.Database': {'node': 'fastlite.Database',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'apswutils.db.Table': {'node': 'apswutils.db.Table',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'apswutils.utils.cursor_row2dict': {'node': 'apswutils.utils.cursor_row2dict',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'numpy.int8': {'node': 'numpy.int8',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'numpy.float16': {'node': 'numpy.float16',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'numpy.float64': {'node': 'numpy.float64',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'numpy.float32': {'node': 'numpy.float32',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core._dtype_suffixes': {'node': 'litesearch.core._dtype_suffixes',
+   'flavor': 'name',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core._dtype_suffix': {'node': 'litesearch.core._dtype_suffix',
+   'flavor': 'function',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core._dtype_suffix.^^^argument^^^': {'node': 'litesearch.core._dtype_suffix.^^^argument^^^',
+   'flavor': 'unspecified',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.query.^^^argument^^^': {'node': 'litesearch.core.query.^^^argument^^^',
+   'flavor': 'unspecified',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.get_store.^^^argument^^^': {'node': 'litesearch.core.get_store.^^^argument^^^',
+   'flavor': 'unspecified',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.vec_search.^^^argument^^^': {'node': 'litesearch.core.vec_search.^^^argument^^^',
+   'flavor': 'unspecified',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.rrf_merge.^^^argument^^^': {'node': 'litesearch.core.rrf_merge.^^^argument^^^',
+   'flavor': 'unspecified',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.rrf_merge.lambda.0.^^^argument^^^': {'node': 'litesearch.core.rrf_merge.lambda.0.^^^argument^^^',
+   'flavor': 'unspecified',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.database.^^^argument^^^': {'node': 'litesearch.core.database.^^^argument^^^',
+   'flavor': 'unspecified',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.search.^^^argument^^^': {'node': 'litesearch.core.search.^^^argument^^^',
+   'flavor': 'unspecified',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.query': {'node': 'litesearch.core.query',
+   'flavor': 'function',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.NoneType': {'node': 'litesearch.core.NoneType',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.query.NoneType': {'node': 'litesearch.core.query.NoneType',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.vec_search.NoneType': {'node': 'litesearch.core.vec_search.NoneType',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.search.NoneType': {'node': 'litesearch.core.search.NoneType',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.query.^^^argument^^^.execute': {'node': 'litesearch.core.query.^^^argument^^^.execute',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.get_store': {'node': 'litesearch.core.get_store',
+   'flavor': 'function',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.bool': {'node': 'litesearch.core.bool',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.get_store.bool': {'node': 'litesearch.core.get_store.bool',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.rrf_merge.bool': {'node': 'litesearch.core.rrf_merge.bool',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.database.bool': {'node': 'litesearch.core.database.bool',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.search.bool': {'node': 'litesearch.core.search.bool',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.rrf_merge.float': {'node': 'litesearch.core.rrf_merge.float',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.int': {'node': 'litesearch.core.int',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.vec_search.int': {'node': 'litesearch.core.vec_search.int',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.get_store.^^^argument^^^.t': {'node': 'litesearch.core.get_store.^^^argument^^^.t',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.search.^^^argument^^^.t': {'node': 'litesearch.core.search.^^^argument^^^.t',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.vec_search': {'node': 'litesearch.core.vec_search',
+   'flavor': 'function',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.NoneType.__iter__': {'node': 'litesearch.core.NoneType.__iter__',
+   'flavor': 'method',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  '*.enumerate.__iter__': {'node': '*.enumerate.__iter__',
+   'flavor': 'method',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.NoneType.__next__': {'node': 'litesearch.core.NoneType.__next__',
+   'flavor': 'method',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  '*.enumerate.__next__': {'node': '*.enumerate.__next__',
+   'flavor': 'method',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.vec_search.listcomp.0': {'node': 'litesearch.core.vec_search.listcomp.0',
+   'flavor': 'scope',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'str.join': {'node': 'str.join',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.vec_search.^^^argument^^^.name': {'node': 'litesearch.core.vec_search.^^^argument^^^.name',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.vec_search.^^^argument^^^.db': {'node': 'litesearch.core.vec_search.^^^argument^^^.db',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.rrf_merge': {'node': 'litesearch.core.rrf_merge',
+   'flavor': 'function',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.rrf_merge.lambda.0': {'node': 'litesearch.core.rrf_merge.lambda.0',
+   'flavor': 'scope',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.database': {'node': 'litesearch.core.database',
+   'flavor': 'function',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastlite.Database.enable_wal': {'node': 'fastlite.Database.enable_wal',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'usearch.sqlite_path': {'node': 'usearch.sqlite_path',
+   'flavor': 'importeditem',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'fastlite.Database.conn': {'node': 'fastlite.Database.conn',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.search': {'node': 'litesearch.core.search',
+   'flavor': 'function',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.search.^^^argument^^^.strip': {'node': 'litesearch.core.search.^^^argument^^^.strip',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.search.^^^argument^^^.quote_fts': {'node': 'litesearch.core.search.^^^argument^^^.quote_fts',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'},
+  'litesearch.core.search.^^^argument^^^.q': {'node': 'litesearch.core.search.^^^argument^^^.q',
+   'flavor': 'attribute',
+   'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py'}})</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="codegraph.from_sources" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.from_sources">CodeGraph.from_sources</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> from_sources(</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    sources:<span class="bu">dict</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Build from {module_name: source_str}.</em></p>
+<div id="5c3f6b1c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>g_pr <span class="op">=</span> CodeGraph(<span class="st">':memory:'</span>)</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>g_pr.db[<span class="st">'graph_edges'</span>].insert_all([</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    {<span class="st">'caller'</span>:<span class="st">'A'</span>,<span class="st">'callee'</span>:<span class="st">'B'</span>,<span class="st">'kind'</span>:<span class="st">'static'</span>,<span class="st">'confidence'</span>:<span class="fl">1.0</span>},</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>    {<span class="st">'caller'</span>:<span class="st">'B'</span>,<span class="st">'callee'</span>:<span class="st">'C'</span>,<span class="st">'kind'</span>:<span class="st">'static'</span>,<span class="st">'confidence'</span>:<span class="fl">1.0</span>},</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>    {<span class="st">'caller'</span>:<span class="st">'A'</span>,<span class="st">'callee'</span>:<span class="st">'C'</span>,<span class="st">'kind'</span>:<span class="st">'static'</span>,<span class="st">'confidence'</span>:<span class="fl">1.0</span>},</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>])</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>pr <span class="op">=</span> _pagerank(g_pr.db)</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(pr)</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="st">'C'</span> <span class="kw">in</span> pr, <span class="st">"C should be in pagerank"</span></span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> pr[<span class="st">'C'</span>] <span class="op">&gt;</span> pr[<span class="st">'A'</span>], <span class="ss">f"C (most linked-to) should rank higher than A: </span><span class="sc">{</span>pr<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"pagerank ok:"</span>, pr)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>{'A': 0.05000000000000001, 'B': 0.07125000000000001, 'C': 0.13181250000000003}
+pagerank ok: {'A': 0.05000000000000001, 'B': 0.07125000000000001, 'C': 0.13181250000000003}</code></pre>
+</div>
+</div>
+<div id="1f63e3894365b88c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>CodeGraph(<span class="st">':memory:'</span>).from_sources({<span class="st">'mod'</span>: <span class="st">'def foo(): pass</span><span class="ch">\n</span><span class="st">def bar(): foo()</span><span class="ch">\n</span><span class="st">'</span>}).db.t.graph_nodes()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'node': 'mod.foo',
+  'flavor': 'function',
+  'file': 'mod',
+  'pagerank': 0.06938,
+  'in_degree': 1,
+  'out_degree': 0},
+ {'node': 'mod.foo.^^^argument^^^',
+  'flavor': 'unspecified',
+  'file': 'mod',
+  'pagerank': 0.0375,
+  'in_degree': 0,
+  'out_degree': 0},
+ {'node': 'mod.bar.^^^argument^^^',
+  'flavor': 'unspecified',
+  'file': 'mod',
+  'pagerank': 0.0375,
+  'in_degree': 0,
+  'out_degree': 0},
+ {'node': 'mod.bar',
+  'flavor': 'function',
+  'file': 'mod',
+  'pagerank': 0.0375,
+  'in_degree': 0,
+  'out_degree': 1}]</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="codegraph.from_pkg" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.from_pkg">CodeGraph.from_pkg</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> from_pkg(</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    pkg:<span class="bu">str</span>, path:pathlib.Path <span class="op">|</span> <span class="bu">str</span><span class="op">=</span><span class="st">'.'</span>, recursive:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, maxdepth:<span class="bu">int</span><span class="op">=</span><span class="va">None</span>, symlinks:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>    file_glob:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, file_re:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, folder_re:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, skip_file_glob:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, skip_file_re:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>    skip_folder_re:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, func:<span class="bu">callable</span><span class="op">=</span>walk_join, ret_folders:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, sort:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, types:<span class="bu">str</span> <span class="op">|</span> <span class="bu">list</span><span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>    exts:<span class="bu">str</span> <span class="op">|</span> <span class="bu">list</span><span class="op">=</span><span class="va">None</span></span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>CodeGraph:</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Build from an installed package. Uses pyan3 on the package source files.</em></p>
+<hr>
+</section>
+<section id="codegraph.from_file" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.from_file">CodeGraph.from_file</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> from_file(</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>    path:<span class="bu">str</span> <span class="op">|</span> pathlib.Path</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>CodeGraph:</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Build from a single .py file. Module name derived from filename.</em></p>
+<hr>
+</section>
+<section id="codegraph.from_dir" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.from_dir">CodeGraph.from_dir</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> from_dir(</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">dir</span>:<span class="bu">str</span> <span class="op">|</span> pathlib.Path, path:pathlib.Path <span class="op">|</span> <span class="bu">str</span><span class="op">=</span><span class="st">'.'</span>, recursive:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, maxdepth:<span class="bu">int</span><span class="op">=</span><span class="va">None</span>, symlinks:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>    file_glob:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, file_re:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, folder_re:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, skip_file_glob:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, skip_file_re:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>    skip_folder_re:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, func:<span class="bu">callable</span><span class="op">=</span>walk_join, ret_folders:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, sort:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, types:<span class="bu">str</span> <span class="op">|</span> <span class="bu">list</span><span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>    exts:<span class="bu">str</span> <span class="op">|</span> <span class="bu">list</span><span class="op">=</span><span class="va">None</span></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>CodeGraph:</span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Build from .py files under path — pyan reads files directly.</em></p>
+<hr>
+</section>
+<section id="codegraph.process_files" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.process_files">CodeGraph.process_files</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> process_files(</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    files, <span class="co"># list of .py file paths to analyse</span></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>    root:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># package root; auto-detected via __init__.py walk if None</span></span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Build static + dynamic call-graph edges for the given source files and recompute centrality.</em></p>
+<div id="3f858142f6bc42df" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>cg<span class="op">=</span>CodeGraph(<span class="st">':memory:'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="3580a42385d6e76c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>cg.from_pkg(<span class="st">'httpx'</span>).from_pkg(<span class="st">'fastcore'</span>).from_pkg(<span class="st">'litesearch'</span>).from_pkg(<span class="st">'fastlite'</span>).from_pkg(<span class="st">'apswutils'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>&lt;__main__.CodeGraph&gt;</code></pre>
+</div>
+</div>
+<div id="49a02e6999a25f74" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>cg.from_pkg(<span class="st">'protobuf'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>&lt;__main__.CodeGraph&gt;</code></pre>
+</div>
+</div>
+<div id="bd0dcc87c553dd0d" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>cg.gn(select<span class="op">=</span><span class="st">'*'</span>, where<span class="op">=</span><span class="st">'node like "</span><span class="sc">%g</span><span class="st">et_store%"'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'node': 'litesearch.core.get_store.str',
+  'flavor': 'attribute',
+  'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py',
+  'pagerank': 0.00023,
+  'in_degree': 0,
+  'out_degree': 0},
+ {'node': 'litesearch.core.get_store.^^^argument^^^',
+  'flavor': 'unspecified',
+  'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py',
+  'pagerank': 0.00023,
+  'in_degree': 0,
+  'out_degree': 0},
+ {'node': 'litesearch.core.get_store',
+  'flavor': 'function',
+  'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py',
+  'pagerank': 0.00029,
+  'in_degree': 1,
+  'out_degree': 3},
+ {'node': 'litesearch.core.get_store.bool',
+  'flavor': 'attribute',
+  'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py',
+  'pagerank': 0.00023,
+  'in_degree': 0,
+  'out_degree': 0},
+ {'node': 'litesearch.core.get_store.^^^argument^^^.t',
+  'flavor': 'attribute',
+  'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/litesearch/core.py',
+  'pagerank': 0.00023,
+  'in_degree': 0,
+  'out_degree': 0}]</code></pre>
+</div>
+</div>
+<div id="f46246cc7fcd65a5" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>cg.from_dir(<span class="st">'../kosha'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>&lt;__main__.CodeGraph&gt;</code></pre>
+</div>
+</div>
+<div id="cc1b809b958d1d1d" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>cg.db.t.graph_nodes.count</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>16160</code></pre>
+</div>
+</div>
+<div id="d461aa62c81e4503" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>cg.gn(<span class="st">'node like "</span><span class="sc">%e</span><span class="st">mb_doc%"'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'node': 'kosha.core.emb_doc.str',
+  'flavor': 'attribute',
+  'file': '../kosha/core.py',
+  'pagerank': 0.00011,
+  'in_degree': 0,
+  'out_degree': 0},
+ {'node': 'kosha.core.emb_doc',
+  'flavor': 'function',
+  'file': '../kosha/core.py',
+  'pagerank': 0.00016,
+  'in_degree': 1,
+  'out_degree': 1},
+ {'node': 'kosha.core.emb_doc.^^^argument^^^',
+  'flavor': 'unspecified',
+  'file': '../kosha/core.py',
+  'pagerank': 0.00011,
+  'in_degree': 0,
+  'out_degree': 0},
+ {'node': 'kosha.core.emb_doc.lambda.0.^^^argument^^^',
+  'flavor': 'unspecified',
+  'file': '../kosha/core.py',
+  'pagerank': 0.00011,
+  'in_degree': 0,
+  'out_degree': 0},
+ {'node': 'kosha.core.emb_doc.lambda.0',
+  'flavor': 'scope',
+  'file': '../kosha/core.py',
+  'pagerank': 0.00011,
+  'in_degree': 0,
+  'out_degree': 1}]</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="codegraph.node_info" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.node_info">CodeGraph.node_info</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> node_info(</span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>    node:<span class="bu">str</span>, <span class="co"># fully-qualified node name</span></span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a>    with_kind:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># include edge kind in callers/callees tuples</span></span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">dict</span>:</span>
+<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Full node record: graph_nodes row merged with callers, callees, and co-dispatch peers.</em></p>
+<hr>
+</section>
+<section id="codegraph.edge_kinds" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.edge_kinds">CodeGraph.edge_kinds</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> edge_kinds(</span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">dict</span>:</span>
+<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Count of each edge kind in the graph (static, decorator, patch, registration, etc.).</em></p>
+<hr>
+</section>
+<section id="codegraph.short_paths" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.short_paths">CodeGraph.short_paths</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> short_paths(</span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>    nodes, <span class="co"># iterable of fully-qualified node names</span></span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>    k:<span class="bu">int</span><span class="op">=</span><span class="dv">10</span>, <span class="co"># consider only the first k nodes</span></span>
+<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb46-6"><a href="#cb46-6" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Shortest paths between all pairs in top-k nodes — one BFS per source node.</em></p>
+<hr>
+</section>
+<section id="codegraph.short_path" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.short_path">CodeGraph.short_path</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> short_path(</span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>    src:<span class="bu">str</span>, <span class="co"># fully-qualified source node name</span></span>
+<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>    tgt:<span class="bu">str</span>, <span class="co"># fully-qualified target node name</span></span>
+<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb47-6"><a href="#cb47-6" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Shortest path from src to tgt via BFS. Returns L of node names or empty L.</em></p>
+<hr>
+</section>
+<section id="codegraph.ranked" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.ranked">CodeGraph.ranked</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> ranked(</span>
+<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a>    k:<span class="bu">int</span><span class="op">=</span><span class="dv">10</span>, <span class="co"># number of top nodes to return</span></span>
+<span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a>    module:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, <span class="co"># optional module prefix filter (e.g. 'fastcore.basics')</span></span>
+<span id="cb48-5"><a href="#cb48-5" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb48-6"><a href="#cb48-6" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Top-k nodes by pagerank, optionally filtered to a module prefix.</em></p>
+<hr>
+</section>
+<section id="codegraph.co_dispatched" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.co_dispatched">CodeGraph.co_dispatched</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> co_dispatched(</span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>    node:<span class="bu">str</span>, <span class="co"># fully-qualified node name</span></span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Nodes registered in the same dispatch group as <code>node</code> (route list, handler table, etc.).</em></p>
+<hr>
+</section>
+<section id="codegraph.neighbors" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.neighbors">CodeGraph.neighbors</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> neighbors(</span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>    n:<span class="bu">str</span>, <span class="co"># fully-qualified node name</span></span>
+<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a>    depth:<span class="bu">int</span><span class="op">=</span><span class="dv">1</span>, <span class="co"># number of hops to expand</span></span>
+<span id="cb50-5"><a href="#cb50-5" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb50-6"><a href="#cb50-6" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>callers + callees up to depth hops.</em></p>
+<hr>
+</section>
+<section id="codegraph.callees" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.callees">CodeGraph.callees</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> callees(</span>
+<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a>    n:<span class="bu">str</span>, <span class="co"># fully-qualified node name</span></span>
+<span id="cb51-4"><a href="#cb51-4" aria-hidden="true" tabindex="-1"></a>    with_kind:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># if True, return (callee, edge_kind) tuples instead of plain names</span></span>
+<span id="cb51-5"><a href="#cb51-5" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb51-6"><a href="#cb51-6" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>All nodes called by <code>n</code>, optionally with edge kind.</em></p>
+<hr>
+</section>
+<section id="codegraph.callers" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.callers">CodeGraph.callers</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb52"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> callers(</span>
+<span id="cb52-3"><a href="#cb52-3" aria-hidden="true" tabindex="-1"></a>    n:<span class="bu">str</span>, <span class="co"># fully-qualified node name (e.g. 'mymod.foo')</span></span>
+<span id="cb52-4"><a href="#cb52-4" aria-hidden="true" tabindex="-1"></a>    with_kind:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># if True, return (caller, edge_kind) tuples instead of plain names</span></span>
+<span id="cb52-5"><a href="#cb52-5" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb52-6"><a href="#cb52-6" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>All nodes that call <code>n</code>, optionally with edge kind.</em></p>
+<div id="b69c996522835c5e" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>cg.db.t.graph_edges(where<span class="op">=</span><span class="st">'caller like "%apswutils.db.Table.insert_all%" and callee like "</span><span class="sc">%i</span><span class="st">nsert_chunk%"'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'id': 9744,
+  'caller': 'apswutils.db.Table.insert_all',
+  'callee': 'apswutils.db.Table.insert_chunk',
+  'kind': 'static',
+  'confidence': 1.0}]</code></pre>
+</div>
+</div>
+<div id="ca6d8ad390457e27" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb55"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>to_date_co <span class="op">=</span> cg.co_dispatched(<span class="st">'fastcore.basics.to_date'</span>)</span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">all</span>(<span class="st">'fastcore'</span> <span class="kw">in</span> n <span class="cf">for</span> n <span class="kw">in</span> to_date_co), <span class="op">\</span></span>
+<span id="cb55-3"><a href="#cb55-3" aria-hidden="true" tabindex="-1"></a>    <span class="ss">f"fastcore.basics.to_date co_dispatched leaked into httpx: </span><span class="sc">{</span>to_date_co<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb55-4"><a href="#cb55-4" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">len</span>(to_date_co) <span class="op">&gt;</span> <span class="dv">0</span>, <span class="st">"fastcore.basics.to_date should have co_dispatched peers"</span></span>
+<span id="cb55-5"><a href="#cb55-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"co_dispatched cross-package isolation ok:"</span>, to_date_co)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>co_dispatched cross-package isolation ok: ['fastcore.basics.to_int', 'fastcore.basics.to_bool', 'fastcore.basics.to_float']</code></pre>
+</div>
+</div>
+<div id="b3cf6cfaff329253" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb57"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a>cg.node_info(<span class="st">'fastcore.basics.to_date'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'node': 'fastcore.basics.to_date',
+ 'flavor': 'function',
+ 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fastcore/basics.py',
+ 'pagerank': 3e-05,
+ 'in_degree': 0,
+ 'out_degree': 2,
+ 'callers': [],
+ 'callees': ['fastcore.basics._typeerr', 'fastcore.basics.str2date'],
+ 'co_dispatched': ['fastcore.basics.to_int', 'fastcore.basics.to_bool', 'fastcore.basics.to_float']}</code></pre>
+</div>
+</div>
+<div id="ba177476104f6fd2" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb59"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>n <span class="op">=</span> cg.db.t.graph_nodes(where<span class="op">=</span><span class="st">'node like "%mk_write"'</span>)[<span class="dv">0</span>][<span class="st">'node'</span>]</span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a>cg.node_info(n)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'node': 'fastcore.xtras.mk_write',
+ 'flavor': 'function',
+ 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fastcore/xtras.py',
+ 'pagerank': 4e-05,
+ 'in_degree': 2,
+ 'out_degree': 2,
+ 'callers': ['fastcore.xtras.write_json', 'fastcore.xtras.Path'],
+ 'callees': ['fastcore.imports.NoneType', 'fastcore.basics.patch'],
+ 'co_dispatched': []}</code></pre>
+</div>
+</div>
+<div id="6f9fdbed01fd4fd2" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb61"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a>path <span class="op">=</span> cg.short_path(<span class="st">'apswutils.db.Table.upsert'</span>, <span class="st">'apswutils.db.Table.insert_chunk'</span>)</span>
+<span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> path[<span class="dv">0</span>] <span class="op">==</span> <span class="st">'apswutils.db.Table.upsert'</span>, <span class="ss">f"wrong start: </span><span class="sc">{</span>path<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb61-3"><a href="#cb61-3" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> path[<span class="op">-</span><span class="dv">1</span>] <span class="op">==</span> <span class="st">'apswutils.db.Table.insert_chunk'</span>, <span class="ss">f"wrong end: </span><span class="sc">{</span>path<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb61-4"><a href="#cb61-4" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">len</span>(path) <span class="op">&gt;=</span> <span class="dv">2</span>, <span class="ss">f"path too short: </span><span class="sc">{</span>path<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb61-5"><a href="#cb61-5" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> cg.short_path(<span class="st">'apswutils.db.Table.upsert'</span>, <span class="st">'apswutils.db.Table.upsert'</span>) <span class="op">==</span> L([<span class="st">'apswutils.db.Table.upsert'</span>]), <span class="st">"src==tgt should return [src]"</span></span>
+<span id="cb61-6"><a href="#cb61-6" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> cg.short_path(<span class="st">'apswutils.db.Table.upsert'</span>, <span class="st">'no.such.node'</span>) <span class="op">==</span> L(), <span class="st">"missing tgt should return empty"</span></span>
+<span id="cb61-7"><a href="#cb61-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"short_path ok:"</span>, path)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>short_path ok: ['apswutils.db.Table.upsert', 'apswutils.db.Table.upsert_all', 'apswutils.db.Table.insert_all', 'apswutils.db.Table.insert_chunk']</code></pre>
+</div>
+</div>
+<div id="e6d61c48d3ab504f" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb63"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a>cg.ranked(<span class="dv">5</span>, module<span class="op">=</span><span class="st">'litesearch'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'node': 'litesearch.data.kw', 'pagerank': 0.0011}, {'node': 'litesearch.utils.FastEncode.__init__', 'pagerank': 0.00075}, {'node': 'litesearch.utils.download_model', 'pagerank': 0.00072}, {'node': 'litesearch.data.file_parse.meta_', 'pagerank': 0.00064}, {'node': 'litesearch.utils.FastEncode._load_enc', 'pagerank': 0.00053}]</code></pre>
+</div>
+</div>
+<div id="991e6fbb63e1fc00" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb65"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a>cg.callers(<span class="st">'litesearch.data.kw'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>['litesearch.core.get_store', 'litesearch.core.database', 'litesearch.data.pkg2chunks', 'litesearch.data.pre', 'litesearch.utils.FastEncode.encode', 'litesearch.utils.FastEncode.encode.lambda.0', 'litesearch.utils.FastEncode.encode_document', 'litesearch.utils.FastEncode.encode_query', 'litesearch.utils.FastEncodeImage.embed', 'litesearch.utils.FastEncodeImage.embed.lambda.0', 'litesearch.utils.FastEncodeMultimodal.encode_text', 'litesearch.utils.FastEncodeMultimodal.encode_image', 'litesearch.utils.encode_pdf_texts']</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="codegraph.file2nodes" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.file2nodes">CodeGraph.file2nodes</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb67"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> file2nodes(</span>
+<span id="cb67-3"><a href="#cb67-3" aria-hidden="true" tabindex="-1"></a>    path:<span class="bu">str</span></span>
+<span id="cb67-4"><a href="#cb67-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">set</span>:</span>
+<span id="cb67-5"><a href="#cb67-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Return set of node names whose file column matches path.</em></p>
+<div id="cae92dc2" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb68"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a>g_drop <span class="op">=</span> CodeGraph(<span class="st">':memory:'</span>)</span>
+<span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a>g_drop.db.t.graph_nodes.insert_all([</span>
+<span id="cb68-3"><a href="#cb68-3" aria-hidden="true" tabindex="-1"></a>    {<span class="st">'node'</span>:<span class="st">'mod.foo'</span>,<span class="st">'flavor'</span>:<span class="st">'function'</span>,<span class="st">'file'</span>:<span class="st">'/proj/mod.py'</span>},</span>
+<span id="cb68-4"><a href="#cb68-4" aria-hidden="true" tabindex="-1"></a>    {<span class="st">'node'</span>:<span class="st">'mod.bar'</span>,<span class="st">'flavor'</span>:<span class="st">'function'</span>,<span class="st">'file'</span>:<span class="st">'/proj/mod.py'</span>},</span>
+<span id="cb68-5"><a href="#cb68-5" aria-hidden="true" tabindex="-1"></a>])</span>
+<span id="cb68-6"><a href="#cb68-6" aria-hidden="true" tabindex="-1"></a>g_drop.db.t.graph_edges.insert({<span class="st">'caller'</span>:<span class="st">'mod.foo'</span>,<span class="st">'callee'</span>:<span class="st">'mod.bar'</span>,<span class="st">'kind'</span>:<span class="st">'static'</span>,<span class="st">'confidence'</span>:<span class="fl">1.0</span>})</span>
+<span id="cb68-7"><a href="#cb68-7" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> g_drop.file2nodes(<span class="st">'/proj/mod.py'</span>) <span class="op">==</span> {<span class="st">'mod.foo'</span>,<span class="st">'mod.bar'</span>}</span>
+<span id="cb68-8"><a href="#cb68-8" aria-hidden="true" tabindex="-1"></a>g_drop._drop_file(<span class="st">'/proj/mod.py'</span>)</span>
+<span id="cb68-9"><a href="#cb68-9" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> g_drop.file2nodes(<span class="st">'/proj/mod.py'</span>) <span class="op">==</span> <span class="bu">set</span>()</span>
+<span id="cb68-10"><a href="#cb68-10" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="kw">not</span> <span class="bu">list</span>(g_drop.db.execute(<span class="st">"SELECT * FROM graph_edges"</span>))</span>
+<span id="cb68-11"><a href="#cb68-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"_drop_file + _nodes_for_file ok"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>_drop_file + _nodes_for_file ok</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="codegraph.sync" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.sync">CodeGraph.sync</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb70"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb70-2"><a href="#cb70-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sync(</span>
+<span id="cb70-3"><a href="#cb70-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">dir</span>:NoneType<span class="op">=</span><span class="va">None</span>, pkgs:NoneType<span class="op">=</span><span class="va">None</span>, force:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span></span>
+<span id="cb70-4"><a href="#cb70-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>CodeGraph:</span>
+<span id="cb70-5"><a href="#cb70-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Incremental sync: from_dir per dir, from_pkg per pkg; manage file_index.</em></p>
+<hr>
+</section>
+<section id="codegraph.sync_pkgs" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.sync_pkgs">CodeGraph.sync_pkgs</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb71"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sync_pkgs(</span>
+<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a>    pkgs:<span class="bu">list</span></span>
+<span id="cb71-4"><a href="#cb71-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>CodeGraph:</span>
+<span id="cb71-5"><a href="#cb71-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Incremental sync for packages: drop missing files, update changed files, add new files.</em></p>
+<hr>
+</section>
+<section id="codegraph.sync_dir" class="level3">
+<h3 class="anchored" data-anchor-id="codegraph.sync_dir">CodeGraph.sync_dir</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb72"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sync_dir(</span>
+<span id="cb72-3"><a href="#cb72-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">dir</span>:<span class="bu">str</span> <span class="op">|</span> pathlib.Path, force:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span></span>
+<span id="cb72-4"><a href="#cb72-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>CodeGraph:</span>
+<span id="cb72-5"><a href="#cb72-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Incremental sync for a directory: drop missing files, update changed files, add new files.</em></p>
+<div id="5449081c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb73"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tempfile, time</span>
+<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-3"><a href="#cb73-3" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> tempfile.TemporaryDirectory() <span class="im">as</span> tmp:</span>
+<span id="cb73-4"><a href="#cb73-4" aria-hidden="true" tabindex="-1"></a>    pa, pb <span class="op">=</span> Path(<span class="ss">f'</span><span class="sc">{</span>tmp<span class="sc">}</span><span class="ss">/a.py'</span>), Path(<span class="ss">f'</span><span class="sc">{</span>tmp<span class="sc">}</span><span class="ss">/b.py'</span>)</span>
+<span id="cb73-5"><a href="#cb73-5" aria-hidden="true" tabindex="-1"></a>    pa.write_text(<span class="st">'def foo(): pass</span><span class="ch">\n</span><span class="st">'</span>)<span class="op">;</span> pb.write_text(<span class="st">'def bar(): pass</span><span class="ch">\n</span><span class="st">'</span>)</span>
+<span id="cb73-6"><a href="#cb73-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-7"><a href="#cb73-7" aria-hidden="true" tabindex="-1"></a>    g <span class="op">=</span> CodeGraph(<span class="st">':memory:'</span>)</span>
+<span id="cb73-8"><a href="#cb73-8" aria-hidden="true" tabindex="-1"></a>    g.sync(<span class="bu">dir</span><span class="op">=</span>tmp)</span>
+<span id="cb73-9"><a href="#cb73-9" aria-hidden="true" tabindex="-1"></a>    fi <span class="op">=</span> {r[<span class="st">'path'</span>]: r[<span class="st">'last_analyzed_at'</span>] <span class="cf">for</span> r <span class="kw">in</span> g.db.t.file_index.rows}</span>
+<span id="cb73-10"><a href="#cb73-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">str</span>(pa) <span class="kw">in</span> fi <span class="kw">and</span> <span class="bu">str</span>(pb) <span class="kw">in</span> fi, fi</span>
+<span id="cb73-11"><a href="#cb73-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-12"><a href="#cb73-12" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Modify b.py — mtime changes</span></span>
+<span id="cb73-13"><a href="#cb73-13" aria-hidden="true" tabindex="-1"></a>    time.sleep(<span class="fl">0.01</span>)</span>
+<span id="cb73-14"><a href="#cb73-14" aria-hidden="true" tabindex="-1"></a>    pb.write_text(<span class="st">'def bar(): return 42</span><span class="ch">\n</span><span class="st">'</span>)</span>
+<span id="cb73-15"><a href="#cb73-15" aria-hidden="true" tabindex="-1"></a>    pb.touch()  <span class="co"># ensure mtime update</span></span>
+<span id="cb73-16"><a href="#cb73-16" aria-hidden="true" tabindex="-1"></a>    g.sync(<span class="bu">dir</span><span class="op">=</span>tmp)</span>
+<span id="cb73-17"><a href="#cb73-17" aria-hidden="true" tabindex="-1"></a>    fi2 <span class="op">=</span> {r[<span class="st">'path'</span>]: r[<span class="st">'last_analyzed_at'</span>] <span class="cf">for</span> r <span class="kw">in</span> g.db.t.file_index.rows}</span>
+<span id="cb73-18"><a href="#cb73-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> fi2[<span class="bu">str</span>(pa)] <span class="op">==</span> fi[<span class="bu">str</span>(pa)], <span class="ss">f"a.py should not be reprocessed: </span><span class="sc">{</span>fi2<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb73-19"><a href="#cb73-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> fi2[<span class="bu">str</span>(pb)] <span class="op">!=</span> fi[<span class="bu">str</span>(pb)], <span class="ss">f"b.py should be reprocessed: </span><span class="sc">{</span>fi2<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb73-20"><a href="#cb73-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-21"><a href="#cb73-21" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Delete a.py — should be removed from file_index</span></span>
+<span id="cb73-22"><a href="#cb73-22" aria-hidden="true" tabindex="-1"></a>    pa.unlink()</span>
+<span id="cb73-23"><a href="#cb73-23" aria-hidden="true" tabindex="-1"></a>    g.sync(<span class="bu">dir</span><span class="op">=</span>tmp)</span>
+<span id="cb73-24"><a href="#cb73-24" aria-hidden="true" tabindex="-1"></a>    fi3 <span class="op">=</span> {r[<span class="st">'path'</span>] <span class="cf">for</span> r <span class="kw">in</span> g.db.t.file_index.rows}</span>
+<span id="cb73-25"><a href="#cb73-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">str</span>(pa) <span class="kw">not</span> <span class="kw">in</span> fi3, <span class="ss">f"a.py should be removed: </span><span class="sc">{</span>fi3<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb73-26"><a href="#cb73-26" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"sync incremental ok, remaining files:"</span>, fi3)</span>
+<span id="cb73-27"><a href="#cb73-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-28"><a href="#cb73-28" aria-hidden="true" tabindex="-1"></a>    <span class="co"># add packages to codegraph</span></span>
+<span id="cb73-29"><a href="#cb73-29" aria-hidden="true" tabindex="-1"></a>    g.sync(pkgs<span class="op">=</span>[<span class="st">'httpx'</span>, <span class="st">'fastcore'</span>])</span>
+<span id="cb73-30"><a href="#cb73-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">len</span>(g.gn(where<span class="op">=</span><span class="st">'node like "httpx.%"'</span>)) <span class="op">&gt;</span> <span class="dv">0</span>, <span class="st">"httpx nodes should be in graph"</span></span>
+<span id="cb73-31"><a href="#cb73-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">len</span>(g.gn(where<span class="op">=</span><span class="st">'node like "fastcore.%"'</span>)) <span class="op">&gt;</span> <span class="dv">0</span>, <span class="st">"fastcore nodes should be in graph"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>no action. pkgs empty
+no action. pkgs empty
+no action. pkgs empty
+sync incremental ok, remaining files: {'/tmp/tmpk36atdco/b.py'}
+no action. dir empty</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="kosha.short_paths" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.short_paths">Kosha.short_paths</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb75"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> short_paths(</span>
+<span id="cb75-3"><a href="#cb75-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb75-4"><a href="#cb75-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb75-5"><a href="#cb75-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Shortest paths helper: shortest paths between all pairs in top-k nodes.</em></p>
+<hr>
+</section>
+<section id="kosha.short_path" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.short_path">Kosha.short_path</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb76"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb76-2"><a href="#cb76-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> short_path(</span>
+<span id="cb76-3"><a href="#cb76-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb76-4"><a href="#cb76-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb76-5"><a href="#cb76-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Shortest path helper: shortest path between two nodes.</em></p>
+<hr>
+</section>
+<section id="kosha.neighbors" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.neighbors">Kosha.neighbors</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb77"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb77-2"><a href="#cb77-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> neighbors(</span>
+<span id="cb77-3"><a href="#cb77-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb77-4"><a href="#cb77-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb77-5"><a href="#cb77-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Neighbors helper: callers + callees up to depth hops.</em></p>
+<hr>
+</section>
+<section id="kosha.ni" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.ni">Kosha.ni</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb78"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb78-2"><a href="#cb78-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> ni(</span>
+<span id="cb78-3"><a href="#cb78-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb78-4"><a href="#cb78-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb78-5"><a href="#cb78-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Node info helper: graph_nodes row + callers, callees, co-dispatched nodes.</em></p>
+<hr>
+</section>
+<section id="kosha.ge" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.ge">Kosha.ge</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb79"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb79-1"><a href="#cb79-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb79-2"><a href="#cb79-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> ge(</span>
+<span id="cb79-3"><a href="#cb79-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb79-4"><a href="#cb79-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb79-5"><a href="#cb79-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>graph_edges table for direct queries.</em></p>
+<hr>
+</section>
+<section id="kosha.gn" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.gn">Kosha.gn</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb80"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb80-1"><a href="#cb80-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb80-2"><a href="#cb80-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> gn(</span>
+<span id="cb80-3"><a href="#cb80-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb80-4"><a href="#cb80-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb80-5"><a href="#cb80-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>graph_nodes table for direct queries.</em></p>
+<hr>
+</section>
+<section id="kosha.graphdb" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.graphdb">Kosha.graphdb</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb81"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb81-1"><a href="#cb81-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb81-2"><a href="#cb81-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> graphdb(</span>
+<span id="cb81-3"><a href="#cb81-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb81-4"><a href="#cb81-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb81-5"><a href="#cb81-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Underlying graph.db database for direct queries.</em></p>
+<hr>
+</section>
+<section id="kosha.graph" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.graph">Kosha.graph</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb82"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb82-1"><a href="#cb82-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb82-2"><a href="#cb82-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> graph(</span>
+<span id="cb82-3"><a href="#cb82-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb82-4"><a href="#cb82-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>CodeGraph:</span>
+<span id="cb82-5"><a href="#cb82-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>code graph for this kosha instance</em></p>
+<hr>
+</section>
+<section id="kosha.public_api" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.public_api">Kosha.public_api</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb83"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb83-1"><a href="#cb83-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb83-2"><a href="#cb83-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> public_api(</span>
+<span id="cb83-3"><a href="#cb83-3" aria-hidden="true" tabindex="-1"></a>    pkg:<span class="bu">str</span>, <span class="co"># package or module to index (e.g. 'kosha', 'litesearch.data')</span></span>
+<span id="cb83-4"><a href="#cb83-4" aria-hidden="true" tabindex="-1"></a>    meta_cols:<span class="bu">str</span><span class="op">=</span><span class="st">'mod_name,docstring'</span>, <span class="co"># metadata keys to extract</span></span>
+<span id="cb83-5"><a href="#cb83-5" aria-hidden="true" tabindex="-1"></a>    limit:<span class="bu">int</span><span class="op">=</span><span class="dv">200</span>, <span class="co"># max names to return</span></span>
+<span id="cb83-6"><a href="#cb83-6" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb83-7"><a href="#cb83-7" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Return public API: all public_api=1 entries + <span class="citation" data-cites="patch-derived">@patch-derived</span> methods from the call graph from env and repo stores.</em></p>
+<div id="public_api_graph_test_c3d4" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb84"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb84-1"><a href="#cb84-1" aria-hidden="true" tabindex="-1"></a>k<span class="op">=</span>Kosha()</span>
+<span id="cb84-2"><a href="#cb84-2" aria-hidden="true" tabindex="-1"></a>api <span class="op">=</span> k.public_api(<span class="st">'kosha'</span>)</span>
+<span id="cb84-3"><a href="#cb84-3" aria-hidden="true" tabindex="-1"></a>names <span class="op">=</span> {r[<span class="st">'mod_name'</span>] <span class="cf">for</span> r <span class="kw">in</span> api}</span>
+<span id="cb84-4"><a href="#cb84-4" aria-hidden="true" tabindex="-1"></a><span class="co"># sync, context etc. are @patch-ed onto Kosha — must appear now</span></span>
+<span id="cb84-5"><a href="#cb84-5" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">any</span>(<span class="st">'sync'</span> <span class="kw">in</span> n <span class="cf">for</span> n <span class="kw">in</span> names), <span class="ss">f"patched 'sync' missing from public_api: </span><span class="sc">{</span>names<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb84-6"><a href="#cb84-6" aria-hidden="true" tabindex="-1"></a>api_httpx <span class="op">=</span> k.public_api(<span class="st">'httpx'</span>)</span>
+<span id="cb84-7"><a href="#cb84-7" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">len</span>(api_httpx) <span class="op">&gt;</span> <span class="dv">0</span>, <span class="st">'httpx __all__-based entries should still be returned'</span></span>
+<span id="cb84-8"><a href="#cb84-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'public_api patch-aware ok | kosha:'</span>, <span class="bu">len</span>(api), <span class="st">'| httpx:'</span>, <span class="bu">len</span>(api_httpx))</span>
+<span id="cb84-9"><a href="#cb84-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'kosha sample:'</span>, <span class="bu">sorted</span>(names)[:<span class="dv">8</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>public_api patch-aware ok | kosha: 113 | httpx: 200
+kosha sample: ['kosha.core._is_pkg_ingested', 'kosha.core.awatch_repo', 'kosha.core.env_context', 'kosha.core.nuke', 'kosha.core.pkg_context', 'kosha.core.pkgs2consider', 'kosha.core.pkgs_in_env', 'kosha.core.process_env']</code></pre>
+</div>
+</div>
+<div id="47a5a1ddaa958b3f" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb86"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb86-1"><a href="#cb86-1" aria-hidden="true" tabindex="-1"></a>k.public_api(<span class="st">'litesearch.data'</span>)[:<span class="dv">3</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'mod_name': 'litesearch.data.pdf_texts', 'docstring': None}, {'mod_name': 'litesearch.data.pdf_links', 'docstring': None}, {'mod_name': 'litesearch.data.pdf_images', 'docstring': None}]</code></pre>
+</div>
+</div>
+<div id="cae3093e65581ad4" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb88"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb88-1"><a href="#cb88-1" aria-hidden="true" tabindex="-1"></a>k.public_api(<span class="st">'fastlite'</span>, meta_cols<span class="op">=</span><span class="st">'mod_name'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'mod_name': 'fastlite.core.t'}, {'mod_name': 'fastlite.core.c'}, {'mod_name': 'fastlite.core.c'}, {'mod_name': 'fastlite.core.__str__'}, {'mod_name': 'fastlite.core.__str__'}, {'mod_name': 'fastlite.core.q'}, {'mod_name': 'fastlite.core.link_dcs'}, {'mod_name': 'fastlite.core.__call__'}, {'mod_name': 'fastlite.core.selectone'}, {'mod_name': 'fastlite.core.set_classes'}, {'mod_name': 'fastlite.core.get_tables'}, {'mod_name': 'fastlite.core.v'}, {'mod_name': 'fastlite.core.create'}, {'mod_name': 'fastlite.core.import_file'}, {'mod_name': 'fastlite.kw.xtra'}, {'mod_name': 'fastlite.kw.get_last'}, {'mod_name': 'fastlite.kw.ids_and_rows_where'}, {'mod_name': 'fastlite.kw.get'}, {'mod_name': 'fastlite.kw.__getitem__'}, {'mod_name': 'fastlite.kw.create'}, {'mod_name': 'fastlite.kw.transform'}, {'mod_name': 'fastlite.kw.transform_sql'}, {'mod_name': 'fastlite.kw.update'}, {'mod_name': 'fastlite.kw.insert_all'}, {'mod_name': 'fastlite.kw.insert'}, {'mod_name': 'fastlite.kw.upsert'}, {'mod_name': 'fastlite.kw.lookup'}, {'mod_name': 'fastlite.core.t'}, {'mod_name': 'fastlite.core.c'}, {'mod_name': 'fastlite.core.c'}, {'mod_name': 'fastlite.core.__str__'}, {'mod_name': 'fastlite.core.__str__'}, {'mod_name': 'fastlite.core.q'}, {'mod_name': 'fastlite.core.all_dcs'}, {'mod_name': 'fastlite.core.create_mod'}, {'mod_name': 'fastlite.core.link_dcs'}, {'mod_name': 'fastlite.core.__call__'}, {'mod_name': 'fastlite.core.selectone'}, {'mod_name': 'fastlite.core.set_classes'}, {'mod_name': 'fastlite.core.get_tables'}, {'mod_name': 'fastlite.core.v'}, {'mod_name': 'fastlite.core.get_typ'}, {'mod_name': 'fastlite.core.create'}, {'mod_name': 'fastlite.core.import_file'}, {'mod_name': 'fastlite.core.diagram'}, {'mod_name': 'fastlite.kw.MissingPrimaryKey'}, {'mod_name': 'fastlite.kw.database'}, {'mod_name': 'fastlite.kw.xtra'}, {'mod_name': 'fastlite.kw.get_last'}, {'mod_name': 'fastlite.kw.ids_and_rows_where'}, {'mod_name': 'fastlite.kw.get'}, {'mod_name': 'fastlite.kw.__getitem__'}, {'mod_name': 'fastlite.kw.create'}, {'mod_name': 'fastlite.kw.transform'}, {'mod_name': 'fastlite.kw.transform_sql'}, {'mod_name': 'fastlite.kw.update'}, {'mod_name': 'fastlite.kw.insert_all'}, {'mod_name': 'fastlite.kw.insert'}, {'mod_name': 'fastlite.kw.upsert'}, {'mod_name': 'fastlite.kw.lookup'}]</code></pre>
+</div>
+</div>
+<div id="608ebac00a460307" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb90"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb90-1"><a href="#cb90-1" aria-hidden="true" tabindex="-1"></a>k.ni(<span class="st">'fastlite.kw.database'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'node': 'fastlite.kw.database',
+ 'flavor': 'function',
+ 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fastlite/kw.py',
+ 'pagerank': 0.00042,
+ 'in_degree': 0,
+ 'out_degree': 12,
+ 'callers': [],
+ 'callees': ['apsw.Connection', 'apswutils.db.Database', 'typing.Any', 'apswutils.db.Database', 'typing.Any', 'apsw.Connection', 'typing.Any', 'apswutils.db.Database', 'apsw.Connection', 'apsw.Connection', 'apswutils.db.Database', 'typing.Any'],
+ 'co_dispatched': []}</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="kosha.context" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.context">Kosha.context</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb92"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb92-1"><a href="#cb92-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb92-2"><a href="#cb92-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> context(</span>
+<span id="cb92-3"><a href="#cb92-3" aria-hidden="true" tabindex="-1"></a>    q:<span class="bu">str</span>, <span class="co"># query with optional key:value filters</span></span>
+<span id="cb92-4"><a href="#cb92-4" aria-hidden="true" tabindex="-1"></a>    limit:<span class="bu">int</span><span class="op">=</span><span class="dv">50</span>, repo:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, env:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, graph:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb92-5"><a href="#cb92-5" aria-hidden="true" tabindex="-1"></a>    compact:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># return slim dicts (mod_name, signature, docstring, lineno) instead of full chunks</span></span>
+<span id="cb92-6"><a href="#cb92-6" aria-hidden="true" tabindex="-1"></a>    columns:<span class="bu">str</span><span class="op">=</span><span class="st">'content,metadata'</span>, sys_wide:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, kw:VAR_KEYWORD</span>
+<span id="cb92-7"><a href="#cb92-7" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L: <span class="co"># forwarded to env_context / repo_context</span></span>
+<span id="cb92-8"><a href="#cb92-8" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Fan-out semantic search: parse filters, run repo + env searches, merge with chained RRF.</em></p>
+<hr>
+</section>
+<section id="kosha.sync" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.sync">Kosha.sync</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb93"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb93-1"><a href="#cb93-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb93-2"><a href="#cb93-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sync(</span>
+<span id="cb93-3"><a href="#cb93-3" aria-hidden="true" tabindex="-1"></a>    pkgs:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># list of package names to sync (e.g. ['httpx', 'fastcore']); if None, sync all env packages</span></span>
+<span id="cb93-4"><a href="#cb93-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">dir</span>:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># directory to sync; if None, sync all of root</span></span>
+<span id="cb93-5"><a href="#cb93-5" aria-hidden="true" tabindex="-1"></a>    verbose:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># print progress messages</span></span>
+<span id="cb93-6"><a href="#cb93-6" aria-hidden="true" tabindex="-1"></a>    in_parallel:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># run repo, env, and graph sync in parallel</span></span>
+<span id="cb93-7"><a href="#cb93-7" aria-hidden="true" tabindex="-1"></a>    force:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># ignore file mtimes and reprocess all files</span></span>
+<span id="cb93-8"><a href="#cb93-8" aria-hidden="true" tabindex="-1"></a>    pyproject:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># if True, auto-detect env packages from pyproject.toml; if False, use pkgs argument as-is</span></span>
+<span id="cb93-9"><a href="#cb93-9" aria-hidden="true" tabindex="-1"></a>    depth:<span class="bu">int</span><span class="op">=</span><span class="dv">1</span>, <span class="co"># depth for pyproject env package detection; ignored if pyproject=False</span></span>
+<span id="cb93-10"><a href="#cb93-10" aria-hidden="true" tabindex="-1"></a>    embed:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># whether to embed</span></span>
+<span id="cb93-11"><a href="#cb93-11" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>Kosha:</span>
+<span id="cb93-12"><a href="#cb93-12" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Sync code store, env store, and code graph. Runs in a daemon thread by default.</em></p>
+<div id="eed0e266d0b13aef" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb94"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb94-1"><a href="#cb94-1" aria-hidden="true" tabindex="-1"></a>k <span class="op">=</span> Kosha()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="3e956240065f0a59" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb95"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb95-1"><a href="#cb95-1" aria-hidden="true" tabindex="-1"></a><span class="co"># k.sync(L(k.pkgs(select='distinct name')).attrgot('name'), in_parallel=True)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="3bb332fa49c6be63" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb96"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb96-1"><a href="#cb96-1" aria-hidden="true" tabindex="-1"></a>k.gn(select<span class="op">=</span><span class="st">'*'</span>, where<span class="op">=</span><span class="st">'node like "</span><span class="sc">%g</span><span class="st">et_store"'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'node': 'litesearch.core.get_store',
+  'flavor': None,
+  'file': None,
+  'pagerank': 5e-05,
+  'in_degree': 1,
+  'out_degree': 0}]</code></pre>
+</div>
+</div>
+<div id="b9c86a7e72c4f8c4" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb98"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb98-1"><a href="#cb98-1" aria-hidden="true" tabindex="-1"></a><span class="co"># k.sync(in_parallel=True, depth=2)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="6b029a48be337b4f" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb99"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb99-1"><a href="#cb99-1" aria-hidden="true" tabindex="-1"></a>k.ni(<span class="st">'fastcore.basics.merge'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'node': 'fastcore.basics.merge',
+ 'flavor': 'function',
+ 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fastcore/basics.py',
+ 'pagerank': 3e-05,
+ 'in_degree': 1,
+ 'out_degree': 10,
+ 'callers': ['fastcore.script.call_parse._f'],
+ 'callees': ['fastcore.basics.NS.__iter__', 'fastcore.nbio.Notebook.__iter__', 'fastcore.xtras.SaveReturn.__iter__', 'fastcore.xml.FT.__iter__', 'fastcore.docscrape.NumpyDocString.__iter__', 'fastcore.xtras._save_iter.__iter__', 'fastcore.xtras.IterLen.__iter__', 'fastcore.foundation.CollBase.__iter__', 'fastcore.xtras.CachedIter.__iter__', 'fastcore.basics.NotStr.__iter__', 'fastcore.xtras.IterLen.__iter__', 'fastcore.basics.NS.__iter__', 'fastcore.foundation.CollBase.__iter__', 'fastcore.xml.FT.__iter__', 'fastcore.xtras._save_iter.__iter__', 'fastcore.docscrape.NumpyDocString.__iter__', 'fastcore.nbio.Notebook.__iter__', 'fastcore.xtras.SaveReturn.__iter__', 'fastcore.xtras.CachedIter.__iter__', 'fastcore.basics.NotStr.__iter__'],
+ 'co_dispatched': []}</code></pre>
+</div>
+</div>
+<div id="a040840fd1e93ac" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb101"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb101-1"><a href="#cb101-1" aria-hidden="true" tabindex="-1"></a>first(k.context(<span class="st">'how do I merge dicts package:fastcore path:basics'</span>, limit<span class="op">=</span><span class="dv">1</span>, compact<span class="op">=</span><span class="va">True</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                                                                     </code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre><code>{'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fastcore/basics.py',
+ 'lineno': 655,
+ 'mod_name': 'fastcore.basics.merge',
+ 'docstring': 'Merge all dictionaries in `ds`',
+ 'sig': 'def merge(*ds):'}</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="kosha.api_call_paths" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.api_call_paths">Kosha.api_call_paths</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb104"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb104-1"><a href="#cb104-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb104-2"><a href="#cb104-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> api_call_paths(</span>
+<span id="cb104-3"><a href="#cb104-3" aria-hidden="true" tabindex="-1"></a>    from_pkg:<span class="bu">str</span>, <span class="co"># package whose public API is the call source</span></span>
+<span id="cb104-4"><a href="#cb104-4" aria-hidden="true" tabindex="-1"></a>    to_pkg:<span class="bu">str</span>, <span class="co"># package whose public API is the call target</span></span>
+<span id="cb104-5"><a href="#cb104-5" aria-hidden="true" tabindex="-1"></a>    k:<span class="bu">int</span><span class="op">=</span><span class="dv">15</span>, <span class="co"># top-k API nodes per package to consider</span></span>
+<span id="cb104-6"><a href="#cb104-6" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">dict</span>:</span>
+<span id="cb104-7"><a href="#cb104-7" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Shortest call-graph paths from from_pkg public API nodes to to_pkg public API nodes.</em></p>
+<hr>
+</section>
+<section id="kosha.top_nodes" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.top_nodes">Kosha.top_nodes</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb105"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb105-1"><a href="#cb105-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb105-2"><a href="#cb105-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> top_nodes(</span>
+<span id="cb105-3"><a href="#cb105-3" aria-hidden="true" tabindex="-1"></a>    pkg:<span class="bu">str</span>, k:<span class="bu">int</span><span class="op">=</span><span class="dv">5</span></span>
+<span id="cb105-4"><a href="#cb105-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb105-5"><a href="#cb105-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Top-k public API nodes for pkg ranked by pagerank in the code graph.</em></p>
+<hr>
+</section>
+<section id="kosha.dep_stack" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.dep_stack">Kosha.dep_stack</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb106"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb106-1"><a href="#cb106-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb106-2"><a href="#cb106-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> dep_stack(</span>
+<span id="cb106-3"><a href="#cb106-3" aria-hidden="true" tabindex="-1"></a>    seeds:<span class="bu">list</span><span class="op">=</span><span class="va">None</span>, depth:<span class="bu">int</span><span class="op">=</span><span class="dv">1</span>, no_sys_pkg:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, allow:<span class="bu">list</span><span class="op">=</span><span class="va">None</span></span>
+<span id="cb106-4"><a href="#cb106-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">list</span>:</span>
+<span id="cb106-5"><a href="#cb106-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>BFS over pkg_deps, ordered by coupling strength.</em></p>
+<hr>
+</section>
+<section id="is_sys_pkg" class="level3">
+<h3 class="anchored" data-anchor-id="is_sys_pkg">is_sys_pkg</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb107"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb107-1"><a href="#cb107-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb107-2"><a href="#cb107-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> is_sys_pkg(</span>
+<span id="cb107-3"><a href="#cb107-3" aria-hidden="true" tabindex="-1"></a>    pkg:<span class="bu">str</span></span>
+<span id="cb107-4"><a href="#cb107-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">bool</span>:</span>
+<span id="cb107-5"><a href="#cb107-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Return True if pkg is a system-wide package (e.g.&nbsp;in site-packages), False if likely user code.</em></p>
+<div id="4bd0ce070f5aeb6e" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb108"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb108-1"><a href="#cb108-1" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> <span class="bu">list</span>(k.envdb.t.pkg_deps(where<span class="op">=</span><span class="st">'from_pkg="fastlite"'</span>))</span>
+<span id="cb108-2"><a href="#cb108-2" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> rows, <span class="st">'pkg_deps should have rows after update_pkg'</span></span>
+<span id="cb108-3"><a href="#cb108-3" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">any</span>(r[<span class="st">'to_pkg'</span>] <span class="kw">in</span> (<span class="st">'fastcore'</span>,<span class="st">'fastlite'</span>) <span class="cf">for</span> r <span class="kw">in</span> rows), <span class="ss">f'expected fastcore/fastlite: </span><span class="sc">{</span>rows[:<span class="dv">3</span>]<span class="sc">}</span><span class="ss">'</span></span>
+<span id="cb108-4"><a href="#cb108-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'pkg_deps via update_pkg ok:'</span>, rows[:<span class="dv">3</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>pkg_deps via update_pkg ok: [{'from_pkg': 'fastlite', 'to_pkg': 'apsw', 'n_modules': 1}, {'from_pkg': 'fastlite', 'to_pkg': 'apswutils', 'n_modules': 2}, {'from_pkg': 'fastlite', 'to_pkg': 'dataclasses', 'n_modules': 2}]</code></pre>
+</div>
+</div>
+<div id="2231966262ef7c33" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb110"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb110-1"><a href="#cb110-1" aria-hidden="true" tabindex="-1"></a>layers <span class="op">=</span> k.dep_stack([<span class="st">'fastlite'</span>])</span>
+<span id="cb110-2"><a href="#cb110-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(layers)</span>
+<span id="cb110-3"><a href="#cb110-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'-------------------------------------------------'</span>)</span>
+<span id="cb110-4"><a href="#cb110-4" aria-hidden="true" tabindex="-1"></a>stack <span class="op">=</span> L(layers).flatten()</span>
+<span id="cb110-5"><a href="#cb110-5" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="st">'fastcore'</span> <span class="kw">in</span> stack, <span class="ss">f'fastcore should be in dep_stack: </span><span class="sc">{</span>stack<span class="sc">}</span><span class="ss">'</span></span>
+<span id="cb110-6"><a href="#cb110-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'_dep_stack ok:'</span>, stack)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[['fastlite'], {'fastcore', 'apswutils', 'apsw'}]
+-------------------------------------------------
+_dep_stack ok: ['fastlite', 'fastcore', 'apswutils', 'apsw']</code></pre>
+</div>
+</div>
+<div id="4dc1bb47c1cc47b9" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb112"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb112-1"><a href="#cb112-1" aria-hidden="true" tabindex="-1"></a>k.dep_stack([<span class="st">'fastlite'</span>], allow<span class="op">=</span>[<span class="st">'fastcore'</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[['fastlite'], {'fastcore'}]</code></pre>
+</div>
+</div>
+<div id="74f879bb3f897c80" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb114"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb114-1"><a href="#cb114-1" aria-hidden="true" tabindex="-1"></a>k.api_call_paths(<span class="st">'fastlite'</span>, <span class="st">'apswutils'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'apswutils.db.Table': ['fastlite.kw.ids_and_rows_where', 'apswutils.db.Table'],
+ 'apswutils.utils.rows_from_file': ['fastlite.core.import_file', 'apswutils.utils.rows_from_file'],
+ 'apswutils.utils.TypeTracker': ['fastlite.core.import_file', 'apswutils.utils.TypeTracker']}</code></pre>
+</div>
+</div>
+<div id="632ff78fc0bc38" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb116"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb116-1"><a href="#cb116-1" aria-hidden="true" tabindex="-1"></a>k.context(<span class="st">'payments page monsterui fasthtml'</span>, repo<span class="op">=</span><span class="va">False</span>)[:<span class="dv">10</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                                                                     </code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'rowid': 79857, 'content': 'def account_management(sess):\n    user_email = sess[\'auth\']\n    user_payments = payments("email=?", (user_email,))\n    # Create table rows for each payment\n    payment_rows = []\n    for payment in user_payments:\n        action_button = ""\n        if payment.payment_status == \'paid\':\n            action_button = Button("Request Refund", hx_post=f"/refund?checkout_sid={payment.checkout_session_id}",hx_target="#refund-status")\n        elif payment.payment_status == \'refunded\': action_button = "Refunded"\n        \n        # Add row to table\n        payment_rows.append(\n            Tr(*map(Td, (payment.created_at, payment.amount, payment.payment_status, action_button))))\n    \n    # Create payment history table\n    payment_history = Table(\n        Thead(Tr(*map(Th, ("Date", "Amount", "Status", "Action")))),\n        Tbody(*payment_rows))\n    \n    return Titled(\n        "Account Management",\n        Div(H2(f"Account: {user_email}"),\n            H3("Payment History"),\n            payment_history,\n            Div(id="refund-status"),  # Target for refund status messages\n            A("Back to Home", href="/")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1777248395.7674882, 'name': 'account_management', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 183, 'end_lineno': 209, 'mod_name': 'fasthtml.stripe_otp.account_management', 'package': 'python-fasthtml', 'version': '0.13.4', 'docstring': {}, 'public_api': True}, '_dist': 0.6479886770248413, '_rrf_score': 0.016666666666666666, '_src_id': 'env:79857', 'node': 'fasthtml.stripe_otp.account_management', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.xtend.A', 'fasthtml.fastapp.fast_app', 'fasthtml.svg.PathFT.A', 'fasthtml.xtend.Titled'], 'co_dispatched': []}, {'rowid': 85624, 'content': 'function isFastElement(element) {...}', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/notebook/static/417.29f636ec8be265b7e480.js', 'uploaded_at': 1773452879.3717442, 'lang': '.js', 'mod_name': 'notebook.static.417.29f636ec8be265b7e480', 'package': 'notebook', 'version': '7.5.5', 'docstring': {}, 'public_api': False}, '_dist': 0.6557579040527344, '_rrf_score': 0.01639344262295082, '_src_id': 'env:85624', 'callers': [], 'callees': [], 'co_dispatched': []}, {'rowid': 49862, 'content': 'def account_management(sess):\n    user_email = sess[\'auth\']\n    user_payments = payments("email=?", (user_email,))\n    # Create table rows for each payment\n    payment_rows = []\n    for payment in user_payments:\n        action_button = ""\n        if payment.payment_status == \'paid\':\n            action_button = Button("Request Refund", hx_post=f"/refund?checkout_sid={payment.checkout_session_id}",hx_target="#refund-status")\n        elif payment.payment_status == \'refunded\': action_button = "Refunded"\n        \n        # Add row to table\n        payment_rows.append(\n            Tr(*map(Td, (payment.created_at, payment.amount, payment.payment_status, action_button))))\n    \n    # Create payment history table\n    payment_history = Table(\n        Thead(Tr(*map(Th, ("Date", "Amount", "Status", "Action")))),\n        Tbody(*payment_rows))\n    \n    return Titled(\n        "Account Management",\n        Div(H2(f"Account: {user_email}"),\n            H3("Payment History"),\n            payment_history,\n            Div(id="refund-status"),  # Target for refund status messages\n            A("Back to Home", href="/")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1775816437.4866984, 'name': 'account_management', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 183, 'end_lineno': 209, 'package': 'python-fasthtml', 'version': '0.13.3', 'mod_name': 'fasthtml.stripe_otp.account_management'}, '_dist': 0.6690305471420288, '_rrf_score': 0.016129032258064516, '_src_id': 'env:49862', 'node': 'fasthtml.stripe_otp.account_management', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.xtend.A', 'fasthtml.fastapp.fast_app', 'fasthtml.svg.PathFT.A', 'fasthtml.xtend.Titled'], 'co_dispatched': []}, {'rowid': 6256, 'content': 'function isFastElement(element) {...}', 'metadata': {'path': '/Users/71293/code/dockeasy/.venv/lib/python3.13/site-packages/notebook/static/417.29f636ec8be265b7e480.js', 'uploaded_at': 1774062595.513854, 'lang': '.js', 'package': 'notebook', 'version': '7.5.5', 'mod_name': 'notebook.static.417.29f636ec8be265b7e480.'}, '_dist': 0.6719375848770142, '_rrf_score': 0.015873015873015872, '_src_id': 'env:6256', 'callers': [], 'callees': [], 'co_dispatched': []}, {'rowid': 49860, 'content': 'def cancel():\n    return Titled(\n        "Cancelled",\n        Div(H2("Payment Cancelled"),\n            P("Your payment was cancelled."),\n            A("Back to Home", href="/")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1775816437.4866984, 'name': 'cancel', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 149, 'end_lineno': 154, 'package': 'python-fasthtml', 'version': '0.13.3', 'mod_name': 'fasthtml.stripe_otp.cancel'}, '_dist': 0.6723628044128418, '_rrf_score': 0.015625, '_src_id': 'env:49860', 'node': 'fasthtml.stripe_otp.cancel', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.svg.PathFT.A', 'fasthtml.fastapp.fast_app', 'fasthtml.xtend.Titled', 'fasthtml.xtend.A'], 'co_dispatched': []}, {'rowid': 49859, 'content': 'def success(sess, checkout_sid:str):    \n    # Get payment record from database (saved in the webhook)\n    payment = payments[checkout_sid]\n\n    if not payment or payment.payment_status != \'paid\': \n        return Titled("Error", P("Payment not found"))\n\n    return Titled(\n        "Success",\n        Div(H2("Payment Successful!"),\n            P(f"Thank you for your purchase, {sess[\'auth\']}"),\n            P(f"Amount Paid: ${payment.amount / 100:.2f}"),\n            P(f"Status: {payment.payment_status}"),\n            P(f"Transaction ID: {payment.checkout_session_id}"),\n            A("Back to Home", href="/")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1775816437.4866984, 'name': 'success', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 131, 'end_lineno': 145, 'package': 'python-fasthtml', 'version': '0.13.3', 'mod_name': 'fasthtml.stripe_otp.success'}, '_dist': 0.6802266836166382, '_rrf_score': 0.015384615384615385, '_src_id': 'env:49859', 'node': 'fasthtml.stripe_otp.success', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.fastapp.fast_app', 'fasthtml.svg.PathFT.A', 'fasthtml.xtend.Titled', 'fasthtml.xtend.A'], 'co_dispatched': []}, {'rowid': 79855, 'content': 'def cancel():\n    return Titled(\n        "Cancelled",\n        Div(H2("Payment Cancelled"),\n            P("Your payment was cancelled."),\n            A("Back to Home", href="/")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1777248395.7674882, 'name': 'cancel', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 149, 'end_lineno': 154, 'mod_name': 'fasthtml.stripe_otp.cancel', 'package': 'python-fasthtml', 'version': '0.13.4', 'docstring': {}, 'public_api': True}, '_dist': 0.6869518756866455, '_rrf_score': 0.015151515151515152, '_src_id': 'env:79855', 'node': 'fasthtml.stripe_otp.cancel', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.svg.PathFT.A', 'fasthtml.fastapp.fast_app', 'fasthtml.xtend.Titled', 'fasthtml.xtend.A'], 'co_dispatched': []}, {'rowid': 79854, 'content': 'def success(sess, checkout_sid:str):    \n    # Get payment record from database (saved in the webhook)\n    payment = payments[checkout_sid]\n\n    if not payment or payment.payment_status != \'paid\': \n        return Titled("Error", P("Payment not found"))\n\n    return Titled(\n        "Success",\n        Div(H2("Payment Successful!"),\n            P(f"Thank you for your purchase, {sess[\'auth\']}"),\n            P(f"Amount Paid: ${payment.amount / 100:.2f}"),\n            P(f"Status: {payment.payment_status}"),\n            P(f"Transaction ID: {payment.checkout_session_id}"),\n            A("Back to Home", href="/")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1777248395.7674882, 'name': 'success', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 131, 'end_lineno': 145, 'mod_name': 'fasthtml.stripe_otp.success', 'package': 'python-fasthtml', 'version': '0.13.4', 'docstring': {}, 'public_api': True}, '_dist': 0.6889044046401978, '_rrf_score': 0.014925373134328358, '_src_id': 'env:79854', 'node': 'fasthtml.stripe_otp.success', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.fastapp.fast_app', 'fasthtml.svg.PathFT.A', 'fasthtml.xtend.Titled', 'fasthtml.xtend.A'], 'co_dispatched': []}, {'rowid': 102733, 'content': 'class _xsrf_form_html(UIModule):\n    def render(self) -&gt; str:\n        return self.handler.xsrf_form_html()', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/tornado/web.py', 'uploaded_at': 1773452877.0579064, 'name': '_xsrf_form_html', 'lang': '.py', 'type': 'ClassDef', 'lineno': 3486, 'end_lineno': 3488, 'mod_name': 'tornado.web._xsrf_form_html', 'package': 'tornado', 'version': '6.5.5', 'public_api': False, 'docstring': {}}, '_dist': 0.6900507807731628, '_rrf_score': 0.014705882352941176, '_src_id': 'env:102733', 'callers': [], 'callees': [], 'co_dispatched': []}, {'rowid': 21782, 'content': 'function escapeHTML(text) {...}', 'metadata': {'path': '/Users/71293/code/dockeasy/.venv/lib/python3.13/site-packages/notebook/static/notebook_core.df310bda0e2ec4176fde.js', 'uploaded_at': 1774062595.791135, 'lang': '.js', 'package': 'notebook', 'version': '7.5.5', 'mod_name': 'notebook.static.notebook_core.df310bda0e2ec4176fde.'}, '_dist': 0.6904992461204529, '_rrf_score': 0.014492753623188406, '_src_id': 'env:21782', 'callers': [], 'callees': [], 'co_dispatched': []}]</code></pre>
+</div>
+</div>
+<div id="6a57f755b23af83b" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb119"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb119-1"><a href="#cb119-1" aria-hidden="true" tabindex="-1"></a>k.context(<span class="st">'payments page packages:monsterui,python-fasthtml'</span>, repo<span class="op">=</span><span class="va">False</span>)[:<span class="dv">10</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                                                                     </code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'rowid': 49813, 'content': 'def HTMX(path="/", host=\'localhost\', app=None, port=8000, height="auto", link=False, iframe=True, client=None):\n    "An iframe which displays the HTMX application in a notebook."\n    if isinstance(height, int): height = f"{height}px"\n    scr = """{\n        let frame = this;\n        window.addEventListener(\'message\', function(e) {\n            if (e.source !== frame.contentWindow) return; // Only proceed if the message is from this iframe\n            if (e.data.height) frame.style.height = (e.data.height+1) + \'px\';\n        }, false);\n    }""" if height == "auto" else ""\n    proto = \'http\' if host==\'localhost\' else \'https\'\n    fullpath = f"{proto}://{host}:{port}{path}" if host else path\n    src = f\'src="{fullpath}"\'\n    if link: display(HTML(f\'&lt;a href="{fullpath}" target="_blank"&gt;Open in new tab&lt;/a&gt;\'))\n    if isinstance(path, (FT,tuple,Safe)):\n        assert app, \'Need an app to render a component\'\n        route = f\'/{unqid()}\'\n        res = path\n        app.get(route)(lambda: res)\n        cli = client if client is not None else TestClient(app)\n        page = cli.get(route).text\n        src = f\'srcdoc="{escape(page)}"\'\n    if iframe:\n        return HTML(f\'&lt;iframe {src} style="width: 100%; height: {height}; border: none;" onload="{scr}" \' + """allow="accelerometer; autoplay; camera; clipboard-read; clipboard-write; display-capture; encrypted-media; fullscreen; gamepad; geolocation; gyroscope; hid; identity-credentials-get; idle-detection; magnetometer; microphone; midi; payment; picture-in-picture; publickey-credentials-get; screen-wake-lock; serial; usb; web-share; xr-spatial-tracking"&gt;&lt;/iframe&gt; """)', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/jupyter.py', 'uploaded_at': 1775816437.484823, 'name': 'HTMX', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 121, 'end_lineno': 144, 'package': 'python-fasthtml', 'version': '0.13.3', 'mod_name': 'fasthtml.jupyter.HTMX'}, 'rank': -11.137826112086925, '_rrf_score': 0.02396593673965937, '_src_id': 'env:49813', 'node': 'fasthtml.jupyter.HTMX', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/jupyter.py', 'pagerank': 8e-05, 'in_degree': 1, 'out_degree': 10, 'callers': ['fasthtml.jupyter.ws_client'], 'callees': ['fasthtml.xtend.with_sid.get', 'IPython.display.HTML', 'fasthtml.xtend.robots_txt.get', 'fasthtml.xtend.sitemap_xml.get', 'fasthtml.core.static_route.get', 'fasthtml.core.static_route_exts.get', 'html.escape', 'starlette.testclient.TestClient', 'IPython.display.display', 'fasthtml.core.unqid'], 'co_dispatched': []}, {'rowid': 79857, 'content': 'def account_management(sess):\n    user_email = sess[\'auth\']\n    user_payments = payments("email=?", (user_email,))\n    # Create table rows for each payment\n    payment_rows = []\n    for payment in user_payments:\n        action_button = ""\n        if payment.payment_status == \'paid\':\n            action_button = Button("Request Refund", hx_post=f"/refund?checkout_sid={payment.checkout_session_id}",hx_target="#refund-status")\n        elif payment.payment_status == \'refunded\': action_button = "Refunded"\n        \n        # Add row to table\n        payment_rows.append(\n            Tr(*map(Td, (payment.created_at, payment.amount, payment.payment_status, action_button))))\n    \n    # Create payment history table\n    payment_history = Table(\n        Thead(Tr(*map(Th, ("Date", "Amount", "Status", "Action")))),\n        Tbody(*payment_rows))\n    \n    return Titled(\n        "Account Management",\n        Div(H2(f"Account: {user_email}"),\n            H3("Payment History"),\n            payment_history,\n            Div(id="refund-status"),  # Target for refund status messages\n            A("Back to Home", href="/")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1777248395.7674882, 'name': 'account_management', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 183, 'end_lineno': 209, 'mod_name': 'fasthtml.stripe_otp.account_management', 'package': 'python-fasthtml', 'version': '0.13.4', 'docstring': {}, 'public_api': True}, '_dist': 0.5437583923339844, '_rrf_score': 0.016666666666666666, '_src_id': 'env:79857', 'node': 'fasthtml.stripe_otp.account_management', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.xtend.A', 'fasthtml.fastapp.fast_app', 'fasthtml.svg.PathFT.A', 'fasthtml.xtend.Titled'], 'co_dispatched': []}, {'rowid': 79788, 'content': 'def HTMX(path="/", host=\'localhost\', app=None, port=8000, height="auto", link=False, iframe=True, client=None):\n    "An iframe which displays the HTMX application in a notebook."\n    if isinstance(height, int): height = f"{height}px"\n    scr = """{\n        let frame = this;\n        window.addEventListener(\'message\', function(e) {\n            if (e.source !== frame.contentWindow) return; // Only proceed if the message is from this iframe\n            if (e.data.height) frame.style.height = (e.data.height+1) + \'px\';\n        }, false);\n    }""" if height == "auto" else ""\n    proto = \'http\' if host==\'localhost\' else \'https\'\n    fullpath = f"{proto}://{host}:{port}{path}" if host else path\n    src = f\'src="{fullpath}"\'\n    if link: display(HTML(f\'&lt;a href="{fullpath}" target="_blank"&gt;Open in new tab&lt;/a&gt;\'))\n    if isinstance(path, (FT,tuple,Safe)):\n        assert app, \'Need an app to render a component\'\n        route = f\'/{unqid()}\'\n        res = path\n        app.get(route)(lambda: res)\n        cli = client if client is not None else TestClient(app)\n        page = cli.get(route).text\n        src = f\'srcdoc="{escape(page)}"\'\n    if iframe:\n        return HTML(f\'&lt;iframe {src} style="width: 100%; height: {height}; border: none;" onload="{scr}" \' + """allow="accelerometer; autoplay; camera; clipboard-read; clipboard-write; display-capture; encrypted-media; fullscreen; gamepad; geolocation; gyroscope; hid; identity-credentials-get; idle-detection; magnetometer; microphone; midi; payment; picture-in-picture; publickey-credentials-get; screen-wake-lock; serial; usb; web-share; xr-spatial-tracking"&gt;&lt;/iframe&gt; """)', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/jupyter.py', 'uploaded_at': 1777248395.759724, 'name': 'HTMX', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 121, 'end_lineno': 144, 'mod_name': 'fasthtml.jupyter.HTMX', 'package': 'python-fasthtml', 'version': '0.13.4', 'docstring': 'An iframe which displays the HTMX application in a notebook.', 'public_api': True}, 'rank': -10.817229317179983, '_rrf_score': 0.01639344262295082, '_src_id': 'env:79788', 'node': 'fasthtml.jupyter.HTMX', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/jupyter.py', 'pagerank': 8e-05, 'in_degree': 1, 'out_degree': 10, 'callers': ['fasthtml.jupyter.ws_client'], 'callees': ['fasthtml.xtend.with_sid.get', 'IPython.display.HTML', 'fasthtml.xtend.robots_txt.get', 'fasthtml.xtend.sitemap_xml.get', 'fasthtml.core.static_route.get', 'fasthtml.core.static_route_exts.get', 'html.escape', 'starlette.testclient.TestClient', 'IPython.display.display', 'fasthtml.core.unqid'], 'co_dispatched': []}, {'rowid': 49862, 'content': 'def account_management(sess):\n    user_email = sess[\'auth\']\n    user_payments = payments("email=?", (user_email,))\n    # Create table rows for each payment\n    payment_rows = []\n    for payment in user_payments:\n        action_button = ""\n        if payment.payment_status == \'paid\':\n            action_button = Button("Request Refund", hx_post=f"/refund?checkout_sid={payment.checkout_session_id}",hx_target="#refund-status")\n        elif payment.payment_status == \'refunded\': action_button = "Refunded"\n        \n        # Add row to table\n        payment_rows.append(\n            Tr(*map(Td, (payment.created_at, payment.amount, payment.payment_status, action_button))))\n    \n    # Create payment history table\n    payment_history = Table(\n        Thead(Tr(*map(Th, ("Date", "Amount", "Status", "Action")))),\n        Tbody(*payment_rows))\n    \n    return Titled(\n        "Account Management",\n        Div(H2(f"Account: {user_email}"),\n            H3("Payment History"),\n            payment_history,\n            Div(id="refund-status"),  # Target for refund status messages\n            A("Back to Home", href="/")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1775816437.4866984, 'name': 'account_management', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 183, 'end_lineno': 209, 'package': 'python-fasthtml', 'version': '0.13.3', 'mod_name': 'fasthtml.stripe_otp.account_management'}, '_dist': 0.5666035413742065, '_rrf_score': 0.01639344262295082, '_src_id': 'env:49862', 'node': 'fasthtml.stripe_otp.account_management', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.xtend.A', 'fasthtml.fastapp.fast_app', 'fasthtml.svg.PathFT.A', 'fasthtml.xtend.Titled'], 'co_dispatched': []}, {'rowid': 49860, 'content': 'def cancel():\n    return Titled(\n        "Cancelled",\n        Div(H2("Payment Cancelled"),\n            P("Your payment was cancelled."),\n            A("Back to Home", href="/")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1775816437.4866984, 'name': 'cancel', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 149, 'end_lineno': 154, 'package': 'python-fasthtml', 'version': '0.13.3', 'mod_name': 'fasthtml.stripe_otp.cancel'}, '_dist': 0.5765199661254883, '_rrf_score': 0.016129032258064516, '_src_id': 'env:49860', 'node': 'fasthtml.stripe_otp.cancel', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.svg.PathFT.A', 'fasthtml.fastapp.fast_app', 'fasthtml.xtend.Titled', 'fasthtml.xtend.A'], 'co_dispatched': []}, {'rowid': 79855, 'content': 'def cancel():\n    return Titled(\n        "Cancelled",\n        Div(H2("Payment Cancelled"),\n            P("Your payment was cancelled."),\n            A("Back to Home", href="/")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1777248395.7674882, 'name': 'cancel', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 149, 'end_lineno': 154, 'mod_name': 'fasthtml.stripe_otp.cancel', 'package': 'python-fasthtml', 'version': '0.13.4', 'docstring': {}, 'public_api': True}, '_dist': 0.5802065134048462, '_rrf_score': 0.015873015873015872, '_src_id': 'env:79855', 'node': 'fasthtml.stripe_otp.cancel', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.svg.PathFT.A', 'fasthtml.fastapp.fast_app', 'fasthtml.xtend.Titled', 'fasthtml.xtend.A'], 'co_dispatched': []}, {'rowid': 79854, 'content': 'def success(sess, checkout_sid:str):    \n    # Get payment record from database (saved in the webhook)\n    payment = payments[checkout_sid]\n\n    if not payment or payment.payment_status != \'paid\': \n        return Titled("Error", P("Payment not found"))\n\n    return Titled(\n        "Success",\n        Div(H2("Payment Successful!"),\n            P(f"Thank you for your purchase, {sess[\'auth\']}"),\n            P(f"Amount Paid: ${payment.amount / 100:.2f}"),\n            P(f"Status: {payment.payment_status}"),\n            P(f"Transaction ID: {payment.checkout_session_id}"),\n            A("Back to Home", href="/")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1777248395.7674882, 'name': 'success', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 131, 'end_lineno': 145, 'mod_name': 'fasthtml.stripe_otp.success', 'package': 'python-fasthtml', 'version': '0.13.4', 'docstring': {}, 'public_api': True}, '_dist': 0.5906938314437866, '_rrf_score': 0.015625, '_src_id': 'env:79854', 'node': 'fasthtml.stripe_otp.success', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.fastapp.fast_app', 'fasthtml.svg.PathFT.A', 'fasthtml.xtend.Titled', 'fasthtml.xtend.A'], 'co_dispatched': []}, {'rowid': 49859, 'content': 'def success(sess, checkout_sid:str):    \n    # Get payment record from database (saved in the webhook)\n    payment = payments[checkout_sid]\n\n    if not payment or payment.payment_status != \'paid\': \n        return Titled("Error", P("Payment not found"))\n\n    return Titled(\n        "Success",\n        Div(H2("Payment Successful!"),\n            P(f"Thank you for your purchase, {sess[\'auth\']}"),\n            P(f"Amount Paid: ${payment.amount / 100:.2f}"),\n            P(f"Status: {payment.payment_status}"),\n            P(f"Transaction ID: {payment.checkout_session_id}"),\n            A("Back to Home", href="/")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1775816437.4866984, 'name': 'success', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 131, 'end_lineno': 145, 'package': 'python-fasthtml', 'version': '0.13.3', 'mod_name': 'fasthtml.stripe_otp.success'}, '_dist': 0.597087025642395, '_rrf_score': 0.015384615384615385, '_src_id': 'env:49859', 'node': 'fasthtml.stripe_otp.success', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.fastapp.fast_app', 'fasthtml.svg.PathFT.A', 'fasthtml.xtend.Titled', 'fasthtml.xtend.A'], 'co_dispatched': []}, {'rowid': 49855, 'content': 'def home(sess):\n    auth = sess[\'auth\']\n    return Titled(\n        "Buy Now", \n        Div(H2("Demo Product - $19.99"),\n            P(f"Welcome, {auth}"),\n            Button("Buy Now", hx_post="/create-checkout-session", hx_swap="none"),\n            A("View Account", href="/account")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1775816437.4866984, 'name': 'home', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 57, 'end_lineno': 64, 'package': 'python-fasthtml', 'version': '0.13.3', 'mod_name': 'fasthtml.stripe_otp.home'}, '_dist': 0.6614590883255005, '_rrf_score': 0.015151515151515152, '_src_id': 'env:49855', 'node': 'fasthtml.stripe_otp.home', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.svg.PathFT.A', 'fasthtml.fastapp.fast_app', 'fasthtml.xtend.Titled', 'fasthtml.xtend.A'], 'co_dispatched': []}, {'rowid': 79848, 'content': 'def home(sess):\n    auth = sess[\'auth\']\n    return Titled(\n        "Buy Now", \n        Div(H2("Demo Product - $19.99"),\n            P(f"Welcome, {auth}"),\n            Button("Buy Now", hx_post="/create-checkout-session", hx_swap="none"),\n            A("View Account", href="/account")))', 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'uploaded_at': 1777248395.7674882, 'name': 'home', 'lang': '.py', 'type': 'FunctionDef', 'lineno': 57, 'end_lineno': 64, 'mod_name': 'fasthtml.stripe_otp.home', 'package': 'python-fasthtml', 'version': '0.13.4', 'docstring': {}, 'public_api': True}, '_dist': 0.662120521068573, '_rrf_score': 0.014925373134328358, '_src_id': 'env:79848', 'node': 'fasthtml.stripe_otp.home', 'flavor': 'function', 'file': '/Users/71293/code/personal/orgs/kosha/.venv/lib/python3.13/site-packages/fasthtml/stripe_otp.py', 'pagerank': 7e-05, 'in_degree': 0, 'out_degree': 4, 'callers': [], 'callees': ['fasthtml.svg.PathFT.A', 'fasthtml.fastapp.fast_app', 'fasthtml.xtend.Titled', 'fasthtml.xtend.A'], 'co_dispatched': []}]</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="kosha.status" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.status">Kosha.status</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb122"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb122-1"><a href="#cb122-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb122-2"><a href="#cb122-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> status(</span>
+<span id="cb122-3"><a href="#cb122-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb122-4"><a href="#cb122-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">dict</span>:</span>
+<span id="cb122-5"><a href="#cb122-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Index freshness: file/pkg/node counts and stale file count.</em></p>
+<div id="532ff9da" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb123"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb123-1"><a href="#cb123-1" aria-hidden="true" tabindex="-1"></a>s <span class="op">=</span> k.status()</span>
+<span id="cb123-2"><a href="#cb123-2" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">set</span>(s) <span class="op">==</span> {<span class="st">'files'</span>, <span class="st">'packages'</span>, <span class="st">'graph_nodes'</span>, <span class="st">'stale_files'</span>, <span class="st">'stale_pkgs'</span>}, <span class="ss">f"unexpected status keys: </span><span class="sc">{</span>s<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb123-3"><a href="#cb123-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'status ok:'</span>, s)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>status ok: {'files': 3, 'packages': 87, 'graph_nodes': 78522, 'stale_files': 0, 'stale_pkgs': ['jupyter_server', 'jupyterlab', 'model2vec', 'huggingface_hub', 'beautifulsoup4']}</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="kosha.where_to_add" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.where_to_add">Kosha.where_to_add</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb125"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb125-1"><a href="#cb125-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb125-2"><a href="#cb125-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> where_to_add(</span>
+<span id="cb125-3"><a href="#cb125-3" aria-hidden="true" tabindex="-1"></a>    description:<span class="bu">str</span>, limit:<span class="bu">int</span><span class="op">=</span><span class="dv">5</span></span>
+<span id="cb125-4"><a href="#cb125-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb125-5"><a href="#cb125-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Likely insertion points for new code: file + line from top context results + co_dispatched peers.</em></p>
+<div id="58d1e41b" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb126"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb126-1"><a href="#cb126-1" aria-hidden="true" tabindex="-1"></a>pts <span class="op">=</span> k.where_to_add(<span class="st">'add a new CLI command'</span>, limit<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb126-2"><a href="#cb126-2" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">isinstance</span>(pts, L)</span>
+<span id="cb126-3"><a href="#cb126-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> pts:</span>
+<span id="cb126-4"><a href="#cb126-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">all</span>(k <span class="kw">in</span> pts[<span class="dv">0</span>] <span class="cf">for</span> k <span class="kw">in</span> (<span class="st">'node'</span>,<span class="st">'path'</span>,<span class="st">'insert_after'</span>,<span class="st">'co_dispatched'</span>,<span class="st">'pagerank'</span>))</span>
+<span id="cb126-5"><a href="#cb126-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'where_to_add ok:'</span>, pts[<span class="dv">0</span>][<span class="st">'path'</span>], <span class="st">'line'</span>, pts[<span class="dv">0</span>][<span class="st">'insert_after'</span>])</span>
+<span id="cb126-6"><a href="#cb126-6" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>: <span class="bu">print</span>(<span class="st">'where_to_add ok: no results (index may be empty)'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>where_to_add ok: /Users/71293/code/personal/orgs/kosha/kosha/cli.py line 247</code></pre>
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vedicreader\.github\.io\/kosha");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/vedicreader/kosha/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

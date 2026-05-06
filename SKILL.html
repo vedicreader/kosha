@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Surface repo code and installed package snippets before writing new code. Run at the start of any task that touches existing patterns or packages.">
+
+<title>skill – koshas</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-de52dc3353fe04aa4d07820b7139bd46.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="styles.css">
+<meta property="og:title" content="koshas">
+<meta property="og:description" content="Surface repo code and installed package snippets before writing new code. Run at the start of any task that touches existing patterns or packages.">
+<meta property="og:site_name" content="koshas">
+<meta name="twitter:title" content="koshas">
+<meta name="twitter:description" content="Surface repo code and installed package snippets before writing new code. Run at the start of any task that touches existing patterns or packages.">
+<meta name="twitter:card" content="summary">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">koshas</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">kosha</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./core.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">core</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./graph.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">graph</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./skill.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">skill</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./cli.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">cli</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#kosha-repo-package-memory-for-coding-agents" id="toc-kosha-repo-package-memory-for-coding-agents" class="nav-link active" data-scroll-target="#kosha-repo-package-memory-for-coding-agents">kosha — repo + package memory for coding agents</a>
+  <ul class="collapse">
+  <li><a href="#how-to-invoke" id="toc-how-to-invoke" class="nav-link" data-scroll-target="#how-to-invoke">How to invoke</a></li>
+  <li><a href="#the-decision-loop" id="toc-the-decision-loop" class="nav-link" data-scroll-target="#the-decision-loop">The decision loop</a></li>
+  <li><a href="#before-writing-code-always-check-first" id="toc-before-writing-code-always-check-first" class="nav-link" data-scroll-target="#before-writing-code-always-check-first">Before writing code — always check first</a></li>
+  <li><a href="#filter-syntax" id="toc-filter-syntax" class="nav-link" data-scroll-target="#filter-syntax">Filter syntax</a></li>
+  <li><a href="#interpreting-a-result" id="toc-interpreting-a-result" class="nav-link" data-scroll-target="#interpreting-a-result">Interpreting a result</a></li>
+  <li><a href="#graph-navigation" id="toc-graph-navigation" class="nav-link" data-scroll-target="#graph-navigation">Graph navigation</a>
+  <ul class="collapse">
+  <li><a href="#co_dispatched-the-most-non-obvious-signal" id="toc-co_dispatched-the-most-non-obvious-signal" class="nav-link" data-scroll-target="#co_dispatched-the-most-non-obvious-signal"><code>co_dispatched</code> — the most non-obvious signal</a></li>
+  </ul></li>
+  <li><a href="#compact-mode-scan-many-results-quickly" id="toc-compact-mode-scan-many-results-quickly" class="nav-link" data-scroll-target="#compact-mode-scan-many-results-quickly">Compact mode — scan many results quickly</a></li>
+  <li><a href="#where-to-add-new-code" id="toc-where-to-add-new-code" class="nav-link" data-scroll-target="#where-to-add-new-code">Where to add new code</a></li>
+  <li><a href="#full-structural-plan-complex-tasks" id="toc-full-structural-plan-complex-tasks" class="nav-link" data-scroll-target="#full-structural-plan-complex-tasks">Full structural plan (complex tasks)</a></li>
+  <li><a href="#daemon-mode-use-this-in-claude-code-sessions" id="toc-daemon-mode-use-this-in-claude-code-sessions" class="nav-link" data-scroll-target="#daemon-mode-use-this-in-claude-code-sessions">Daemon mode — use this in Claude Code sessions</a></li>
+  <li><a href="#quick-reference" id="toc-quick-reference" class="nav-link" data-scroll-target="#quick-reference">Quick reference</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/vedicreader/kosha/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div><div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="SKILL-commonmark.md"><i class="bi bi-file-code"></i>CommonMark</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+<section id="kosha-repo-package-memory-for-coding-agents" class="level1">
+<h1>kosha — repo + package memory for coding agents</h1>
+<p>FTS5 + vector search + call graph over your repo and installed packages. <strong>Use this before Grep, Read, or web search</strong> whenever the question is about existing code or packages.</p>
+<section id="how-to-invoke" class="level2">
+<h2 class="anchored" data-anchor-id="how-to-invoke">How to invoke</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> kosha <span class="im">import</span> Kosha</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>k <span class="op">=</span> Kosha()</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>k.sync(in_parallel<span class="op">=</span><span class="va">True</span>)  <span class="co"># incremental — near-instant on repeat runs</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Use <code>clikernel</code> if available (state persists, no re-import cost). Otherwise <code>.venv/bin/python -c "..."</code>.</p>
+<hr>
+</section>
+<section id="the-decision-loop" class="level2">
+<h2 class="anchored" data-anchor-id="the-decision-loop">The decision loop</h2>
+<p>Every coding task runs through the same questions. Use kosha to answer them before touching files.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 62%">
+<col style="width: 37%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Question</th>
+<th>Call</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Is the index fresh?</td>
+<td><code>k.status()</code></td>
+</tr>
+<tr class="even">
+<td>Does this already exist in a dependency?</td>
+<td><code>k.env_context('description', limit=8)</code></td>
+</tr>
+<tr class="odd">
+<td>What pattern is used here / how is this done in the repo?</td>
+<td><code>k.context('description', graph=True, limit=15)</code></td>
+</tr>
+<tr class="even">
+<td>Who calls this function, and what does it call?</td>
+<td><code>k.ni('pkg.module.fn')</code></td>
+</tr>
+<tr class="odd">
+<td>How does module A connect to module B?</td>
+<td><code>k.short_path('a.fn', 'b.fn')</code></td>
+</tr>
+<tr class="even">
+<td>What is the real public API surface for a package?</td>
+<td><code>k.public_api('pkg')</code></td>
+</tr>
+<tr class="odd">
+<td>Where do I add my new code?</td>
+<td><code>k.where_to_add('description', limit=5)</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>context(q, graph=True)</code> is the right default for any task that touches more than one module. <code>env_context</code> is for package-only searches (no repo results, faster).</p>
+<p><strong>Check status first.</strong> If <code>stale_files &gt; 0</code> or <code>stale_pkgs</code> is non-empty, run <code>k.sync()</code> before querying — stale results look like missing results.</p>
+<hr>
+</section>
+<section id="before-writing-code-always-check-first" class="level2">
+<h2 class="anchored" data-anchor-id="before-writing-code-always-check-first">Before writing code — always check first</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># About to implement atomic file writes?</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> k.env_context(<span class="st">'atomic write temp file permissions chmod'</span>, limit<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> r <span class="kw">in</span> results: <span class="bu">print</span>(r[<span class="st">'metadata'</span>][<span class="st">'mod_name'</span>], <span class="st">'</span><span class="ch">\n</span><span class="st">'</span>, r[<span class="st">'content'</span>][:<span class="dv">200</span>])</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># → surfaces fastcore.xtras.atomic_save — reuse it</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># User says "fastcore has X" or "check xtras for Y" — use filters, not grep:</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>k.env_context(<span class="st">'package:fastcore path:xtras atomic save'</span>, limit<span class="op">=</span><span class="dv">10</span>)</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Scoped to a specific package and path:</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>k.env_context(<span class="st">'package:dockeasy type:FunctionDef run command'</span>, limit<span class="op">=</span><span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Anti-pattern:</strong> invoking this skill, then immediately grepping files. <code>env_context</code> searches all installed packages semantically. Grep only finds exact strings in files you already know to look in.</p>
+<hr>
+</section>
+<section id="filter-syntax" class="level2">
+<h2 class="anchored" data-anchor-id="filter-syntax">Filter syntax</h2>
+<p>Filters combine with natural language in one query string:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Token</th>
+<th>Example</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>package:name</code></td>
+<td><code>package:fastcore</code></td>
+<td>Restrict to one package</td>
+</tr>
+<tr class="even">
+<td><code>path:pattern</code></td>
+<td><code>path:xtras</code></td>
+<td>Restrict by path substring</td>
+</tr>
+<tr class="odd">
+<td><code>file:glob</code></td>
+<td><code>file:xtras*</code></td>
+<td>Restrict by filename glob</td>
+</tr>
+<tr class="even">
+<td><code>lang:ext</code></td>
+<td><code>lang:py</code></td>
+<td>Filter by language</td>
+</tr>
+<tr class="odd">
+<td><code>type:node</code></td>
+<td><code>type:FunctionDef</code></td>
+<td>Filter by AST node type</td>
+</tr>
+</tbody>
+</table>
+<p>Bare package names in the query are auto-detected as package filters:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>k.context(<span class="st">'monsterui fasthtml card component'</span>, repo<span class="op">=</span><span class="va">False</span>)  <span class="co"># restricts to those packages</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<hr>
+</section>
+<section id="interpreting-a-result" class="level2">
+<h2 class="anchored" data-anchor-id="interpreting-a-result">Interpreting a result</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">'content'</span>:  <span class="st">'def merge(*ds):</span><span class="ch">\n</span><span class="st">    "Merge all dicts"</span><span class="ch">\n</span><span class="st">    ...'</span>,</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">'metadata'</span>: {</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>      <span class="st">'mod_name'</span>: <span class="st">'fastcore.basics.merge'</span>,  <span class="co"># use this for ni() / short_path()</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>      <span class="st">'path'</span>:     <span class="st">'/path/to/fastcore/basics.py'</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>      <span class="st">'lineno'</span>:   <span class="dv">655</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>      <span class="st">'type'</span>:     <span class="st">'FunctionDef'</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>      <span class="st">'package'</span>:  <span class="st">'fastcore'</span>,               <span class="co"># env results only</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  },</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">'pagerank'</span>:      <span class="fl">0.00027</span>,  <span class="co"># centrality — higher = more load-bearing, touch carefully</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">'in_degree'</span>:     <span class="dv">8</span>,</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  <span class="st">'out_degree'</span>:    <span class="dv">12</span>,</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  <span class="st">'callers'</span>:       [<span class="st">'fastcore.script.call_parse._f'</span>, ...],</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  <span class="st">'callees'</span>:       [<span class="st">'fastcore.basics.NS.__iter__'</span>, ...],</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  <span class="st">'co_dispatched'</span>: [],       <span class="co"># see below</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong><code>pagerank</code> tells you blast radius.</strong> High-pagerank nodes are load-bearing — changes ripple widely.</p>
+<hr>
+</section>
+<section id="graph-navigation" class="level2">
+<h2 class="anchored" data-anchor-id="graph-navigation">Graph navigation</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Full structural picture of one node</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>info <span class="op">=</span> k.ni(<span class="st">'fastcore.basics.merge'</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># info['callers']       — who calls this → where to hook in upstream</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co"># info['callees']       — what it calls → what you can reuse downstream</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co"># info['co_dispatched'] — registered peers (see below)</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Shortest call chain between two nodes</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>path <span class="op">=</span> k.short_path(<span class="st">'kosha.core.Kosha.sync'</span>, <span class="st">'litesearch.core.search'</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Nodes within 2 hops</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>k.neighbors(<span class="st">'kosha.core.Kosha'</span>, depth<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Top-k nodes by PageRank for a package</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>k.graph.ranked(k<span class="op">=</span><span class="dv">10</span>, module<span class="op">=</span><span class="st">'fastcore'</span>)</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Public API (respects __all__ + @patch methods)</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>k.public_api(<span class="st">'fastcore'</span>)</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>k.public_api(<span class="st">'fastcore.basics'</span>)  <span class="co"># scoped to submodule</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="co_dispatched-the-most-non-obvious-signal" class="level3">
+<h3 class="anchored" data-anchor-id="co_dispatched-the-most-non-obvious-signal"><code>co_dispatched</code> — the most non-obvious signal</h3>
+<p>Functions assigned together in the same list, dict, or tuple at module level — route groups, handler tables, plugin registrations. When you need to add a new handler, <code>co_dispatched</code> shows you which functions are peers and where the registration lives, without reading the glue code.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>k.ni(<span class="st">'myapp.routes.get_user'</span>)[<span class="st">'co_dispatched'</span>]</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># → ['myapp.routes.create_user', 'myapp.routes.delete_user']</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># These three are registered together → follow the same pattern, add yours at the same site</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<hr>
+</section>
+</section>
+<section id="compact-mode-scan-many-results-quickly" class="level2">
+<h2 class="anchored" data-anchor-id="compact-mode-scan-many-results-quickly">Compact mode — scan many results quickly</h2>
+<p><code>context(q, compact=True)</code> returns slim dicts instead of full code bodies — useful when you need to triage 15+ results before drilling in:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> k.context(<span class="st">'your task description'</span>, limit<span class="op">=</span><span class="dv">20</span>, compact<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> r <span class="kw">in</span> results:</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>r[<span class="st">'mod_name'</span>]<span class="sc">}</span><span class="ss">  line </span><span class="sc">{</span>r[<span class="st">'lineno'</span>]<span class="sc">}</span><span class="ss">  pagerank=</span><span class="sc">{</span>r[<span class="st">'pagerank'</span>]<span class="sc">:.5f}</span><span class="ss">"</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  </span><span class="sc">{</span>r[<span class="st">'signature'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> r[<span class="st">'docstring'</span>]: <span class="bu">print</span>(<span class="ss">f"  # </span><span class="sc">{</span>r[<span class="st">'docstring'</span>][:<span class="dv">80</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Once you've identified 2-3 candidates, use ni() to drill into them</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<hr>
+</section>
+<section id="where-to-add-new-code" class="level2">
+<h2 class="anchored" data-anchor-id="where-to-add-new-code">Where to add new code</h2>
+<p><code>where_to_add(description)</code> combines <code>context</code> + <code>co_dispatched</code> to return <code>file:line</code> insertion points:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>pts <span class="op">=</span> k.where_to_add(<span class="st">'add a new route handler'</span>, limit<span class="op">=</span><span class="dv">5</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> p <span class="kw">in</span> pts:</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>p[<span class="st">'path'</span>]<span class="sc">}</span><span class="ss">:</span><span class="sc">{</span>p[<span class="st">'insert_after'</span>]<span class="sc">}</span><span class="ss">  (</span><span class="sc">{</span>p[<span class="st">'node'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> p[<span class="st">'co_dispatched'</span>]: <span class="bu">print</span>(<span class="ss">f"  peers: </span><span class="sc">{</span>p[<span class="st">'co_dispatched'</span>][:<span class="dv">3</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co"># → tells you the exact file:line to add after, and which peers to pattern-match</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<hr>
+</section>
+<section id="full-structural-plan-complex-tasks" class="level2">
+<h2 class="anchored" data-anchor-id="full-structural-plan-complex-tasks">Full structural plan (complex tasks)</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> itertools <span class="im">import</span> combinations</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Find key functions with structural context</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> k.context(<span class="st">'your task description'</span>, limit<span class="op">=</span><span class="dv">20</span>, graph<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Map call chains between the top results</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>nodes <span class="op">=</span> [r[<span class="st">'metadata'</span>][<span class="st">'mod_name'</span>] <span class="cf">for</span> r <span class="kw">in</span> results[:<span class="dv">8</span>]]</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>paths <span class="op">=</span> [p <span class="cf">for</span> a, b <span class="kw">in</span> combinations(nodes, <span class="dv">2</span>) <span class="cf">if</span> (p <span class="op">:=</span> k.short_path(a, b))]</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>paths.sort(key<span class="op">=</span><span class="bu">len</span>)   <span class="co"># shortest = tightest coupling</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Drill into join points</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> node <span class="kw">in</span> nodes[:<span class="dv">5</span>]:</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    info <span class="op">=</span> k.ni(node)</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(node, <span class="st">'| callers:'</span>, <span class="bu">list</span>(info[<span class="st">'callers'</span>])[:<span class="dv">3</span>], <span class="st">'| co_dispatched:'</span>, <span class="bu">list</span>(info[<span class="st">'co_dispatched'</span>]))</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Ground the plan in mod_name + lineno</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> r <span class="kw">in</span> results[:<span class="dv">5</span>]:</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> r[<span class="st">'metadata'</span>]</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>m[<span class="st">'mod_name'</span>]<span class="sc">}</span><span class="ss">  line </span><span class="sc">{</span>m<span class="sc">.</span>get(<span class="st">'lineno'</span>,<span class="st">'?'</span>)<span class="sc">}</span><span class="ss">  pagerank=</span><span class="sc">{</span>r<span class="sc">.</span>get(<span class="st">'pagerank'</span>,<span class="dv">0</span>)<span class="sc">:.5f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<hr>
+</section>
+<section id="daemon-mode-use-this-in-claude-code-sessions" class="level2">
+<h2 class="anchored" data-anchor-id="daemon-mode-use-this-in-claude-code-sessions">Daemon mode — use this in Claude Code sessions</h2>
+<p>The first kosha call in a session pays a ~3–5s embedding model cold-start. Daemon mode starts one warm process and routes all subsequent calls through it via JSON on stdin/stdout.</p>
+<p><strong>Start once per session:</strong></p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kosha</span> daemon <span class="kw">&amp;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Send requests:</strong></p>
+<pre><code>→ {"cmd":"context","args":{"q":"your task","limit":15,"graph":true}}
+← {"ok":true,"result":[...]}
+
+→ {"cmd":"env_context","args":{"q":"package:fastcore atomic save","limit":8}}
+← {"ok":true,"result":[...]}
+
+→ {"cmd":"ni","args":{"mod_name":"fastcore.basics.merge"}}
+← {"ok":true,"result":{"callers":[...],"callees":[...],"co_dispatched":[]}}
+
+→ {"cmd":"public_api","args":{"pkg":"fastcore"}}
+← {"ok":true,"result":[...]}
+
+→ {"cmd":"sync","args":{}}
+← {"ok":true,"result":"synced"}</code></pre>
+<p>Available commands: <code>sync</code>, <code>context</code>, <code>repo_context</code>, <code>env_context</code>, <code>ni</code>, <code>top_nodes</code>, <code>public_api</code>, <code>api_call_paths</code>, <code>status</code>, <code>where_to_add</code>.</p>
+<p><strong>Auto-start hook</strong> (warm daemon available for every session):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span> <span class="dt">"hooks"</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">"SessionStart"</span><span class="fu">:</span> <span class="ot">[</span><span class="fu">{</span> <span class="dt">"command"</span><span class="fu">:</span> <span class="st">"kosha daemon &amp;"</span> <span class="fu">}</span><span class="ot">]</span> <span class="fu">}</span> <span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<hr>
+</section>
+<section id="quick-reference" class="level2">
+<h2 class="anchored" data-anchor-id="quick-reference">Quick reference</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 38%">
+<col style="width: 61%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>k.status()</code></td>
+<td>Start of session — returns <code>{files, packages, graph_nodes, stale_files, stale_pkgs}</code></td>
+</tr>
+<tr class="even">
+<td><code>k.context(q, graph=True)</code></td>
+<td>Default: any task touching existing code</td>
+</tr>
+<tr class="odd">
+<td><code>k.context(q, compact=True)</code></td>
+<td>Triage many results — returns slim dicts, no full code bodies</td>
+</tr>
+<tr class="even">
+<td><code>k.env_context(q)</code></td>
+<td>Package-only; faster when repo results aren’t needed</td>
+</tr>
+<tr class="odd">
+<td><code>k.repo_context(q)</code></td>
+<td>Repo-only; when you know the answer is in this codebase</td>
+</tr>
+<tr class="even">
+<td><code>k.ni(node)</code></td>
+<td>After finding a node — understand its structural position</td>
+</tr>
+<tr class="odd">
+<td><code>k.short_path(a, b)</code></td>
+<td>How two modules connect</td>
+</tr>
+<tr class="even">
+<td><code>k.public_api(pkg)</code></td>
+<td>What a package exports (not just what’s in <code>__all__</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>k.where_to_add(description)</code></td>
+<td>Find file:line insertion point for new code</td>
+</tr>
+<tr class="even">
+<td><code>k.api_call_paths(from_pkg, to_pkg)</code></td>
+<td>Shortest paths from one package’s public API to another’s</td>
+</tr>
+</tbody>
+</table>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vedicreader\.github\.io\/kosha");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/vedicreader/kosha/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

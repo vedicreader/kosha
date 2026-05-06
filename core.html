@@ -1,0 +1,2000 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Kosha is a tool for building a context for code generation based on your repo and environment.">
+
+<title>core – koshas</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-de52dc3353fe04aa4d07820b7139bd46.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="styles.css">
+<meta property="og:title" content="core – koshas">
+<meta property="og:description" content="Kosha is a tool for building a context for code generation based on your repo and environment.">
+<meta property="og:site_name" content="koshas">
+<meta name="twitter:title" content="core – koshas">
+<meta name="twitter:description" content="Kosha is a tool for building a context for code generation based on your repo and environment.">
+<meta name="twitter:card" content="summary">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">koshas</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./core.html">core</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">kosha</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./core.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">core</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./graph.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">graph</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./skill.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">skill</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./cli.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">cli</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#utils" id="toc-utils" class="nav-link active" data-scroll-target="#utils">Utils</a>
+  <ul class="collapse">
+  <li><a href="#parse" id="toc-parse" class="nav-link" data-scroll-target="#parse">parse</a></li>
+  <li><a href="#mv_skill_md" id="toc-mv_skill_md" class="nav-link" data-scroll-target="#mv_skill_md">mv_skill_md</a></li>
+  <li><a href="#repo_root" id="toc-repo_root" class="nav-link" data-scroll-target="#repo_root">repo_root</a></li>
+  <li><a href="#arun" id="toc-arun" class="nav-link" data-scroll-target="#arun">arun</a></li>
+  <li><a href="#pkg_trans_deps" id="toc-pkg_trans_deps" class="nav-link" data-scroll-target="#pkg_trans_deps">pkg_trans_deps</a></li>
+  <li><a href="#env_pkg_versions" id="toc-env_pkg_versions" class="nav-link" data-scroll-target="#env_pkg_versions">env_pkg_versions</a></li>
+  </ul></li>
+  <li><a href="#embedder" id="toc-embedder" class="nav-link" data-scroll-target="#embedder">embedder</a>
+  <ul class="collapse">
+  <li><a href="#emb_query" id="toc-emb_query" class="nav-link" data-scroll-target="#emb_query">emb_query</a></li>
+  <li><a href="#emb_doc" id="toc-emb_doc" class="nav-link" data-scroll-target="#emb_doc">emb_doc</a></li>
+  <li><a href="#static_embedder" id="toc-static_embedder" class="nav-link" data-scroll-target="#static_embedder">static_embedder</a></li>
+  <li><a href="#embedder-1" id="toc-embedder-1" class="nav-link" data-scroll-target="#embedder-1">embedder</a></li>
+  </ul></li>
+  <li><a href="#kosha" id="toc-kosha" class="nav-link" data-scroll-target="#kosha">Kosha</a>
+  <ul class="collapse">
+  <li><a href="#kosha-1" id="toc-kosha-1" class="nav-link" data-scroll-target="#kosha-1">Kosha</a></li>
+  <li><a href="#pkg_url" id="toc-pkg_url" class="nav-link" data-scroll-target="#pkg_url">pkg_url</a></li>
+  <li><a href="#pkg_doc" id="toc-pkg_doc" class="nav-link" data-scroll-target="#pkg_doc">pkg_doc</a></li>
+  <li><a href="#has_init" id="toc-has_init" class="nav-link" data-scroll-target="#has_init">has_init</a></li>
+  <li><a href="#enrich_chunks" id="toc-enrich_chunks" class="nav-link" data-scroll-target="#enrich_chunks">enrich_chunks</a></li>
+  <li><a href="#kosha.pkgs_in_env" id="toc-kosha.pkgs_in_env" class="nav-link" data-scroll-target="#kosha.pkgs_in_env">Kosha.pkgs_in_env</a></li>
+  <li><a href="#kosha.prune_old_pkgs" id="toc-kosha.prune_old_pkgs" class="nav-link" data-scroll-target="#kosha.prune_old_pkgs">Kosha.prune_old_pkgs</a></li>
+  <li><a href="#kosha.prune_old_versions" id="toc-kosha.prune_old_versions" class="nav-link" data-scroll-target="#kosha.prune_old_versions">Kosha.prune_old_versions</a></li>
+  <li><a href="#kosha.update_repo" id="toc-kosha.update_repo" class="nav-link" data-scroll-target="#kosha.update_repo">Kosha.update_repo</a></li>
+  <li><a href="#kosha.update_pkgs" id="toc-kosha.update_pkgs" class="nav-link" data-scroll-target="#kosha.update_pkgs">Kosha.update_pkgs</a></li>
+  <li><a href="#kosha.process_repo" id="toc-kosha.process_repo" class="nav-link" data-scroll-target="#kosha.process_repo">Kosha.process_repo</a></li>
+  <li><a href="#kosha.rm_pkg" id="toc-kosha.rm_pkg" class="nav-link" data-scroll-target="#kosha.rm_pkg">Kosha.rm_pkg</a></li>
+  <li><a href="#kosha.update_pkg" id="toc-kosha.update_pkg" class="nav-link" data-scroll-target="#kosha.update_pkg">Kosha.update_pkg</a></li>
+  <li><a href="#count_imp" id="toc-count_imp" class="nav-link" data-scroll-target="#count_imp">count_imp</a></li>
+  <li><a href="#kosha.process_env" id="toc-kosha.process_env" class="nav-link" data-scroll-target="#kosha.process_env">Kosha.process_env</a></li>
+  <li><a href="#process_content" id="toc-process_content" class="nav-link" data-scroll-target="#process_content">process_content</a></li>
+  <li><a href="#embed_chunk" id="toc-embed_chunk" class="nav-link" data-scroll-target="#embed_chunk">embed_chunk</a></li>
+  <li><a href="#kosha.nuke" id="toc-kosha.nuke" class="nav-link" data-scroll-target="#kosha.nuke">Kosha.nuke</a></li>
+  </ul></li>
+  <li><a href="#structured-search" id="toc-structured-search" class="nav-link" data-scroll-target="#structured-search">Structured Search</a>
+  <ul class="collapse">
+  <li><a href="#parseq" id="toc-parseq" class="nav-link" data-scroll-target="#parseq">parseq</a></li>
+  <li><a href="#filt2wh" id="toc-filt2wh" class="nav-link" data-scroll-target="#filt2wh">filt2wh</a></li>
+  <li><a href="#kosha.pkgs2consider" id="toc-kosha.pkgs2consider" class="nav-link" data-scroll-target="#kosha.pkgs2consider">Kosha.pkgs2consider</a></li>
+  <li><a href="#kosha.env_context" id="toc-kosha.env_context" class="nav-link" data-scroll-target="#kosha.env_context">Kosha.env_context</a></li>
+  <li><a href="#kosha.watch_repo" id="toc-kosha.watch_repo" class="nav-link" data-scroll-target="#kosha.watch_repo">Kosha.watch_repo</a></li>
+  <li><a href="#kosha.awatch_repo" id="toc-kosha.awatch_repo" class="nav-link" data-scroll-target="#kosha.awatch_repo">Kosha.awatch_repo</a></li>
+  <li><a href="#kosha.repo_context" id="toc-kosha.repo_context" class="nav-link" data-scroll-target="#kosha.repo_context">Kosha.repo_context</a></li>
+  <li><a href="#kosha.pkg_context" id="toc-kosha.pkg_context" class="nav-link" data-scroll-target="#kosha.pkg_context">Kosha.pkg_context</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/vedicreader/kosha/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div><div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="core.html.md"><i class="bi bi-file-code"></i>CommonMark</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">core</h1>
+</div>
+
+<div>
+  <div class="description">
+    Kosha is a tool for building a context for code generation based on your repo and environment.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<section id="utils" class="level2">
+<h2 class="anchored" data-anchor-id="utils">Utils</h2>
+<blockquote class="blockquote">
+<p>Utility functions for finding the repo root, copying the SKILL.md file, running async code from sync contexts, and getting installed package versions.</p>
+</blockquote>
+<hr>
+<section id="parse" class="level3">
+<h3 class="anchored" data-anchor-id="parse">parse</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> parse(</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    code:NoneType<span class="op">=</span><span class="va">None</span>, p:NoneType<span class="op">=</span><span class="va">None</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Parse source, tag parents, return (tree, imp, top_fns, all_fns). Cached — called freely.</em></p>
+<hr>
+</section>
+<section id="mv_skill_md" class="level3">
+<h3 class="anchored" data-anchor-id="mv_skill_md">mv_skill_md</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> mv_skill_md(</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    dry_run:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="bu">dir</span>:NoneType<span class="op">=</span><span class="va">None</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="va">None</span>:</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Copy bundled SKILL.md to skill directories.</em></p>
+<hr>
+</section>
+<section id="repo_root" class="level3">
+<h3 class="anchored" data-anchor-id="repo_root">repo_root</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> repo_root(</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>Path:</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Find the root of the current git repository, or None if not in a repo.</em></p>
+<hr>
+</section>
+<section id="arun" class="level3">
+<h3 class="anchored" data-anchor-id="arun">arun</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> arun(</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    coro</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">any</span>:</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Run an async coroutine from sync code, even if already inside an event loop</em></p>
+<div id="e8edf5249e5a52a9" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> _add(a, b): <span class="cf">return</span> a <span class="op">+</span> b</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> arun(_add(<span class="dv">1</span>, <span class="dv">2</span>)) <span class="op">==</span> L(<span class="dv">3</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'arun: sync context ok'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>arun: sync context ok</code></pre>
+</div>
+</div>
+<div id="64588d4a8789cea3" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> _test_nested():</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> arun(_add(<span class="dv">10</span>, <span class="dv">20</span>))</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> first(result) <span class="op">==</span> <span class="dv">30</span>, <span class="ss">f'got </span><span class="sc">{</span>result<span class="sc">}</span><span class="ss">'</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>arun(_test_nested())</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'arun: nested-loop context ok'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>arun: nested-loop context ok</code></pre>
+</div>
+</div>
+<div id="e3ac071e58731dd3" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>mv_skill_md()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Copying /Users/71293/code/personal/orgs/kosha/nbs/SKILL.md to: ['/Users/71293/code/personal/orgs/kosha/.agents/skills/kosha/SKILL.md', '.claude/skills/kosha/SKILL.md']
+Installed → ['/Users/71293/code/personal/orgs/kosha/.agents/skills/kosha/SKILL.md', '.claude/skills/kosha/SKILL.md']</code></pre>
+</div>
+</div>
+<div id="73af6180b40b9af0" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>mv_skill_md(<span class="bu">dir</span><span class="op">=</span><span class="st">'.'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Copying /Users/71293/code/personal/orgs/kosha/nbs/SKILL.md to: ['.agents/skills/kosha/SKILL.md', '.claude/skills/kosha/SKILL.md']
+Installed → ['.agents/skills/kosha/SKILL.md', '.claude/skills/kosha/SKILL.md']</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="pkg_trans_deps" class="level3">
+<h3 class="anchored" data-anchor-id="pkg_trans_deps">pkg_trans_deps</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> pkg_trans_deps(</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    seeds:<span class="bu">list</span>, depth:<span class="bu">int</span><span class="op">=</span><span class="dv">2</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>BFS over importlib.metadata requires: return seeds + all transitive deps up to depth levels (installed only, no optional extras).</em></p>
+<hr>
+</section>
+<section id="env_pkg_versions" class="level3">
+<h3 class="anchored" data-anchor-id="env_pkg_versions">env_pkg_versions</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> env_pkg_versions(</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    pyproject:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, depth:<span class="bu">int</span><span class="op">=</span><span class="dv">1</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">dict</span>:</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Get a dict of installed package versions using importlib.metadata.</em> passing depth traverse multiple layers of dependencies</p>
+<div id="14c16d861c6f5053" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>installed_packages(pyproject<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>['fastprogress', 'litesearch', 'pyan3', 'pyskills', 'watchfiles']</code></pre>
+</div>
+</div>
+<div id="255995252f57d628" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>pkg_trans_deps([<span class="st">'litesearch'</span>], depth<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>['fastlite', 'chonkie', 'pandas', 'tokenizers', 'notebook', 'codesigs', 'yake', 'pdf-oxide', 'pillow', 'litesearch', 'onnxruntime', 'model2vec', 'usearch']</code></pre>
+</div>
+</div>
+<div id="f929b699" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># httpx depends on httpcore; depth=1 should include both httpx + httpcore</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>d1 <span class="op">=</span> pkg_trans_deps([<span class="st">'httpx'</span>], depth<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="st">'httpx'</span> <span class="kw">in</span> d1, <span class="st">"seeds must be in result"</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="st">'httpcore'</span> <span class="kw">in</span> d1, <span class="ss">f"depth=1 should include httpcore (direct dep of httpx): </span><span class="sc">{</span>d1<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="co"># depth=0 returns only seeds</span></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">list</span>(pkg_trans_deps([<span class="st">'httpx'</span>], depth<span class="op">=</span><span class="dv">0</span>)) <span class="op">==</span> [<span class="st">'httpx'</span>], <span class="st">"depth=0 should return only seeds"</span></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="co"># pyproject seeds → depth=2 expansion</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>pyp <span class="op">=</span> installed_packages(pyproject<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> pyp:</span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>    deep <span class="op">=</span> pkg_trans_deps(<span class="bu">list</span>(pyp), depth<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">set</span>(pyp).issubset(<span class="bu">set</span>(deep)), <span class="st">"seeds must be a subset of result"</span></span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">len</span>(deep) <span class="op">&gt;=</span> <span class="bu">len</span>(pyp), <span class="st">"depth=2 should expand beyond pyproject direct deps"</span></span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"pkg_trans_deps ok: </span><span class="sc">{</span><span class="bu">len</span>(pyp)<span class="sc">}</span><span class="ss"> pyproject seeds → </span><span class="sc">{</span><span class="bu">len</span>(deep)<span class="sc">}</span><span class="ss"> packages at depth=2"</span>)</span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"pkg_trans_deps ok (no pyproject deps to test)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>pkg_trans_deps ok: 5 pyproject seeds → 58 packages at depth=2</code></pre>
+</div>
+</div>
+<div id="d02ac671fc24effb" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>env_pkg_versions()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'python-fasthtml': '0.13.4',
+ 'fastlite': '0.2.4',
+ 'chonkie': '1.6.4',
+ 'pandas': '3.0.2',
+ 'tokenizers': '0.23.1',
+ 'yake': '0.7.3',
+ 'watchfiles': '1.1.1',
+ 'pdf_oxide': '0.3.43',
+ 'Jinja2': '3.1.6',
+ 'anyio': '4.13.0',
+ 'fastprogress': '1.1.5',
+ 'pyan3': '2.6.0',
+ 'usearch': '2.25.2',
+ 'codesigs': '0.0.2',
+ 'notebook': '7.5.6',
+ 'pillow': '12.2.0',
+ 'litesearch': '0.0.25',
+ 'onnxruntime': '1.25.1',
+ 'fastcore': '1.12.44',
+ 'pyskills': '0.0.7',
+ 'model2vec': '0.8.1'}</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="embedder" class="level2">
+<h2 class="anchored" data-anchor-id="embedder">embedder</h2>
+<blockquote class="blockquote">
+<p>jina-embeddings-v2-base-code is a model designed for code understanding and generation tasks</p>
+</blockquote>
+<hr>
+<section id="emb_query" class="level3">
+<h3 class="anchored" data-anchor-id="emb_query">emb_query</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> emb_query(</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    e, <span class="co"># embedder factory — callable returning a FastEncode or AutoEmbeddings instance</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Curry an embedder factory into a query-embedding function <code>t -&gt; embedding</code>.</em></p>
+<hr>
+</section>
+<section id="emb_doc" class="level3">
+<h3 class="anchored" data-anchor-id="emb_doc">emb_doc</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> emb_doc(</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    e, <span class="co"># embedder factory — callable returning a FastEncode or AutoEmbeddings instance</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Curry an embedder factory into a document-embedding function <code>t -&gt; embedding</code>.</em></p>
+<hr>
+</section>
+<section id="static_embedder" class="level3">
+<h3 class="anchored" data-anchor-id="static_embedder">static_embedder</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> static_embedder(</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>    emb_model:<span class="bu">str</span><span class="op">=</span><span class="st">'minishlab/potion-retrieval-32M'</span>, <span class="co"># HuggingFace model id for static embeddings</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>AutoEmbeddings:</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Load or return cached static (potion-retrieval) embedder (24h TTL).</em></p>
+<hr>
+</section>
+<section id="embedder-1" class="level3">
+<h3 class="anchored" data-anchor-id="embedder-1">embedder</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> embedder(</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>    emb_model:AttrDict<span class="op">=</span>{<span class="st">'model'</span>: <span class="st">'mrsladoje/CodeRankEmbed-onnx-int8'</span>, <span class="st">'onnx_path'</span>: <span class="st">'onnx/model.onnx'</span>, <span class="st">'prompt'</span>: {<span class="st">'query'</span>: <span class="st">'Represent this query for searching relevant code: </span><span class="sc">{text}</span><span class="st">'</span>, <span class="st">'document'</span>: <span class="st">'</span><span class="sc">{text}</span><span class="st">'</span>}}, <span class="co"># model config AttrDict (model name, onnx_path, prompt instructions)</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>    model_dict:AttrDict<span class="op">=</span>{<span class="st">'model'</span>: <span class="st">'onnx-community/embeddinggemma-300m-ONNX'</span>, <span class="st">'onnx_path'</span>: <span class="st">'onnx/model.onnx'</span>, <span class="st">'prompt'</span>: {<span class="st">'document'</span>: <span class="st">'Instruct: document </span><span class="ch">\n</span><span class="st"> document: </span><span class="sc">{text}</span><span class="st">'</span>, <span class="st">'query'</span>: <span class="st">'Instruct: query </span><span class="ch">\n</span><span class="st"> query: </span><span class="sc">{text}</span><span class="st">'</span>}},</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>    repo_id:NoneType<span class="op">=</span><span class="va">None</span>, md:NoneType<span class="op">=</span><span class="va">None</span>, md_nm:NoneType<span class="op">=</span><span class="va">None</span>, normalize:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, dtype:<span class="bu">type</span><span class="op">=</span>float16,</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>    tti:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, prompt:NoneType<span class="op">=</span><span class="va">None</span>, hf_token:NoneType<span class="op">=</span><span class="va">None</span>, batch_size:<span class="bu">int</span><span class="op">=</span><span class="dv">32</span>, parallel:<span class="bu">int</span><span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>    quantize:NoneType<span class="op">=</span><span class="va">None</span>, max_seq_len:NoneType<span class="op">=</span><span class="va">None</span></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>FastEncode:</span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Load or return cached CodeRankEmbed ONNX document embedder (24h TTL).</em></p>
+<div id="22b3fd0eeba89b15" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>emb_doc(embedder)(<span class="st">'def add(a, b): return a + b'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>array([[ 1.1848e-02, -3.0869e-02,  2.4231e-02, -1.4404e-02, -8.3590e-04,
+         4.9469e-02, -4.8828e-02, -2.7969e-02, -9.0027e-03, -2.9724e-02,
+         4.6539e-02,  6.9458e-02, -1.0262e-02, -4.5319e-02,  1.8244e-03,
+        -4.2694e-02,  3.5950e-02, -1.4320e-02, -5.1086e-02,  5.8098e-03,
+         1.0651e-01, -4.6417e-02,  1.8097e-02, -4.7485e-02,  5.7495e-02,
+        -3.5004e-02, -5.4047e-02,  1.2405e-02,  8.4152e-03,  3.8361e-02,
+        -7.0129e-02,  6.0272e-02,  3.6346e-02,  2.6718e-02,  2.9480e-02,
+         2.7222e-02,  3.1738e-02, -3.4058e-02, -5.7465e-02, -3.3966e-02,
+        -2.2888e-02,  5.6030e-02,  3.2043e-02,  2.3209e-02,  4.4769e-02,
+         6.5651e-03, -3.4142e-03,  1.6022e-02,  7.7515e-02, -2.0081e-02,
+         3.2883e-03, -7.1045e-02, -7.4341e-02,  7.9575e-03,  2.4155e-02,
+         1.9791e-02, -5.1880e-03, -2.0493e-02,  5.5237e-02, -2.2171e-02,
+         7.5989e-02,  7.3181e-02,  4.8752e-03,  2.5543e-02,  8.8730e-03,
+        -2.0798e-02,  9.5825e-03,  3.5309e-02,  1.0292e-02, -9.3765e-03,
+         1.3924e-02, -5.5695e-02,  3.5767e-02, -1.5228e-02, -4.6234e-03,
+         2.3346e-02, -9.1629e-03,  2.6489e-02,  9.2545e-03, -1.0910e-03,
+         9.2163e-03, -5.5206e-02,  1.1029e-01, -5.1231e-03, -7.5134e-02,
+         6.8848e-02, -4.6783e-02,  2.9037e-02, -1.0658e-02, -1.4297e-02,
+        -2.2232e-02, -6.0364e-02, -2.3376e-02,  1.7487e-02, -1.1499e-01,
+        -1.2428e-02,  4.2145e-02,  6.9809e-03,  1.1841e-02,  5.0323e-02,
+         4.0512e-03,  2.7420e-02,  1.9028e-02,  4.5166e-03,  1.8845e-02,
+        -3.7048e-02, -6.0196e-03, -1.5717e-02, -2.6581e-02, -2.7817e-02,
+        -1.9669e-02,  2.8870e-02,  1.7105e-02, -4.1595e-02, -3.1616e-02,
+         2.9617e-02, -5.8716e-02,  2.7969e-02,  2.9251e-02,  4.0283e-02,
+        -3.5889e-02,  3.9917e-02, -5.0751e-02,  4.1504e-02, -3.9291e-03,
+         4.4525e-02,  4.0894e-02, -1.7670e-02,  1.7563e-02, -1.6449e-02,
+         2.0203e-02, -6.3904e-02,  7.6477e-02,  3.1433e-02,  1.0193e-02,
+         8.7433e-03,  3.1769e-02,  3.2410e-02,  1.3588e-02,  7.5340e-03,
+         7.1449e-03,  1.2276e-02, -1.0498e-02,  1.7639e-02, -6.3721e-02,
+        -1.3985e-02,  7.0763e-03,  4.7226e-03, -2.4200e-02, -8.1329e-03,
+         4.2480e-02,  4.2633e-02, -2.5196e-03,  6.4209e-02, -1.3374e-02,
+        -2.5589e-02,  3.6011e-02,  1.5793e-02,  1.5244e-02, -3.8910e-02,
+         8.1421e-02,  7.9193e-03, -6.5979e-02, -6.8550e-03, -1.8555e-02,
+        -4.5959e-02,  1.6332e-04, -9.7809e-03, -2.9297e-03,  3.1342e-02,
+         4.9500e-02, -5.3131e-02,  3.4515e-02,  3.2288e-02,  1.7681e-03,
+        -2.3132e-02, -3.9673e-02,  1.4772e-03, -1.1215e-02, -4.7119e-02,
+        -1.2939e-02, -7.3814e-03,  4.9927e-02, -1.1468e-04, -2.9297e-03,
+        -4.8248e-02, -3.5645e-02, -8.3160e-03, -3.4943e-02,  3.1166e-03,
+         5.9843e-04,  3.5217e-02,  1.0616e-04,  1.4458e-02, -4.1565e-02,
+         5.7098e-02,  4.1618e-03,  6.2042e-02,  1.0826e-02,  6.6528e-02,
+         3.9703e-02, -7.8064e-02,  1.6968e-02, -4.3274e-02, -1.9470e-02,
+         3.2196e-02, -3.7727e-03, -1.3908e-02,  1.6663e-02, -9.3567e-02,
+         3.2562e-02,  1.9196e-02, -2.5787e-02,  1.9638e-02,  7.2266e-02,
+        -5.6610e-02, -2.2339e-02, -5.0018e-02, -4.0039e-02, -5.7190e-02,
+         2.6627e-02,  6.9389e-03,  4.9194e-02, -5.2368e-02,  5.3894e-02,
+         3.8433e-03, -3.6438e-02,  6.8848e-02, -4.4067e-02,  6.4941e-02,
+        -2.6123e-02, -1.5121e-02,  6.2500e-02,  5.0171e-02,  4.7974e-02,
+         1.4830e-04,  8.7814e-03,  4.0039e-02,  4.6051e-02, -2.9572e-02,
+         3.6072e-02, -2.1301e-02, -5.3749e-03,  4.5441e-02, -1.7212e-02,
+         1.7014e-02, -6.3354e-02, -3.5706e-02, -5.2567e-03,  3.0670e-03,
+        -6.1279e-02, -2.9190e-02,  7.2510e-02, -2.5055e-02,  2.2217e-02,
+         7.3204e-03, -6.4087e-02, -2.1194e-02, -5.9021e-02,  7.2289e-03,
+         7.0496e-02,  4.8492e-02, -6.6872e-03,  3.0384e-03,  1.3954e-02,
+         3.1250e-02, -1.3199e-02, -4.6143e-02,  5.1514e-02, -4.7180e-02,
+        -6.9641e-02, -3.5828e-02, -1.0651e-02,  1.3535e-02, -1.9440e-02,
+         2.6169e-02,  1.0077e-01, -9.6817e-03,  2.0844e-02,  2.4204e-03,
+        -3.8666e-02,  3.6011e-02,  3.3112e-02,  6.7627e-02, -5.0232e-02,
+         5.7953e-02,  7.9117e-03,  9.3002e-03,  1.3809e-02, -3.6621e-02,
+         2.1942e-02, -1.1589e-02, -3.1342e-02,  8.3313e-03, -1.1681e-02,
+         2.0233e-02,  1.2299e-02,  2.2936e-04, -1.1734e-02, -2.6703e-02,
+        -5.8319e-02,  3.3844e-02, -1.2650e-02, -2.2934e-02, -2.4612e-02,
+         4.4373e-02, -1.8682e-03, -1.0300e-02,  2.8046e-02,  7.3608e-02,
+        -3.7201e-02,  1.3313e-02,  1.2054e-02, -1.5793e-02,  9.5415e-04,
+         2.7847e-02, -1.8555e-02, -2.2936e-04,  5.7831e-02, -1.2268e-02,
+        -2.4109e-02, -4.9957e-02,  1.3458e-02,  1.8494e-02, -2.7145e-02,
+        -2.8366e-02, -2.3251e-03,  8.1787e-03,  6.2218e-03, -3.8788e-02,
+        -4.8096e-02,  7.4577e-04, -2.0111e-02, -2.0432e-02, -2.0660e-02,
+        -1.4168e-02,  3.8696e-02, -5.5817e-02, -2.3346e-02, -1.2970e-02,
+         8.6609e-02,  5.4443e-02, -1.3947e-02,  3.2104e-02,  9.5291e-03,
+         1.0277e-02,  5.7922e-02, -3.1982e-02, -2.8183e-02,  5.5054e-02,
+        -3.6102e-02, -3.2440e-02,  1.6190e-02,  3.0182e-02, -2.4658e-02,
+        -5.1788e-02,  5.5656e-03, -3.3691e-02,  6.3705e-03, -1.6266e-02,
+        -3.1872e-03,  2.5620e-02, -1.4427e-02,  1.8082e-02,  8.6060e-03,
+        -1.0815e-01,  1.8402e-02, -5.7526e-02,  2.9724e-02, -7.4341e-02,
+         1.1154e-02,  3.2104e-02, -1.6907e-02,  2.2064e-02,  1.1719e-02,
+        -2.2064e-02, -2.4185e-02,  3.6224e-02, -1.8539e-02, -2.2964e-02,
+         2.1347e-02,  6.5430e-02,  3.0472e-02, -5.6839e-03, -5.5023e-02,
+        -4.9133e-02, -3.1555e-02, -5.6610e-03,  4.2419e-02, -2.6184e-02,
+        -1.3588e-02,  6.3934e-03,  2.8931e-02,  1.5350e-02, -4.1260e-02,
+         1.9455e-02, -8.3771e-03, -1.6174e-02, -1.2505e-02, -1.4923e-02,
+        -2.6337e-02, -4.1962e-02,  2.2614e-04,  1.4641e-02, -9.3231e-03,
+        -4.9500e-02,  1.7029e-02, -4.8752e-03,  3.0869e-02, -5.8228e-02,
+        -2.0233e-02,  2.2984e-03, -6.2675e-03, -5.8174e-03,  1.3664e-02,
+         4.2511e-02,  5.1819e-02, -6.8321e-03,  2.6794e-02,  2.2491e-02,
+        -2.3682e-02,  1.2863e-02,  1.7365e-02, -2.6283e-03,  6.3744e-03,
+        -2.6077e-02, -3.8422e-02,  4.2816e-02,  2.1992e-03, -4.2999e-02,
+         9.3002e-03,  4.1321e-02, -1.7120e-02,  1.7868e-02,  4.2297e-02,
+         1.6708e-02, -2.2903e-02,  1.9592e-02,  8.5571e-02, -3.9307e-02,
+         5.6610e-02, -1.3504e-02,  7.0374e-02, -1.1169e-02, -6.3629e-03,
+         5.5511e-02,  1.2405e-02, -2.0351e-03, -1.6098e-02, -1.2894e-03,
+         5.7030e-03,  4.8462e-02,  6.9824e-02,  9.3994e-03, -2.2644e-02,
+         2.3880e-02,  3.3936e-02,  3.7903e-02, -4.7516e-02,  4.6814e-02,
+        -3.3020e-02, -2.4155e-02,  5.8289e-02, -1.1177e-02,  1.5083e-02,
+        -1.3977e-02,  6.9214e-02, -5.3345e-02, -1.0490e-02,  2.2526e-03,
+        -1.7502e-02,  3.0792e-02,  3.5034e-02,  2.6321e-02,  1.1581e-02,
+         7.3669e-02, -1.3565e-02,  8.0322e-02,  2.7771e-03,  5.9929e-03,
+        -2.9572e-02,  3.1738e-02,  2.4658e-02,  9.8133e-04,  1.8784e-02,
+        -2.4277e-02,  2.4918e-02,  5.0049e-02, -1.9928e-02, -1.2581e-02,
+         4.1718e-02, -3.2562e-02,  4.0527e-02, -6.8512e-03, -5.1514e-02,
+         1.7181e-02, -4.5929e-02,  2.5116e-02, -6.0181e-02,  2.1423e-02,
+        -3.9673e-02, -3.8696e-02, -5.7129e-02, -2.3621e-02, -2.3758e-02,
+         4.3427e-02, -3.9429e-02, -1.9485e-02,  1.0727e-02, -1.9363e-02,
+        -4.0527e-02, -5.4901e-02, -1.7029e-02, -2.9221e-02,  1.1757e-02,
+         5.2643e-02,  1.5198e-02, -4.7119e-02,  6.0921e-03,  3.5156e-02,
+        -1.1314e-02,  2.4307e-02,  3.0762e-02,  2.9633e-02,  2.7939e-02,
+        -2.5833e-02,  5.7281e-02, -3.1281e-03,  8.4305e-03, -2.0046e-03,
+        -4.0405e-02,  8.2397e-02,  5.6335e-02,  5.9395e-03, -3.3226e-03,
+        -2.2202e-03, -2.6276e-02,  1.4465e-02,  2.8992e-02, -5.1819e-02,
+         3.3966e-02,  3.1525e-02, -3.1921e-02,  3.4332e-02,  6.1523e-02,
+        -7.2693e-02, -3.8929e-03, -1.9302e-03,  1.0956e-02, -3.3813e-02,
+        -1.4801e-02, -4.9622e-02,  1.7700e-02,  2.1347e-02, -2.8946e-02,
+        -1.7960e-02, -3.0396e-02, -4.3945e-03,  4.1473e-02,  1.7151e-02,
+        -8.0566e-03, -3.0060e-02, -4.0558e-02, -2.4780e-02, -1.1139e-01,
+        -6.0730e-02, -2.9388e-02,  7.7393e-02, -5.5145e-02, -7.5760e-03,
+         4.5509e-03, -5.7739e-02,  2.6382e-02,  6.9857e-04,  5.3131e-02,
+        -2.1637e-02, -1.9104e-02, -3.1021e-02, -2.6993e-02, -2.9087e-03,
+        -2.2297e-03, -4.3213e-02, -6.0791e-02,  1.5732e-02, -3.5461e-02,
+        -5.4169e-02, -2.8793e-02, -1.0735e-04,  1.5656e-02, -2.8595e-02,
+         5.5359e-02, -3.8544e-02,  1.4214e-02, -2.8351e-02, -5.2460e-02,
+         1.6327e-02, -1.6613e-03,  1.6800e-02,  4.8706e-02,  4.4312e-02,
+        -3.0960e-02,  8.1024e-03,  1.2405e-02,  3.6377e-02,  2.5314e-02,
+        -1.8250e-02, -2.0538e-02, -2.0447e-02, -4.3365e-02, -3.2562e-02,
+        -4.7363e-02, -3.5950e-02, -5.0598e-02,  5.0812e-02,  8.6899e-03,
+         8.4381e-03,  2.7206e-02, -3.5461e-02,  9.5520e-03, -1.9485e-02,
+        -7.1239e-04, -1.3557e-02, -3.7048e-02,  7.5607e-03,  3.3386e-02,
+         3.6163e-02, -3.1567e-03,  3.7537e-02,  7.3051e-03, -4.4250e-03,
+        -6.5536e-03, -1.9241e-02, -1.9241e-02, -4.7516e-02, -3.6499e-02,
+         4.2953e-03,  7.6723e-04,  4.2236e-02, -2.1877e-03, -2.3376e-02,
+        -1.0254e-02,  1.2001e-02,  2.4353e-02,  6.2317e-02,  2.3331e-02,
+        -8.0811e-02, -2.3849e-02, -1.4786e-02, -3.3844e-02, -1.4610e-02,
+        -9.1919e-02, -1.1627e-02,  5.6000e-02,  3.7567e-02,  3.1525e-02,
+        -2.6688e-02,  1.6418e-02,  2.8458e-02, -7.0992e-03, -1.4557e-02,
+        -7.9193e-03, -1.0719e-02, -2.4582e-02, -2.7359e-02, -1.3382e-02,
+        -1.2314e-02, -4.6448e-02,  3.0090e-02, -3.1464e-02,  2.7557e-02,
+         1.4374e-02,  8.4534e-03, -4.0985e-02, -1.3802e-02,  3.7354e-02,
+         1.2230e-02,  1.8677e-02,  1.6937e-02,  8.1787e-03, -8.7952e-02,
+         8.6975e-02, -4.3152e-02, -3.6285e-02,  1.3382e-02, -3.0777e-02,
+         4.7302e-03,  3.2684e-02, -2.0294e-02, -4.9042e-02, -1.1169e-02,
+         7.0618e-02,  4.4495e-02,  5.5267e-02, -1.7548e-02, -2.5253e-02,
+         2.4002e-02, -3.6377e-02, -4.3411e-03, -1.2341e-03, -2.9907e-03,
+         4.3716e-03, -4.1412e-02,  3.4851e-02, -4.0497e-02, -7.4158e-02,
+         1.1093e-02,  7.8552e-02, -1.8448e-02, -5.4550e-04, -6.8298e-02,
+         7.8506e-03, -1.5320e-02,  4.8187e-02,  5.2155e-02, -1.8463e-02,
+        -2.5406e-02, -6.1760e-03,  2.6276e-02, -6.1378e-03, -4.2152e-03,
+         1.6815e-02, -5.7800e-02, -2.3407e-02, -2.3697e-02, -8.0322e-02,
+         4.7058e-02, -2.8625e-02,  4.2267e-03,  4.7722e-03, -4.8950e-02,
+         3.3508e-02, -1.9592e-02,  3.7872e-02,  1.3170e-03, -3.4393e-02,
+        -4.7913e-02, -9.9335e-03,  1.7426e-02, -7.7332e-02, -2.6733e-02,
+        -5.5389e-02, -1.0735e-02, -1.7662e-03,  4.4708e-02,  2.9037e-02,
+        -2.6611e-02, -3.1555e-02,  2.7435e-02, -1.9653e-02,  1.7365e-02,
+         1.7166e-02, -2.8801e-03,  2.8976e-02,  3.9154e-02,  8.1787e-02,
+         6.3049e-02, -1.2482e-02,  3.8300e-02, -2.7466e-02,  6.8176e-02,
+        -1.8082e-02,  2.2202e-02,  4.3121e-02,  1.2802e-02,  4.9164e-02,
+        -1.5795e-04,  2.6840e-02, -4.5135e-02]], dtype=float16)</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="kosha" class="level2">
+<h2 class="anchored" data-anchor-id="kosha">Kosha</h2>
+<blockquote class="blockquote">
+<p>The main class for managing the code and environment databases, updating package metadata, embedding code snippets, and performing context-aware searches.</p>
+</blockquote>
+<hr>
+<section id="kosha-1" class="level3">
+<h3 class="anchored" data-anchor-id="kosha-1">Kosha</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> Kosha(</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">dir</span>:Path<span class="op">=</span><span class="va">None</span>, install_skill:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, xdg_dir:Path<span class="op">=</span><span class="va">None</span>, efn:function<span class="op">=</span>embedder</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Kosha allows you to build a context for code generation based on your repo and environment.</em></p>
+<div id="8658c0785db76108" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>k<span class="op">=</span>Kosha()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="b662b76eb7a1e8e2" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>k.emb_doc(<span class="st">'def add(a, b): return a + b'</span>)[:<span class="dv">5</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>array([[ 1.3954e-02, -2.5146e-02,  2.2491e-02, -1.3031e-02,  2.8496e-03,
+         5.9265e-02, -4.7455e-02, -2.2934e-02, -9.8190e-03, -1.1307e-02,
+         3.8971e-02,  7.4951e-02, -4.2915e-03, -5.3009e-02,  1.0384e-02,
+        -1.9043e-02,  1.9760e-02, -1.7395e-02, -5.3375e-02, -1.3027e-03,
+         1.0101e-01, -4.6722e-02,  1.8021e-02, -4.7028e-02,  6.4087e-02,
+        -3.5492e-02, -6.1462e-02,  9.9106e-03,  9.7942e-04,  4.2450e-02,
+        -5.3284e-02,  6.7383e-02,  4.2755e-02,  2.7069e-02,  3.4912e-02,
+         1.9119e-02,  3.2288e-02, -2.0523e-02, -6.4636e-02, -2.6794e-02,
+        -8.5907e-03,  6.6895e-02,  2.6825e-02,  1.1925e-02,  4.3701e-02,
+         6.4621e-03, -3.2997e-03,  3.1471e-03,  7.7209e-02, -1.3374e-02,
+        -1.2016e-02, -7.0496e-02, -8.1848e-02,  6.0387e-03,  3.0457e-02,
+         1.9684e-02,  9.3765e-03, -2.5528e-02,  6.4697e-02, -2.3788e-02,
+         8.3740e-02,  5.1270e-02,  1.9577e-02,  2.8046e-02,  2.8419e-03,
+        -2.7145e-02,  1.6129e-02,  4.5441e-02, -8.0872e-03, -1.0284e-02,
+         1.2344e-02, -4.9011e-02,  3.8757e-02, -1.0590e-02, -1.1086e-02,
+         1.7212e-02, -8.3923e-03,  3.0853e-02,  1.3840e-02, -9.6130e-03,
+         2.2827e-02, -5.7861e-02,  1.0291e-01, -8.8272e-03, -7.8064e-02,
+         6.3721e-02, -5.6976e-02,  2.1088e-02, -1.4008e-02, -1.5961e-02,
+        -1.2650e-02, -4.6387e-02, -2.5574e-02,  2.6932e-02, -1.0626e-01,
+        -1.6693e-02,  5.1147e-02,  1.8066e-02,  3.7212e-03,  5.9998e-02,
+         7.5188e-03,  3.6713e-02,  1.3138e-02, -1.7433e-03,  2.4536e-02,
+        -2.0126e-02, -1.5297e-03, -2.3376e-02, -3.9368e-02, -3.2074e-02,
+        -2.0798e-02,  1.0391e-02, -3.1033e-03, -4.4739e-02, -2.2324e-02,
+         2.9480e-02, -4.8981e-02,  4.3640e-02,  3.0334e-02,  3.1494e-02,
+        -2.7130e-02,  5.0934e-02, -4.4220e-02,  4.9377e-02,  1.0239e-02,
+         4.1016e-02,  4.0833e-02, -1.4572e-02,  7.1259e-03, -2.8763e-02,
+         1.4488e-02, -5.8746e-02,  7.4585e-02,  3.1342e-02,  5.2490e-03,
+         2.0462e-02,  3.1464e-02,  2.4704e-02,  1.2245e-02,  7.2441e-03,
+        -7.7133e-03,  1.6815e-02,  5.1613e-03,  2.1454e-02, -5.9357e-02,
+        -9.9182e-03, -2.9812e-03,  8.0872e-03, -1.4519e-02,  6.7635e-03,
+         4.3457e-02,  4.2175e-02,  2.0721e-02,  8.1970e-02, -2.1820e-02,
+        -2.4857e-02,  3.1860e-02,  2.5513e-02,  1.5007e-02, -4.5441e-02,
+         7.1838e-02,  1.2642e-02, -6.7993e-02, -1.1520e-02, -2.5589e-02,
+        -6.4087e-02,  8.3466e-03, -7.9803e-03,  2.0809e-03,  2.3651e-02,
+         4.1809e-02, -4.8706e-02,  2.5528e-02,  2.9694e-02,  1.2245e-02,
+        -3.0823e-02, -4.6082e-02,  1.0071e-02, -9.7656e-03, -4.8492e-02,
+         1.2341e-03, -1.1238e-02,  5.5969e-02,  1.8954e-04,  2.8419e-03,
+        -4.7760e-02, -4.8401e-02, -7.2632e-03, -3.3386e-02, -1.8196e-03,
+        -5.5580e-03,  3.8788e-02, -7.5264e-03,  1.0208e-02, -4.5288e-02,
+         8.0139e-02, -1.2993e-02,  8.0444e-02, -1.0073e-04,  6.8604e-02,
+         3.9917e-02, -7.9956e-02,  1.7099e-03, -2.9999e-02, -2.4918e-02,
+         3.4821e-02, -1.0689e-02,  6.4468e-04,  4.4403e-03, -9.8633e-02,
+         4.2542e-02,  2.6047e-02, -2.9572e-02,  1.9836e-02,  7.1533e-02,
+        -4.2267e-02, -1.7014e-02, -3.7170e-02, -2.8809e-02, -5.7739e-02,
+         2.5543e-02,  1.0567e-03,  4.3213e-02, -5.2490e-02,  4.1321e-02,
+        -6.3248e-03, -3.4698e-02,  6.9763e-02, -5.1941e-02,  6.7688e-02,
+        -2.7756e-02, -2.3560e-02,  6.1951e-02,  6.7688e-02,  4.2542e-02,
+         9.5596e-03,  4.8523e-03,  4.2419e-02,  4.3060e-02, -2.3697e-02,
+         3.4729e-02, -2.3285e-02, -5.5351e-03,  3.0045e-02, -2.3590e-02,
+         1.2169e-02, -7.1838e-02, -3.9246e-02, -5.7602e-03,  3.7823e-03,
+        -5.3925e-02, -2.9984e-02,  7.9041e-02, -1.9714e-02,  9.2468e-03,
+         2.5848e-02, -6.2988e-02, -2.6611e-02, -5.9265e-02,  4.2534e-03,
+         7.2571e-02,  5.4779e-02,  3.8395e-03,  7.9956e-03,  1.0902e-02,
+         2.0706e-02, -1.1299e-02, -4.0192e-02,  5.9937e-02, -6.5491e-02,
+        -7.1167e-02, -3.1525e-02, -1.5572e-02,  1.4458e-02, -1.3107e-02,
+         1.8875e-02,  1.0681e-01, -1.2566e-02,  3.1342e-02, -5.7678e-03,
+        -5.3741e-02,  2.8412e-02,  2.7466e-02,  6.4331e-02, -5.7281e-02,
+         6.4697e-02, -8.0795e-03,  1.0544e-02,  2.1500e-02, -3.7842e-02,
+         9.1095e-03, -1.9608e-02, -1.5480e-02,  1.3847e-02, -7.2956e-04,
+         1.7502e-02,  2.7466e-02, -6.9923e-03, -5.8632e-03, -1.7563e-02,
+        -4.4708e-02,  1.1223e-02, -1.5976e-02, -2.3361e-02, -2.3514e-02,
+         5.2887e-02,  2.1732e-04,  3.6657e-05,  1.8402e-02,  8.3313e-02,
+        -3.5828e-02,  2.6474e-02,  1.6647e-02, -2.3758e-02, -3.0537e-03,
+         3.8574e-02, -3.5858e-02,  3.6240e-03,  4.6112e-02, -2.5543e-02,
+        -1.3794e-02, -5.5969e-02,  1.0788e-02,  2.5654e-03, -2.4780e-02,
+        -3.1921e-02, -4.8485e-03,  1.4442e-02,  3.9558e-03, -2.7725e-02,
+        -4.8767e-02, -7.6752e-03, -2.2980e-02, -1.8768e-02, -1.1261e-02,
+        -1.0300e-02,  4.2297e-02, -4.0314e-02, -2.9160e-02, -2.1248e-03,
+         8.9355e-02,  5.9357e-02, -9.9335e-03,  2.6306e-02,  6.6414e-03,
+         3.6869e-03,  6.3232e-02, -3.5828e-02, -1.4122e-02,  7.0251e-02,
+        -4.5074e-02, -3.3844e-02,  2.0599e-02,  2.2415e-02, -2.3773e-02,
+        -4.9622e-02, -8.5449e-04, -2.4368e-02,  7.1678e-03, -1.4542e-02,
+        -2.8534e-03,  2.6230e-02, -1.8463e-02,  1.9318e-02,  9.3307e-03,
+        -1.0730e-01, -1.5192e-03, -5.6122e-02,  3.1860e-02, -7.0740e-02,
+         7.0457e-03,  2.8793e-02, -1.9913e-02,  2.5650e-02,  6.7062e-03,
+        -8.3771e-03, -1.7502e-02,  3.1464e-02, -1.0704e-02, -2.0355e-02,
+         1.9135e-02,  6.9519e-02,  2.9327e-02,  1.1322e-02, -4.0985e-02,
+        -2.8259e-02, -2.9785e-02,  8.3771e-03,  4.7455e-02, -1.8768e-02,
+        -8.8654e-03,  3.7041e-03,  2.7939e-02,  1.9730e-02, -4.1504e-02,
+         1.8234e-02, -1.3710e-02, -2.0584e-02, -2.6379e-03, -2.7580e-03,
+        -1.4717e-02, -5.6793e-02, -1.6266e-02,  1.3451e-02, -7.9880e-03,
+        -4.9927e-02,  1.1406e-02, -7.5264e-03,  2.4445e-02, -6.0059e-02,
+        -2.1133e-02, -7.5188e-03, -2.8744e-03,  4.7035e-03,  1.1024e-03,
+         3.7994e-02,  4.7302e-02,  4.5280e-03,  3.0640e-02,  2.6398e-02,
+        -1.9653e-02,  2.1362e-02,  1.1032e-02,  1.4610e-03,  1.9806e-02,
+        -4.7638e-02, -3.0762e-02,  3.5522e-02,  1.8265e-02, -4.2053e-02,
+         1.1971e-02,  3.3844e-02, -3.2196e-02,  1.7670e-02,  4.1718e-02,
+         8.7662e-03, -1.8372e-02,  1.8951e-02,  9.3750e-02, -2.6276e-02,
+         5.3650e-02, -1.3237e-02,  6.5491e-02, -6.3133e-03, -1.0048e-02,
+         5.6488e-02,  3.1586e-02, -4.8065e-03, -6.1150e-03, -1.3237e-02,
+         3.9482e-03,  5.3741e-02,  6.6284e-02,  1.5545e-03, -3.3321e-03,
+         2.4551e-02,  3.5095e-02,  4.1809e-02, -5.0568e-02,  4.5776e-02,
+        -4.1321e-02, -3.4393e-02,  5.2063e-02, -1.7624e-03,  1.2405e-02,
+        -1.9287e-02,  6.5247e-02, -4.9988e-02, -1.8539e-02, -4.4556e-03,
+        -2.0050e-02,  3.6896e-02,  4.4922e-02,  2.1606e-02,  1.3077e-02,
+         6.4514e-02, -2.1133e-02,  6.9336e-02,  4.5586e-03,  9.8343e-03,
+        -3.6835e-02,  3.1647e-02,  3.0212e-02,  5.0583e-03,  1.8829e-02,
+        -3.0548e-02,  2.2079e-02,  3.3752e-02, -7.1602e-03,  3.6011e-03,
+         2.8214e-02, -3.6530e-02,  4.6600e-02, -2.2110e-02, -4.6661e-02,
+         2.0035e-02, -4.4708e-02,  2.7313e-02, -5.9814e-02,  2.0828e-02,
+        -5.3375e-02, -2.4567e-02, -5.6091e-02, -1.3557e-02, -3.0380e-02,
+         4.0649e-02, -4.0649e-02, -2.7939e-02,  2.6245e-02, -2.0218e-02,
+        -4.1473e-02, -4.9072e-02, -1.9318e-02, -2.2507e-02,  1.9547e-02,
+         4.9957e-02,  6.9160e-03, -5.4352e-02, -1.0056e-02,  4.4769e-02,
+        -1.6052e-02,  1.2733e-02,  2.8793e-02,  4.1779e-02,  2.9343e-02,
+        -2.2018e-02,  5.5786e-02, -1.6495e-02,  2.6627e-02,  1.1017e-02,
+        -3.3203e-02,  8.9600e-02,  6.1554e-02,  1.2230e-02, -3.8376e-03,
+        -8.3466e-03, -1.9562e-02,  2.0096e-02,  4.2084e-02, -4.9866e-02,
+         2.1667e-02,  1.1742e-02, -2.9816e-02,  4.2328e-02,  6.5247e-02,
+        -8.1848e-02, -6.6986e-03,  9.5654e-04,  2.1591e-02, -3.1067e-02,
+        -2.4490e-02, -5.0293e-02,  7.4692e-03,  2.2202e-02, -2.4170e-02,
+        -2.2125e-02, -3.6682e-02,  1.6022e-02,  4.3304e-02, -8.8577e-03,
+         2.1706e-03, -2.2034e-02, -4.4006e-02, -3.1952e-02, -9.9487e-02,
+        -5.5328e-02, -3.6316e-02,  6.2866e-02, -4.8462e-02, -1.2688e-02,
+        -2.9850e-03, -4.4678e-02,  2.0599e-02,  4.6959e-03,  4.5288e-02,
+        -1.6113e-02, -1.8478e-02, -5.3497e-02, -2.9892e-02, -4.0054e-03,
+         2.6913e-03, -5.1147e-02, -6.7505e-02,  2.7237e-02, -4.5471e-02,
+        -5.0323e-02, -2.6566e-02,  1.4175e-02,  6.6185e-03, -1.7273e-02,
+         5.0537e-02, -3.6896e-02,  1.0078e-02, -3.7292e-02, -4.9835e-02,
+         1.8738e-02, -1.0468e-02, -2.8934e-03,  4.2023e-02,  4.1687e-02,
+        -1.5106e-02,  5.9843e-04,  1.7118e-03,  3.9673e-02,  2.5391e-02,
+        -1.5282e-02, -2.2949e-02, -3.1174e-02, -4.8401e-02, -2.0844e-02,
+        -4.9377e-02, -3.1769e-02, -4.6417e-02,  5.0842e-02,  1.8433e-02,
+         1.1772e-02,  1.1894e-02, -2.2491e-02, -5.0354e-03, -2.3605e-02,
+        -4.1351e-03, -1.1513e-02, -3.2379e-02,  4.9133e-03,  3.0716e-02,
+         3.5004e-02, -9.5749e-03,  4.1168e-02, -8.3466e-03,  1.8997e-02,
+        -3.2368e-03, -1.4526e-02, -1.5778e-02, -3.9703e-02, -3.8605e-02,
+         4.5509e-03, -8.7051e-03,  4.6143e-02,  2.7161e-03, -2.4002e-02,
+        -1.4969e-02,  1.7044e-02,  1.4130e-02,  5.8289e-02,  2.7573e-02,
+        -9.0088e-02, -2.6871e-02, -2.3941e-02, -3.4210e-02, -1.4557e-02,
+        -9.3384e-02,  1.9188e-03,  4.2908e-02,  3.7384e-02,  2.1957e-02,
+        -1.4214e-02,  9.0408e-03,  3.6865e-02, -1.8723e-02, -1.6342e-02,
+        -1.1978e-02, -1.7929e-02, -3.4256e-03, -3.0701e-02, -2.8534e-03,
+        -2.5330e-02, -5.4321e-02,  1.9073e-02, -1.3771e-02,  7.3547e-03,
+         2.1057e-02,  9.7656e-03, -4.1901e-02, -1.1665e-02,  2.8946e-02,
+         1.6284e-04,  1.0513e-02,  1.5244e-02,  6.9523e-04, -7.9041e-02,
+         7.5134e-02, -4.3243e-02, -3.0899e-02,  2.2964e-02, -4.5776e-02,
+         1.0040e-02,  2.3198e-04, -2.0996e-02, -5.3497e-02,  7.5874e-03,
+         5.3802e-02,  3.9185e-02,  6.9092e-02, -2.1576e-02, -4.1046e-02,
+         1.1543e-02, -3.5034e-02, -1.3027e-03, -1.3008e-02, -8.9951e-03,
+        -1.1421e-02, -4.5563e-02,  1.3954e-02, -2.5955e-02, -6.6589e-02,
+         2.0737e-02,  8.4595e-02, -1.1131e-02, -1.4435e-02, -6.0059e-02,
+         7.3242e-03, -6.3038e-04,  4.9255e-02,  4.1656e-02, -2.4017e-02,
+        -2.5146e-02, -4.4785e-03,  2.6566e-02, -1.9531e-03,  1.0597e-02,
+         2.6596e-02, -6.0364e-02, -2.1896e-02, -1.6830e-02, -6.9397e-02,
+         5.3070e-02, -2.1698e-02, -7.4883e-03, -4.9019e-03, -4.5288e-02,
+         3.3203e-02, -3.0991e-02,  3.3722e-02,  2.4338e-02, -3.7415e-02,
+        -5.0049e-02, -3.1414e-03,  1.3512e-02, -8.1177e-02, -1.6342e-02,
+        -6.2286e-02, -5.1422e-03, -2.0103e-03,  5.3192e-02,  1.6449e-02,
+        -2.9648e-02, -1.5068e-02,  1.9638e-02, -7.6447e-03,  2.1172e-03,
+         1.2535e-02, -5.8250e-03,  2.6794e-02,  3.5767e-02,  7.0923e-02,
+         5.5328e-02, -1.8372e-02,  3.2135e-02, -1.2711e-02,  7.8979e-02,
+        -2.8458e-02,  6.4926e-03,  2.6566e-02,  1.0704e-02,  4.3304e-02,
+        -2.9278e-03,  4.0588e-02, -5.6366e-02]], dtype=float16)</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="pkg_url" class="level3">
+<h3 class="anchored" data-anchor-id="pkg_url">pkg_url</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> pkg_url(</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>    pkg:<span class="bu">str</span></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">str</span> <span class="op">|</span> <span class="va">None</span>:</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Return best web URL for pkg from importlib.metadata: Source Code &gt; Repository &gt; Home-page &gt; first Project-URL.</em></p>
+<hr>
+</section>
+<section id="pkg_doc" class="level3">
+<h3 class="anchored" data-anchor-id="pkg_doc">pkg_doc</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> pkg_doc(</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>    pkg</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">dict</span>:</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Build pkg_store content dict: content=summary+readme, metadata=json.</em></p>
+<div id="f331d22c78be9aa8" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>pkg_doc(<span class="st">'httpx'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'content': 'The next generation HTTP client.\n&lt;p align="center"&gt;\n  &lt;a href="https://www.python-httpx.org/"&gt;&lt;img width="350" height="208" src="https://raw.githubusercontent.com/encode/httpx/master/docs/img/butterfly.png" alt=\'HTTPX\'&gt;&lt;/a&gt;\n&lt;/p&gt;\n\n&lt;p align="center"&gt;&lt;strong&gt;HTTPX&lt;/strong&gt; &lt;em&gt;- A next-generation HTTP client for Python.&lt;/em&gt;&lt;/p&gt;\n\n&lt;p align="center"&gt;\n&lt;a href="https://github.com/encode/httpx/actions"&gt;\n    &lt;img src="https://github.com/encode/httpx/workflows/Test%20Suite/badge.svg" alt="Test Suite"&gt;\n&lt;/a&gt;\n&lt;a href="https://pypi.org/project/httpx/"&gt;\n    &lt;img src="https://badge.fury.io/py/httpx.svg" alt="Package version"&gt;\n&lt;/a&gt;\n&lt;/p&gt;\n\nHTTPX is a fully featured HTTP client library for Python 3. It includes **an integrated command line client**, has support for both **HTTP/1.1 and HTTP/2**, and provides both **sync and async APIs**.\n\n---\n\nInstall HTTPX using pip:\n\n```shell\n$ pip install httpx\n```\n\nNow, let\'s get started:\n\n```pycon\n&gt;&gt;&gt; import httpx\n&gt;&gt;&gt; r = httpx.get(\'https://www.example.org/\')\n&gt;&gt;&gt; r\n&lt;Response [200 OK]&gt;\n&gt;&gt;&gt; r.status_code\n200\n&gt;&gt;&gt; r.headers[\'content-type\']\n\'text/html; charset=UTF-8\'\n&gt;&gt;&gt; r.text\n\'&lt;!doctype html&gt;\\n&lt;html&gt;\\n&lt;head&gt;\\n&lt;title&gt;Example Domain&lt;/title&gt;...\'\n```\n\nOr, using the command-line client.\n\n```shell\n$ pip install \'httpx[cli]\'  # The command line client is an optional dependency.\n```\n\nWhich now allows us to use HTTPX directly from the command-line...\n\n&lt;p align="center"&gt;\n  &lt;img width="700" src="https://raw.githubusercontent.com/encode/httpx/master/docs/img/httpx-help.png" alt=\'httpx --help\'&gt;\n&lt;/p&gt;\n\nSending a request...\n\n&lt;p align="center"&gt;\n  &lt;img width="700" src="https://raw.githubusercontent.com/encode/httpx/master/docs/img/httpx-request.png" alt=\'httpx http://httpbin.org/json\'&gt;\n&lt;/p&gt;\n\n## Features\n\nHTTPX builds on the well-established usability of `requests`, and gives you:\n\n* A broadly [requests-compatible API](https://www.python-httpx.org/compatibility/).\n* An integrated command-line client.\n* HTTP/1.1 [and HTTP/2 support](https://www.python-httpx.org/http2/).\n* Standard synchronous interface,',
+ 'metadata': {'name': 'httpx',
+  'version': '0.28.1',
+  'keywords': '',
+  'requires': 'h2 socksio rich brotlicffi zstandard pygments httpcore brotli anyio idna click certifi',
+  'summary': 'The next generation HTTP client.',
+  'url': 'https://github.com/encode/httpx'}}</code></pre>
+</div>
+</div>
+<div id="pkg_url_test_e1f2" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>u <span class="op">=</span> pkg_url(<span class="st">'httpx'</span>)</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> u <span class="kw">and</span> u.startswith(<span class="st">'http'</span>), <span class="ss">f'expected a URL, got </span><span class="sc">{</span>u<span class="sc">!r}</span><span class="ss">'</span></span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'pkg_url httpx:'</span>, u)</span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a><span class="co"># packages without Project-URL fall back to Home-page</span></span>
+<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> pkg_url(<span class="st">'fastcore'</span>) <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>, <span class="st">'fastcore should have a URL'</span></span>
+<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'pkg_url fastcore:'</span>, pkg_url(<span class="st">'fastcore'</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>pkg_url httpx: https://github.com/encode/httpx
+pkg_url fastcore: https://github.com/AnswerDotAI/fastcore/</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="has_init" class="level3">
+<h3 class="anchored" data-anchor-id="has_init">has_init</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> has_init(</span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a>    d:Path</span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">bool</span>:</span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>True if dir is a Python package root: has <strong>init</strong>.py or a C-extension <strong>init</strong></em>.so.*</p>
+<hr>
+</section>
+<section id="enrich_chunks" class="level3">
+<h3 class="anchored" data-anchor-id="enrich_chunks">enrich_chunks</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> enrich_chunks(</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>    content:L</span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Set public_api+docstring flags on non-assign chunks and explode ClassDefs into method sub-chunks.</em></p>
+<hr>
+</section>
+<section id="kosha.pkgs_in_env" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.pkgs_in_env">Kosha.pkgs_in_env</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> pkgs_in_env(</span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>    pyproject:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span></span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">list</span>:</span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Intersection of the packages table with packages installed in the environment.</em></p>
+<hr>
+</section>
+<section id="kosha.prune_old_pkgs" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.prune_old_pkgs">Kosha.prune_old_pkgs</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> prune_old_pkgs(</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Keep only the latest version of each package in the database.</em></p>
+<hr>
+</section>
+<section id="kosha.prune_old_versions" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.prune_old_versions">Kosha.prune_old_versions</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> prune_old_versions(</span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>    pkg:<span class="bu">str</span></span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Keep only the latest version of a package in the database.</em></p>
+<hr>
+</section>
+<section id="kosha.update_repo" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.update_repo">Kosha.update_repo</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> update_repo(</span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">dir</span>:Path<span class="op">=</span><span class="va">None</span>, <span class="co"># directory to index; defaults to repo root</span></span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a>    embed:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># embed chunks after parsing</span></span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>    files:L<span class="op">=</span><span class="va">None</span>, <span class="co"># specific paths to (re)index; None = full sync</span></span>
+<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a>    exts:<span class="bu">str</span><span class="op">=</span><span class="st">'.py,.js,.ts,.jsx,.tsx,.java,.go,.cs,.ruby,.php,.swift,.kt,.kts,.rs,.scala,.lua'</span>,</span>
+<span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a>    verbose:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># verbose</span></span>
+<span id="cb44-8"><a href="#cb44-8" aria-hidden="true" tabindex="-1"></a>    force:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># reindex all files regardless of mtime</span></span>
+<span id="cb44-9"><a href="#cb44-9" aria-hidden="true" tabindex="-1"></a>    skip_file_re:<span class="bu">str</span><span class="op">=</span><span class="st">'^[.]|^(?:setup</span><span class="ch">\\</span><span class="st">.py|conftest</span><span class="ch">\\</span><span class="st">.py)$'</span>,</span>
+<span id="cb44-10"><a href="#cb44-10" aria-hidden="true" tabindex="-1"></a>    skip_folder_re:<span class="bu">str</span><span class="op">=</span><span class="st">'^[.]|^(?:tests?|examples?|docs?|build|dist)$'</span>, func:<span class="bu">type</span><span class="op">=</span>Path, path:pathlib.Path <span class="op">|</span> <span class="bu">str</span><span class="op">=</span><span class="st">'.'</span>,</span>
+<span id="cb44-11"><a href="#cb44-11" aria-hidden="true" tabindex="-1"></a>    recursive:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, maxdepth:<span class="bu">int</span><span class="op">=</span><span class="va">None</span>, symlinks:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, file_glob:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, file_re:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb44-12"><a href="#cb44-12" aria-hidden="true" tabindex="-1"></a>    folder_re:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, skip_file_glob:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, ret_folders:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, sort:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, types:<span class="bu">str</span> <span class="op">|</span> <span class="bu">list</span><span class="op">=</span><span class="va">None</span></span>
+<span id="cb44-13"><a href="#cb44-13" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb44-14"><a href="#cb44-14" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Index or update repo code chunks. Pass files= for incremental update (e.g.&nbsp;from watcher).</em></p>
+<hr>
+</section>
+<section id="kosha.update_pkgs" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.update_pkgs">Kosha.update_pkgs</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> update_pkgs(</span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>    pkgs:<span class="bu">str</span> <span class="op">|</span> <span class="bu">list</span><span class="op">=</span><span class="va">None</span>, <span class="co"># packages to sync; None syncs all installed env packages</span></span>
+<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>    embed:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># embed chunks after indexing</span></span>
+<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a>    exts:<span class="bu">str</span><span class="op">=</span><span class="st">'.py,.js,.ts,.jsx,.tsx,.java,.go,.cs,.ruby,.php,.swift,.kt,.kts,.rs,.scala,.lua'</span>, <span class="co"># file extensions to include</span></span>
+<span id="cb45-6"><a href="#cb45-6" aria-hidden="true" tabindex="-1"></a>    verbose:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># print progress</span></span>
+<span id="cb45-7"><a href="#cb45-7" aria-hidden="true" tabindex="-1"></a>    force:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># reindex even if package version already loaded</span></span>
+<span id="cb45-8"><a href="#cb45-8" aria-hidden="true" tabindex="-1"></a>    kwargs:VAR_KEYWORD</span>
+<span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Sync installed packages into the env store; if pkgs is None, syncs all env packages.</em></p>
+<hr>
+</section>
+<section id="kosha.process_repo" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.process_repo">Kosha.process_repo</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> process_repo(</span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>    content:NoneType<span class="op">=</span><span class="va">None</span>, reembed:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, embed:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, emb_fn:function<span class="op">=</span>emb_doc</span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Embed all documents in the code store, or only those without embeddings if reembed=False.</em></p>
+<hr>
+</section>
+<section id="kosha.rm_pkg" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.rm_pkg">Kosha.rm_pkg</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rm_pkg(</span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>    pkg:<span class="bu">str</span>, ver:<span class="bu">str</span><span class="op">=</span><span class="va">None</span></span>
+<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Remove a package and its code snippets from the database.</em></p>
+<hr>
+</section>
+<section id="kosha.update_pkg" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.update_pkg">Kosha.update_pkg</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> update_pkg(</span>
+<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a>    pkg:<span class="bu">str</span>, embed:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a>    exts:<span class="bu">str</span><span class="op">=</span><span class="st">'.py,.js,.ts,.jsx,.tsx,.java,.go,.cs,.ruby,.php,.swift,.kt,.kts,.rs,.scala,.lua'</span>, verbose:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb48-5"><a href="#cb48-5" aria-hidden="true" tabindex="-1"></a>    force:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, imports:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span></span>
+<span id="cb48-6"><a href="#cb48-6" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb48-7"><a href="#cb48-7" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Update package metadata in the packages table.</em></p>
+<hr>
+</section>
+<section id="count_imp" class="level3">
+<h3 class="anchored" data-anchor-id="count_imp">count_imp</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> count_imp(</span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>    files, own:<span class="bu">str</span><span class="op">=</span><span class="st">''</span></span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>Counter:</span>
+<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>*External top-level imports from a source-string iterable. Reuses cached _parse.*</p>
+<hr>
+</section>
+<section id="kosha.process_env" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.process_env">Kosha.process_env</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> process_env(</span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>    content:NoneType<span class="op">=</span><span class="va">None</span>, reembed:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, embed:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, emb_fn:function<span class="op">=</span>emb_doc</span>
+<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb50-5"><a href="#cb50-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Embed all documents in the env store, or only those without embeddings if reembed=False.</em></p>
+<hr>
+</section>
+<section id="process_content" class="level3">
+<h3 class="anchored" data-anchor-id="process_content">process_content</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> process_content(</span>
+<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a>    store, content:L, embed:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, emb_fn:function<span class="op">=</span>emb_doc</span>
+<span id="cb51-4"><a href="#cb51-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb51-5"><a href="#cb51-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Embed chunks and upsert into store; no-op if content is empty.</em></p>
+<hr>
+</section>
+<section id="embed_chunk" class="level3">
+<h3 class="anchored" data-anchor-id="embed_chunk">embed_chunk</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb52"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> embed_chunk(</span>
+<span id="cb52-3"><a href="#cb52-3" aria-hidden="true" tabindex="-1"></a>    chunk:<span class="bu">list</span> <span class="op">|</span> fastcore.foundation.L, emb_fn:function<span class="op">=</span>emb_doc</span>
+<span id="cb52-4"><a href="#cb52-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb52-5"><a href="#cb52-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Embed a list of code chunks using emb_f</em></p>
+<hr>
+</section>
+<section id="kosha.nuke" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.nuke">Kosha.nuke</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> nuke(</span>
+<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb53-4"><a href="#cb53-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb53-5"><a href="#cb53-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Reset the databases by dropping all tables.</em></p>
+<div id="619bf879a3cf4298" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb54"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> kosha.core <span class="im">as</span> _kc, inspect</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="86315289" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb55"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>_f <span class="op">=</span> Path(inspect.getfile(_kc))</span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a>_anchor <span class="op">=</span> _f.parent</span>
+<span id="cb55-3"><a href="#cb55-3" aria-hidden="true" tabindex="-1"></a><span class="cf">while</span> has_init(_anchor): _anchor <span class="op">=</span> _anchor.parent</span>
+<span id="cb55-4"><a href="#cb55-4" aria-hidden="true" tabindex="-1"></a>_mod <span class="op">=</span> <span class="st">'.'</span>.join(_f.relative_to(_anchor).with_suffix(<span class="st">''</span>).parts)</span>
+<span id="cb55-5"><a href="#cb55-5" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> _mod <span class="op">==</span> <span class="st">'kosha.core'</span>, <span class="ss">f'expected kosha.core, got </span><span class="sc">{</span>_mod<span class="sc">}</span><span class="ss">'</span></span>
+<span id="cb55-6"><a href="#cb55-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'mod_name anchor fix: ok —'</span>, _mod)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>mod_name anchor fix: ok — kosha.core</code></pre>
+</div>
+</div>
+<div id="4dd610f0de1cb5e1" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb57"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a>dir2files(repo_root(), strict_skip_file_re, strict_skip_folder_re, exts<span class="op">=</span>code_exts)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[Path('/Users/71293/code/personal/orgs/kosha/kosha/cli.py'), Path('/Users/71293/code/personal/orgs/kosha/kosha/core.py'), Path('/Users/71293/code/personal/orgs/kosha/kosha/graph.py'), Path('/Users/71293/code/personal/orgs/kosha/kosha/skill.py')]</code></pre>
+</div>
+</div>
+<div id="4b60f80fef73f196" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb59"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>k <span class="op">=</span> Kosha()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="5f743a1709ffedd8" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb60"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a>pkg<span class="op">=</span><span class="st">'fastcore'</span></span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a>k._is_pkg_ingested(pkg)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'name': 'fastcore', 'version': '1.12.44'}</code></pre>
+</div>
+</div>
+<div id="aafd10cc3335834b" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb62"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a>k.env_st(select<span class="op">=</span><span class="st">'content, embedding, json_extract(metadata, "$.mod_name","$.docstring", "$.public_api") as pa'</span>,where<span class="op">=</span><span class="st">'package="httpx" and json_extract(metadata, "$.public_api")=1'</span>, limit<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'content': 'def request(\n    method: str,\n    url: URL | str,\n    *,\n    params: QueryParamTypes | None = None,\n    content: RequestContent | None = None,\n    data: RequestData | None = None,\n    files: RequestFiles | None = None,\n    json: typing.Any | None = None,\n    headers: HeaderTypes | None = None,\n    cookies: CookieTypes | None = None,\n    auth: AuthTypes | None = None,\n    proxy: ProxyTypes | None = None,\n    timeout: TimeoutTypes = DEFAULT_TIMEOUT_CONFIG,\n    follow_redirects: bool = False,\n    verify: ssl.SSLContext | str | bool = True,\n    trust_env: bool = True,\n) -&gt; Response:\n    """\n    Sends an HTTP request.\n\n    **Parameters:**\n\n    * **method** - HTTP method for the new `Request` object: `GET`, `OPTIONS`,\n    `HEAD`, `POST`, `PUT`, `PATCH`, or `DELETE`.\n    * **url** - URL for the new `Request` object.\n    * **params** - *(optional)* Query parameters to include in the URL, as a\n    string, dictionary, or sequence of two-tuples.\n    * **content** - *(optional)* Binary content to include in the body of the\n    request, as bytes or a byte iterator.\n    * **data** - *(optional)* Form data to include in the body of the request,\n    as a dictionary.\n    * **files** - *(optional)* A dictionary of upload files to include in the\n    body of the request.\n    * **json** - *(optional)* A JSON serializable object to include in the body\n    of the request.\n    * **headers** - *(optional)* Dictionary of HTTP headers to include in the\n    request.\n    * **cookies** - *(optional)* Dictionary of Cookie items to include in the\n    request.\n    * **auth** - *(optional)* An authentication class to use when sending the\n    request.\n    * **proxy** - *(optional)* A proxy URL where all the traffic should be routed.\n    * **timeout** - *(optional)* The timeout configuration to use when sending\n    the request.\n    * **follow_redirects** - *(optional)* Enables or disables HTTP redirects.\n    * **verify** - *(optional)* Either `True` to use an SSL context with the\n    default CA bundle, `False` to disable verification, or an instance of\n    `ssl.SSLContext` to use a custom context.\n    * **trust_env** - *(optional)* Enables or disables usage of environment\n    variables for configuration.\n\n    **Returns:** `Response`\n\n    Usage:\n\n    ```\n    &gt;&gt;&gt; import httpx\n    &gt;&gt;&gt; response = httpx.request(\'GET\', \'https://httpbin.org/get\')\n    &gt;&gt;&gt; response\n    &lt;Response [200 OK]&gt;\n    ```\n    """\n    with Client(\n        cookies=cookies,\n        proxy=proxy,\n        verify=verify,\n        timeout=timeout,\n        trust_env=trust_env,\n    ) as client:\n        return client.request(\n            method=method,\n            url=url,\n            content=content,\n            data=data,\n            files=files,\n            json=json,\n            params=params,\n            headers=headers,\n            auth=auth,\n            follow_redirects=follow_redirects,\n        )',
+  'embedding': b'K\xa5\xf8$P*d \xe4\x99\xbd\xacY\xa4\x12\xa8q\x1c\xc5\'\xc9\x11\x1b*\t\xa2\x9f\xa2~\xa3\x11\xa9\x18\xa4X!\x87\xa0\xfe+\xae*\x8b\x9c\xbe&amp;\x12\x17"\x9d\xeb\x1d*\xa3\xd1\xaa;\x9b\x9f\xa00\xa8G\xa6\x9c,c#C\xa8,\'\x7f\xaa8\xab\xc3\xaa\xdb%\x1b\xa6\x7f\xa3\x07\xa8\xfc\xa8=\x97E$\xa2*\x8e$J\xa4\xe9\x94\xec\xa5z\xa1\x9a\xa4?\x1ae\x96\xa5\xa20\r\x8b"\xb1\xa8"\x1f\xd6\xa0\xba-r\x1d\t\xa7N\x9ck\xa1\xf6\xab=\xa7\x06##\x1e`\x98G\xa1F\xaa\xf8\x9a\x00\x9e\xae\x1d\x1d\xa4\xec\xa3W*\xd0\xa0^\xa5\xdc"\x08\x1e\xd7(\xc9\x95\xae#\x95\xa4f\xa3\x18*T)\x98\xa5\x8e\xa6E*\xb2\xaak\xad\xa3\xae\xf8\xa4\x0f\x1b\x06(\x97\xa4 \xa6V+\x8e\xa6T\xa9\xca\xa7\x8f\x12\xde\x1f\xad\x1d\x88*M\xa1\x9d\xa8:\'@\x92\r\xa1\xcc\x95\x84\xabR&amp;\xa9)\x0f%k.\xd4\xa52 p\x16{#/\xacX(\xa7\'\xce\xa2T\xa7Z\x93o\'\x1d&amp;9\'\xf1\xaa\xbc\x11\xe0\x1f\x1b\xa3|\xa49"?\xa1\xec$U(&amp;\xa4m!X\x9bo&amp;" \xae\'\xb5\'\xc2\xa5T(\xb9&amp;\x08(\xaf\xa8m\xa9\x11\xa6\x99\x9d\xe2&amp;,\xa95*\x08\xa4\xba(\x8a(W\xa6\x93\xac:\xa2\x0e\xa8J$\xee\x9e\x94\x9ci\xaa@,\x8f*_07&amp; \xaa\xf2.+*\xda\x98S\xa5:\xac\x92\x8f\xac\xa2\x02\xa4W\x13F\xac\\$\x95\xa4\xbf\xa9\x83\xa4\xff)\x86\x9d\r&amp;\xda\xacS\x99P\x8f(\x1f\x8b&amp;\x19\xa0\xfd\x92\x8c&amp;\xa9\xa5\xb4,\x02\xac\xb9\xa1~,\x19)"\x19V+\xef\x13\xb5&amp;d\xa4\x06(g\x94p\xa0\x02 \xe3\xa57,d\xac~$h,\x14\x1a*\xa8\xb0\xab\x1e\xa3\xc7!\xb7\xa9t&amp;=)\x03\x9cE%\xee\xa1\x98#\xfd\x9f\xc0\x1c\xfb)e)~\xa4\xd8\xa43\xaaL\xa1l$%\x9d\x9e \x8c\x9c[\xa5\xd3\xa9\xbd"\xba)!\xa5&lt;\xa8\xa1\xacx,5*y\xa1\x9b\'\xff(\xd9 :\xae\'\xa8\xd5\n6\xa8(\x19\xf3\xa7\x92"\x91\xa7u"\xa1&amp;6\x96\xbd(\xc7\xa1\x87\xa4\xe5\xa6U(\xe1\xa9R\xa5\x1e$$\xa8\xa4(u\xa2,\x1c\xa7&amp;\xe0&amp;S,5)U\x12\x04\xa2\xf4+\xc7\xa6.%c%4\x1f\xcf\x98\'\xa9\xfa\xa9\xc9\xa7\xab\x19\xc8\xaa(!x\xae\xba\xa7T(\x86+L\x93e\x18\x18.0\xa1\xfa\xa5^\xa8\xb4\']\x19~ 6\xac\x1c)V%\x92\xa5W\x9e9(\x88\xae\xd6\x9a\xf6\x96\t*\xd4)\x08$3\x1f"*\x98\xa1\'\xa06\x1cf\xa4`\xa5)\xaaz\xa4\xcd#\xaf\xae\xef\xa4g*x\x1e\\)$\xa9\xa3.\x97$\x96\x16}(\xb0\xa5I\xa3\xef*\xf0\xa7\xe4"\xb3\x11\x12,;\xa6q\x1d^\x96Z$1%A\xab$\x14c\'\xb6\'\xf6\xa6\xc2)\xe9\xa8n(\x05%\xae\xb1\xed\x18v\xa4`\xa4\xff\x18\xb9)V\x15\xd3%\xb1%\xb2&amp;\x80!1%\x9f 6\xad\xf0\xa4\x1e(\xae*\x12\xa5"$X\'\xa6\xa6f\xa7m,J"\x04&amp;N\x1f\xa6\xa1\xcb!\xb1\xa6w\x158\xa6Q\xa6%\xa8P\xa9R\xa4W&amp;\xa9&amp;\x1d\x9d6+\xf1(\xb8\xa8\x03)\x91\xa0\x03\xa1C\xab\x17\xa0V\xa9U\xaa\xa4\x9c\xc4,)\xa8t\xa4\xa3\xa8\xc2*\xac\x9e\xdf\xaa\x06\xa9 \xa8_\xad/\x18\xff\xa3\xd1\xaa\xa2 \xc8*\x1a\xa9\x04\'0(\x1d"\x1b\xa6\x1b%\xcd$\x02#\xd2\xa4\xc2 \x9e\xac\xb1)\xe0*\x80#\x01%\xb6\xa2@\xa9\x96"\x82)\xdd,\xdc\xa3u+\xbd\x1fj\xaaw\xa7P\xacq\'{ \x8a\xa8\'\xa0\xcb/\xb0\x9dl\x88\x8f\'.\x1b\xae Y\x1c\xaa%\xfa\x1e\x8a\xa9}\'\xcc\xa9\xf0\xa6B(/,\xc8\xa5&amp;$\x1c\x1d\xbf\xa9*\xa8\x08 \x9d\x1f\x9a$\x82\x1a\x14\xa1\xd1\xa7\x88\xa03\xa5\xc6\xa0J\xa4y\'\xe4\xab~(9\xab:\xa9\xa0 \xd4\xa73!\x17(\xd1\xa7`!x\xa0W$\x16\xa9\xf4\xa8\xf2\xa4\xb8)\xea\xa7\x00(\x13\xa0\xdb\xa0\x04\xa7H\x9f\x80\xacG\xa8a\xa6\x1b\x1a\xc4\xa9\x93\xac\xfe+\x82,+\xa6\xd8!\xa1\xa7V*\x10\x8c\xb8#E\xab \'\x17\xa6\x01\xaaZ$\x1d\xa9\x1f$\xc0*\x05\xad\x1f\x1cD\xab*\xa7m*\xa3!\x84\xa0}%\xba%`(&gt;+\x1a\xa6\n#\xcc)g\x1f\x05\xa3\x9b\xa4\xa4\xa0\xb9 \x8e,\xda(\n#\xbb\xa5\x12\xa3A&amp;\xd5\xa8\x19)9\xa5\xc5\xa98\xa6\x86\x9aB\xa5\xa9\xad\x97\xa4\x01\xa4\xd3#\x11"\xa0\xab\xf8#\xde\xa5G\x1d&gt;\xa3t(\x1a\xa9\x7f\xa6\xd1\xa9\xae%\xb9"\x91\x90\x0f\xa8V&amp;7(\x18)-\xa6\x01(\xbf\x9f/&amp;2\xa6\xb0\xa6\x94\xadK\xa6#)\x9e\xa5z\'\x17.\x80-6)^&amp;\xb0\xa8b\x1d\xf0%[\x16\x07-\xb0$\xd6*k%\x16\xa3\xaa"\xfc\xa7\xbe\x1c\xb2$\x91%+\xa4\xd1\xa5\xd1\xa6\x9e\xa2\xb1\xa9\x99\xa5\xbe)\xe9\xa3@\xa4l\xa4\xb4\xa5+\xa7\xf3%D$9\x13\xdc\x9e\xb2&amp;l\xa7\x81\xa8\x18\x1f\xd8\xa1!*\x95\x1c\xe6\x9e\'*\x90\xa9,\'\x19\x98\xad\x9d#\xae\x8c\xa1&amp;\xac\xdb\xa8\xf1\xa8\xc6\xa9b%\x04#\t\x1f+\xa4\xa3)\xfb\xa7\x98*~$N\xab\x18\x9d\xef!Y\x1d\xd4\xa1X\x99&lt;+\xc3(~\xa1\x05\xa0\xee\xa0\x02\'\xb4+\xc7%P\x1d\xa5\xa9\xb4\x96\xf4!]%\xce*N\xa7\x07\xab\x12(\xab-*\x07t\xa7\xe2$\xb2\xa2.*\'\xab:\x9a/\x19\xa3+\xfc$w\x95I\x9d\x86\xa7\n\xa9\xad\xa7k\x9f\xf4!h\xa9\x06\xa9Q\xa7\xde!\x00*\xe6\xa6!+\x15\xa4\x82\xa8\x00\xaa\x13* +\x99\x1b\xca\xa3\xda\xa9\x82&amp;y+)\x9eC*\xd6\xaa\x18,\x9f\'\xb7+\x94\xa2\xde\xaa\xb0%\xb0\xaa\xa2\x9f\x84\x9cz\xa2\xdb*\xd7\xa6\xfc%\xe7+3(\xd8\x1c\xea\xa4\xd2)\xf7%\xdd\r\xe8\xa2="\x00\xac\xea\x13\x03"q)! \x1e\'\x00).%\xd7(\x19%L(\xb3\xac\xaf,\xaf\'\xa3\x9f;(V)D&amp;\xc3\xa9f\xaa\xd6\x99\xce\xa6\x15\x8d\xe1\xa5\xcf$\x1d\xa1',
+  'pa': '["httpx._api.request","Sends an HTTP request.\\n\\n**Parameters:**\\n\\n* **method** - HTTP method for the new `Request` object: `GET`, `OPTIONS`,\\n`HEAD`, `POST`, `PUT`, `PATCH`, or `DELETE`.\\n* **url** - URL for the new `Request` object.\\n* **params** - *(optional)* Query parameters to include in the URL, as a\\nstring, dictionary, or sequence of two-tuples.\\n* **content** - *(optional)* Binary content to include in the body of the\\nrequest, as bytes or a byte iterator.\\n* **data** - *(optional)* Form data to include in the body of the request,\\nas a dictionary.\\n* **files** - *(optional)* A dictionary of upload files to include in the\\nbody of the request.\\n* **json** - *(optional)* A JSON serializable object to include in the body\\nof the request.\\n* **headers** - *(optional)* Dictionary of HTTP headers to include in the\\nrequest.\\n* **cookies** - *(optional)* Dictionary of Cookie items to include in the\\nrequest.\\n* **auth** - *(optional)* An authentication class to use when sending the\\nrequest.\\n* **proxy** - *(optional)* A proxy URL where all the traffic should be routed.\\n* **timeout** - *(optional)* The timeout configuration to use when sending\\nthe request.\\n* **follow_redirects** - *(optional)* Enables or disables HTTP redirects.\\n* **verify** - *(optional)* Either `True` to use an SSL context with the\\ndefault CA bundle, `False` to disable verification, or an instance of\\n`ssl.SSLContext` to use a custom context.\\n* **trust_env** - *(optional)* Enables or disables usage of environment\\nvariables for configuration.\\n\\n**Returns:** `Response`\\n\\nUsage:\\n\\n```\\n&gt;&gt;&gt; import httpx\\n&gt;&gt;&gt; response = httpx.request(\'GET\', \'https://httpbin.org/get\')\\n&gt;&gt;&gt; response\\n&lt;Response [200 OK]&gt;\\n```",true]'}]</code></pre>
+</div>
+</div>
+<div id="958a4d133404d921" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb64"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a>k.pkgs(order_by<span class="op">=</span><span class="st">'name'</span>, limit<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'name': 'APScheduler',
+  'version': '3.11.2',
+  'summary': 'In-process task scheduler with Cron-like capabilities',
+  'uploaded_at': '2026-05-05 11:30:49'}]</code></pre>
+</div>
+</div>
+<div id="fb3ca02d6570933c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb66"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a>k.update_pkg(<span class="st">'protobuf'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updating pkg: protobuf ...
+package {'name': 'protobuf', 'version': '7.34.1'} already loaded.</code></pre>
+</div>
+</div>
+<div id="1df76ea6ee467ca5" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb68"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a>k.update_pkg(<span class="st">'fastlite'</span>, force<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updating pkg: fastlite ...
+package {'name': 'fastlite', 'version': '0.2.4'} already loaded.
+forcing an update to pkg {'name': 'fastlite', 'version': '0.2.4'}
+updated pkg: fastlite with 64 new/changed chunks, -64 unchanged, -64 removed</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre><code>{}</code></pre>
+</div>
+</div>
+<div id="423b3387ed700ac3" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb71"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a>k.update_repo(skip_file_glob<span class="op">=</span><span class="st">'*.ipynb'</span>, force<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>syncing files [Path('/Users/71293/code/personal/orgs/kosha/kosha/cli.py'), Path('/Users/71293/code/personal/orgs/kosha/kosha/core.py'), Path('/Users/71293/code/personal/orgs/kosha/kosha/graph.py'), Path('/Users/71293/code/personal/orgs/kosha/kosha/skill.py')] .....
+synced repo</code></pre>
+</div>
+</div>
+<div id="fde50f387217e63" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb73"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a>k.code_st(select<span class="op">=</span><span class="st">'json_extract(metadata, "$.mod_name","$.docstring", "$.public_api") as pa'</span>,where<span class="op">=</span><span class="st">'json_extract(metadata, "$.public_api")=1'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'pa': '["kosha.core.repo_root","Find the root of the current git repository, or None if not in a repo.",true]'},
+ {'pa': '["kosha.core.env_pkg_versions","Get a dict of installed package versions using importlib.metadata.\\npassing depth traverse multiple layers of dependencies",true]'},
+ {'pa': '["kosha.core.static_embedder","Load or return cached static (potion-retrieval) embedder (24h TTL).",true]'},
+ {'pa': '["kosha.core.emb_doc","Curry an embedder factory into a document-embedding function `t -&gt; embedding`.",true]'},
+ {'pa': '["kosha.core.emb_query","Curry an embedder factory into a query-embedding function `t -&gt; embedding`.",true]'},
+ {'pa': '["kosha.core.pkg_url","Return best web URL for pkg from importlib.metadata: Source Code &gt; Repository &gt; Home-page &gt; first Project-URL.",true]'},
+ {'pa': '["kosha.core.pkg_doc","Build pkg_store content dict: content=summary+readme, metadata=json.",true]'},
+ {'pa': '["kosha.core.has_init","True if dir is a Python package root: has __init__.py or a C-extension __init__*.so.",true]'},
+ {'pa': '["kosha.core.count_imp","External top-level imports from a source-string iterable. Reuses cached _parse.",true]'},
+ {'pa': '["kosha.core.parseq","Parse key:value filter tokens from a query. Returns (bare_query, filters_dict).",true]'},
+ {'pa': '["kosha.core.filt2wh","Convert a filter dict (from parse_query) to a SQL WHERE clause for the given store (code or env).",true]'},
+ {'pa': '["kosha.core.arun","Run an async coroutine from sync code, even if already inside an event loop",true]'},
+ {'pa': '["kosha.core.embed_chunk","Embed a list of code chunks using emb_f",true]'},
+ {'pa': '["kosha.core.process_content","Embed chunks and upsert into store; no-op if content is empty.",true]'},
+ {'pa': '["kosha.core.parse","Parse source, tag parents, return (tree, imp, top_fns, all_fns). Cached — called freely.",true]'},
+ {'pa': '["kosha.core.enrich_chunks","Set public_api+docstring flags on non-assign chunks and explode ClassDefs into method sub-chunks.",true]'},
+ {'pa': '["kosha.graph.dyn_edges","All dynamic dispatch edges: decorator, connect_body, registration, co_dispatch.",true]'},
+ {'pa': '["kosha.graph.static_edges","Static call edges via pyan3. Provide either filenames+root or sources dict.",true]'},
+ {'pa': '["kosha.graph.CodeGraph","Call graph builder and query engine. Uses pyan3 for static analysis and custom AST parsing for dynamic edges.\\nStores everything in a SQLite database.",true]'},
+ {'pa': '["kosha.graph.CodeGraph.__init__",null,true]'},
+ {'pa': '["kosha.graph.CodeGraph.nuke",null,true]'},
+ {'pa': '["kosha.graph.is_sys_pkg","Return True if pkg is a system-wide package (e.g. in site-packages), False if likely user code.",true]'},
+ {'pa': '["kosha.cli.public_api","List public API entries for a package (respects __all__ + @patch methods).",true]'},
+ {'pa': '["kosha.cli.dep_stack","BFS dependency layers from seed packages, ordered by coupling strength.",true]'},
+ {'pa': '["kosha.cli.top_nodes","Top-k public API nodes for a package ranked by PageRank in the call graph.",true]'},
+ {'pa': '["kosha.cli.main","Entry point for the `kosha` CLI command.",true]'},
+ {'pa': '["kosha.cli.watch","Live incremental re-index on file changes. Blocking — Ctrl-C to stop.",true]'},
+ {'pa': '["kosha.cli.sync","Sync repo + env packages + call graph into .kosha/ databases.",true]'},
+ {'pa': '["kosha.cli.context","Fan-out semantic search over repo and env, optionally graph-enriched.",true]'},
+ {'pa': '["kosha.cli.repo_context","Semantic + keyword search over indexed repo code only.",true]'},
+ {'pa': '["kosha.cli.env_context","Semantic search over indexed env packages only.",true]'},
+ {'pa': '["kosha.cli.ni","Node info: callers, callees, co_dispatched, pagerank for a single graph node.",true]'},
+ {'pa': '["kosha.cli.daemon","Persistent kosha kernel. Reads newline-delimited JSON from stdin, writes results to stdout.",true]'},
+ {'pa': '["kosha.cli.api_paths","Shortest call-graph paths from from_pkg public API to to_pkg public API.",true]'},
+ {'pa': '["kosha.core.embedder","Load or return cached CodeRankEmbed ONNX document embedder (24h TTL).",true]'},
+ {'pa': '["kosha.cli.where_to_add","Find likely insertion points for new code matching description.",true]'},
+ {'pa': '["kosha.core.mv_skill_md","Copy bundled SKILL.md to skill directories.",true]'},
+ {'pa': '["kosha.cli.install","Install kosha SKILL.md to .agents/skills/kosha/ and .claude/skills/kosha/.",true]'},
+ {'pa': '["kosha.core.Kosha.__init__",null,true]'},
+ {'pa': '["kosha.core.pkg_trans_deps","BFS over importlib.metadata requires: return seeds + all transitive deps up to depth levels (installed only, no optional extras).",true]'},
+ {'pa': '["kosha.core.Kosha","Kosha allows you to build a context for code generation based on your repo and environment.",true]'},
+ {'pa': '["kosha.cli.status","Show index freshness: file/pkg/node counts, stale files, and stale packages.",true]'},
+ {'pa': '["kosha.core.embedder","Load or return cached CodeRankEmbed ONNX document embedder (24h TTL).",true]'},
+ {'pa': '["kosha.core.Kosha","Kosha allows you to build a context for code generation based on your repo and environment.",true]'},
+ {'pa': '["kosha.core.embed_chunk","Embed a list of code chunks using emb_f",true]'},
+ {'pa': '["kosha.core.process_content","Embed chunks and upsert into store; no-op if content is empty.",true]'},
+ {'pa': '["kosha.core.Kosha.__init__",null,true]'}]</code></pre>
+</div>
+</div>
+<div id="5196bfe8053826f" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb75"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a>k.code_st(select<span class="op">=</span><span class="st">'content'</span>,where<span class="op">=</span><span class="st">'json_extract(metadata, "$.mod_name")="kosha.core.Kosha.__init__"'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'content': "def __init__(self, dir: Path = None, install_skill: bool = False, xdg_dir: Path = None):\n\t\tself.root, self.xdg = Path(dir or repo_root() or '.'), xdg_dir or xdg_data_home()\n\t\tif install_skill: mv_skill_md(dir=self.root, dry_run=False)\n\t\tself.cp, self.ce = self.root.joinpath('.kosha','code.db'), self.xdg.joinpath('kosha','env.db')\n\t\tfor p in (self.cp, self.ce): p.parent.mkdir(parents=True, exist_ok=True)\n\t\tself.codedb, self.envdb = database(self.cp), database(self.ce)\n\t\tself.code_st,self.env_st = self.codedb.get_store(path=str,hash=True),self.envdb.get_store(package=str,hash=True)\n\t\tself.pkg_st, self.pkgs = self.envdb.get_store('pkg_store', hash=True), self.envdb.t.packages\n\t\tself.env_pd, self.code_rd = self.envdb.t.pkg_deps, self.codedb.t.repo_deps\n\t\tself.pkgs.create(name=str, version=str, summary=str, uploaded_at=float, pk=['name','version'],\n\t\t\t defaults=dict(uploaded_at='CURRENT_TIMESTAMP'), if_not_exists=True)\n\t\tself.env_pd.create(from_pkg=str, to_pkg=str, n_modules=int, if_not_exists=True, pk=['from_pkg','to_pkg'])\n\t\tself.code_rd.create(from_module=str, to_pkg=str, n_files=int, if_not_exists=True, pk=['from_module','to_pkg'])"},
+ {'content': "def __init__(self, dir: Path = None, install_skill: bool = False, xdg_dir: Path = None, efn=embedder):\n\t\tself.root, self.xdg = Path(dir or repo_root() or '.'), xdg_dir or xdg_data_home()\n\t\tself.efn = bind(efn, md=self.xdg)\n\t\tself.emb_doc, self.emb_query = emb_doc(self.efn), emb_query(self.efn)\n\t\tif install_skill: mv_skill_md(dir=self.root, dry_run=False)\n\t\tself.cp, self.ce = self.root.joinpath('.kosha','code.db'), self.xdg.joinpath('kosha','env.db')\n\t\tfor p in (self.cp, self.ce): p.parent.mkdir(parents=True, exist_ok=True)\n\t\tself.codedb, self.envdb = database(self.cp), database(self.ce)\n\t\tself.code_st,self.env_st = self.codedb.get_store(path=str,hash=True),self.envdb.get_store(package=str,hash=True)\n\t\tself.pkg_st, self.pkgs = self.envdb.get_store('pkg_store', hash=True), self.envdb.t.packages\n\t\tself.env_pd, self.code_rd = self.envdb.t.pkg_deps, self.codedb.t.repo_deps\n\t\tself.pkgs.create(name=str, version=str, summary=str, uploaded_at=float, pk=['name','version'],\n\t\t\t defaults=dict(uploaded_at='CURRENT_TIMESTAMP'), if_not_exists=True)\n\t\tself.env_pd.create(from_pkg=str, to_pkg=str, n_modules=int, if_not_exists=True, pk=['from_pkg','to_pkg'])\n\t\tself.code_rd.create(from_module=str, to_pkg=str, n_files=int, if_not_exists=True, pk=['from_module','to_pkg'])"}]</code></pre>
+</div>
+</div>
+<div id="969439d2bb54f174" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb77"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a>k.update_pkgs(<span class="bu">set</span>(env_pkg_versions()), embed<span class="op">=</span><span class="va">False</span>, force<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>loading pkgs {'pdf_oxide', 'chonkie', 'pandas', 'watchfiles', 'anyio', 'usearch', 'codesigs', 'pyan3', 'notebook', 'pyskills', 'python-fasthtml', 'fastlite', 'tokenizers', 'yake', 'fastprogress', 'pillow', 'litesearch', 'onnxruntime', 'fastcore', 'model2vec'} ......</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:   0%|          | 0/20 [00:00&lt;?, ?pkg/s]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updating pkg: pdf_oxide ...
+package {'name': 'pdf_oxide', 'version': '0.3.43'} already loaded.
+forcing an update to pkg {'name': 'pdf_oxide', 'version': '0.3.43'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:   5%|▌         | 1/20 [00:00&lt;00:09,  2.09pkg/s]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: pdf_oxide with 22 new/changed chunks, -22 unchanged, -22 removed
+updating pkg: chonkie ...
+package {'name': 'chonkie', 'version': '1.6.4'} already loaded.
+forcing an update to pkg {'name': 'chonkie', 'version': '1.6.4'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  10%|█         | 2/20 [00:01&lt;00:14,  1.21pkg/s]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: chonkie with 811 new/changed chunks, -811 unchanged, -811 removed
+updating pkg: pandas ...
+package {'name': 'pandas', 'version': '3.0.2'} already loaded.
+forcing an update to pkg {'name': 'pandas', 'version': '3.0.2'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  15%|█▌        | 3/20 [00:22&lt;02:50, 10.01s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: pandas with 7087 new/changed chunks, -7087 unchanged, -7087 removed
+updating pkg: watchfiles ...
+package {'name': 'watchfiles', 'version': '1.1.1'} already loaded.
+forcing an update to pkg {'name': 'watchfiles', 'version': '1.1.1'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  20%|██        | 4/20 [00:22&lt;01:37,  6.12s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: watchfiles with 43 new/changed chunks, -43 unchanged, -43 removed
+updating pkg: anyio ...
+package {'name': 'anyio', 'version': '4.13.0'} already loaded.
+forcing an update to pkg {'name': 'anyio', 'version': '4.13.0'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  25%|██▌       | 5/20 [00:23&lt;01:03,  4.22s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: anyio with 1087 new/changed chunks, -1087 unchanged, -1087 removed
+updating pkg: usearch ...
+package {'name': 'usearch', 'version': '2.25.2'} already loaded.
+forcing an update to pkg {'name': 'usearch', 'version': '2.25.2'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  30%|███       | 6/20 [00:23&lt;00:40,  2.88s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: usearch with 155 new/changed chunks, -155 unchanged, -155 removed
+updating pkg: codesigs ...
+package {'name': 'codesigs', 'version': '0.0.2'} already loaded.
+forcing an update to pkg {'name': 'codesigs', 'version': '0.0.2'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  35%|███▌      | 7/20 [00:23&lt;00:25,  1.98s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: codesigs with 18 new/changed chunks, -18 unchanged, -18 removed
+updating pkg: pyan3 ...
+package {'name': 'pyan3', 'version': '2.6.0'} already loaded.
+forcing an update to pkg {'name': 'pyan3', 'version': '2.6.0'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  40%|████      | 8/20 [00:24&lt;00:18,  1.51s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: pyan3 with 240 new/changed chunks, -240 unchanged, -240 removed
+updating pkg: notebook ...
+package {'name': 'notebook', 'version': '7.5.6'} already loaded.
+forcing an update to pkg {'name': 'notebook', 'version': '7.5.6'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  45%|████▌     | 9/20 [00:45&lt;01:24,  7.64s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: notebook with 24616 new/changed chunks, -24616 unchanged, -24616 removed
+updating pkg: pyskills ...
+package {'name': 'pyskills', 'version': '0.0.7'} already loaded.
+forcing an update to pkg {'name': 'pyskills', 'version': '0.0.7'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>&lt;unknown&gt;:1: SyntaxWarning: invalid escape sequence '\s'
+&lt;unknown&gt;:1: SyntaxWarning: invalid escape sequence '\s'
+Updating packages:  50%|█████     | 10/20 [00:45&lt;00:54,  5.40s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: pyskills with 52 new/changed chunks, -52 unchanged, -52 removed
+updating pkg: python-fasthtml ...
+package {'name': 'python-fasthtml', 'version': '0.13.4'} already loaded.
+forcing an update to pkg {'name': 'python-fasthtml', 'version': '0.13.4'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  55%|█████▌    | 11/20 [00:46&lt;00:34,  3.88s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: python-fasthtml with 320 new/changed chunks, -320 unchanged, -320 removed
+updating pkg: fastlite ...
+package {'name': 'fastlite', 'version': '0.2.4'} already loaded.
+forcing an update to pkg {'name': 'fastlite', 'version': '0.2.4'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  60%|██████    | 12/20 [00:46&lt;00:22,  2.76s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: fastlite with 64 new/changed chunks, -64 unchanged, -64 removed
+updating pkg: tokenizers ...
+package {'name': 'tokenizers', 'version': '0.23.1'} already loaded.
+forcing an update to pkg {'name': 'tokenizers', 'version': '0.23.1'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  65%|██████▌   | 13/20 [00:46&lt;00:13,  2.00s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: tokenizers with 86 new/changed chunks, -86 unchanged, -86 removed
+updating pkg: yake ...
+package {'name': 'yake', 'version': '0.7.3'} already loaded.
+forcing an update to pkg {'name': 'yake', 'version': '0.7.3'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  70%|███████   | 14/20 [00:47&lt;00:08,  1.48s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: yake with 129 new/changed chunks, -129 unchanged, -129 removed
+updating pkg: fastprogress ...
+package {'name': 'fastprogress', 'version': '1.1.5'} already loaded.
+forcing an update to pkg {'name': 'fastprogress', 'version': '1.1.5'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  75%|███████▌  | 15/20 [00:47&lt;00:05,  1.08s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: fastprogress with 59 new/changed chunks, -59 unchanged, -59 removed
+updating pkg: pillow ...
+package {'name': 'pillow', 'version': '12.2.0'} already loaded.
+forcing an update to pkg {'name': 'pillow', 'version': '12.2.0'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  80%|████████  | 16/20 [00:49&lt;00:05,  1.43s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: pillow with 1382 new/changed chunks, -1382 unchanged, -1382 removed
+updating pkg: litesearch ...
+package {'name': 'litesearch', 'version': '0.0.25'} already loaded.
+forcing an update to pkg {'name': 'litesearch', 'version': '0.0.25'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  85%|████████▌ | 17/20 [00:49&lt;00:03,  1.07s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: litesearch with 62 new/changed chunks, -62 unchanged, -62 removed
+updating pkg: onnxruntime ...
+package {'name': 'onnxruntime', 'version': '1.25.1'} already loaded.
+forcing an update to pkg {'name': 'onnxruntime', 'version': '1.25.1'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  90%|█████████ | 18/20 [00:54&lt;00:04,  2.34s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: onnxruntime with 3588 new/changed chunks, -3588 unchanged, -3588 removed
+updating pkg: fastcore ...
+package {'name': 'fastcore', 'version': '1.12.44'} already loaded.
+forcing an update to pkg {'name': 'fastcore', 'version': '1.12.44'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  95%|█████████▌| 19/20 [00:56&lt;00:02,  2.08s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: fastcore with 890 new/changed chunks, -890 unchanged, -890 removed
+updating pkg: model2vec ...
+package {'name': 'model2vec', 'version': '0.8.1'} already loaded.
+forcing an update to pkg {'name': 'model2vec', 'version': '0.8.1'}</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages: 100%|██████████| 20/20 [00:56&lt;00:00,  2.84s/pkg]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updated pkg: model2vec with 112 new/changed chunks, -112 unchanged, -112 removed</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code></code></pre>
+</div>
+</div>
+<div id="c1f9193b22080fb2" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb122"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb122-1"><a href="#cb122-1" aria-hidden="true" tabindex="-1"></a>k.env_st(where<span class="op">=</span><span class="st">'embedding is NULL'</span>, select<span class="op">=</span><span class="st">'count(*)'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>[{'count(*)': 0}]</code></pre>
+</div>
+</div>
+<div id="fa8d81324648d860" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb124"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb124-1"><a href="#cb124-1" aria-hidden="true" tabindex="-1"></a>k.process_env()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                                                                     </code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre><code>&lt;Table store (id, content, embedding, metadata, uploaded_at, package)&gt;</code></pre>
+</div>
+</div>
+<div id="11603e9298270223" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb127"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb127-1"><a href="#cb127-1" aria-hidden="true" tabindex="-1"></a>k.update_pkgs([<span class="st">'python-fasthtml'</span>,<span class="st">'fastcore'</span>,<span class="st">'litesearch'</span>,<span class="st">'fastlite'</span>,<span class="st">'apsw'</span>,<span class="st">'ghapi'</span>,<span class="st">'httpx'</span>], embed<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>loading pkgs {'python-fasthtml', 'fastlite', 'apsw', 'httpx', 'ghapi', 'litesearch', 'fastcore'} ......</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:   0%|          | 0/7 [00:00&lt;?, ?pkg/s]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>updating pkg: python-fasthtml ...</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  43%|████▎     | 3/7 [00:00&lt;00:00,  7.14pkg/s]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>package {'name': 'python-fasthtml', 'version': '0.13.4'} already loaded.
+updating pkg: fastlite ...
+package {'name': 'fastlite', 'version': '0.2.4'} already loaded.
+updating pkg: apsw ...
+package {'name': 'apsw', 'version': '3.53.0.0'} already loaded.
+updating pkg: httpx ...</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages:  71%|███████▏  | 5/7 [00:00&lt;00:00,  9.00pkg/s]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>package {'name': 'httpx', 'version': '0.28.1'} already loaded.
+updating pkg: ghapi ...
+package {'name': 'ghapi', 'version': '1.0.13'} already loaded.
+updating pkg: litesearch ...
+package {'name': 'litesearch', 'version': '0.0.25'} already loaded.
+updating pkg: fastcore ...</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Updating packages: 100%|██████████| 7/7 [00:00&lt;00:00,  8.68pkg/s]</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>package {'name': 'fastcore', 'version': '1.12.44'} already loaded.</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code></code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="structured-search" class="level2">
+<h2 class="anchored" data-anchor-id="structured-search">Structured Search</h2>
+<blockquote class="blockquote">
+<p><code>parseq</code> strips <code>key:value</code> filter tokens from a query string. <code>filt2wh</code> maps them to SQL WHERE clauses. <code>Kosha.context</code> fans out searches across detected packages and merges results with chained RRF.</p>
+</blockquote>
+<hr>
+<section id="parseq" class="level3">
+<h3 class="anchored" data-anchor-id="parseq">parseq</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb138"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb138-1"><a href="#cb138-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb138-2"><a href="#cb138-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> parseq(</span>
+<span id="cb138-3"><a href="#cb138-3" aria-hidden="true" tabindex="-1"></a>    q:<span class="bu">str</span></span>
+<span id="cb138-4"><a href="#cb138-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">tuple</span>:</span>
+<span id="cb138-5"><a href="#cb138-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Parse key:value filter tokens from a query. Returns (bare_query, filters_dict).</em></p>
+<div id="e99970170053c3cc" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb139"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb139-1"><a href="#cb139-1" aria-hidden="true" tabindex="-1"></a>parseq(<span class="st">'how do I merge dicts package:fastcore path:data*'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>('how do I merge dicts',
+ defaultdict(list, {'package': ['fastcore'], 'path': ['data*']}))</code></pre>
+</div>
+</div>
+<div id="c1d2e3f4a5b6c7d8" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb141"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb141-1"><a href="#cb141-1" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> parseq(<span class="st">'stripe payments package:fasthtml file:routes*'</span>) <span class="op">==</span> (<span class="st">'stripe payments'</span>, {<span class="st">'package'</span>: [<span class="st">'fasthtml'</span>], <span class="st">'file'</span>: [<span class="st">'routes*'</span>]})</span>
+<span id="cb141-2"><a href="#cb141-2" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> parseq(<span class="st">'package:monsterui package:fasthtml create a table'</span>) <span class="op">==</span> (<span class="st">'create a table'</span>, {<span class="st">'package'</span>: [<span class="st">'monsterui'</span>, <span class="st">'fasthtml'</span>]})</span>
+<span id="cb141-3"><a href="#cb141-3" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> parseq(<span class="st">'no filters here'</span>) <span class="op">==</span> (<span class="st">'no filters here'</span>, {})</span>
+<span id="cb141-4"><a href="#cb141-4" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> parseq(<span class="st">'type:FunctionDef lang:py'</span>) <span class="op">==</span> (<span class="st">'type:FunctionDef lang:py'</span>, {<span class="st">'type'</span>: [<span class="st">'FunctionDef'</span>], <span class="st">'lang'</span>: [<span class="st">'py'</span>]})</span>
+<span id="cb141-5"><a href="#cb141-5" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> parseq(<span class="st">'package:only'</span>)[<span class="dv">0</span>] <span class="op">==</span> <span class="st">'package:only'</span></span>
+<span id="cb141-6"><a href="#cb141-6" aria-hidden="true" tabindex="-1"></a><span class="co"># plural forms + comma-separated values</span></span>
+<span id="cb141-7"><a href="#cb141-7" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> parseq(<span class="st">'merge dicts packages:fastcore,litesearch'</span>) <span class="op">==</span> (<span class="st">'merge dicts'</span>, {<span class="st">'package'</span>: [<span class="st">'fastcore'</span>, <span class="st">'litesearch'</span>]})</span>
+<span id="cb141-8"><a href="#cb141-8" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> parseq(<span class="st">'search paths:basics,core,data'</span>) <span class="op">==</span> (<span class="st">'search'</span>, {<span class="st">'path'</span>: [<span class="st">'basics'</span>, <span class="st">'core'</span>, <span class="st">'data'</span>]})</span>
+<span id="cb141-9"><a href="#cb141-9" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> parseq(<span class="st">'query packages:fastcore,litesearch paths:basics,core'</span>) <span class="op">==</span> (<span class="st">'query'</span>, {<span class="st">'package'</span>: [<span class="st">'fastcore'</span>, <span class="st">'litesearch'</span>], <span class="st">'path'</span>: [<span class="st">'basics'</span>, <span class="st">'core'</span>]})</span>
+<span id="cb141-10"><a href="#cb141-10" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> parseq(<span class="st">'langs:py,js files:routes*,api*'</span>) <span class="op">==</span> (<span class="st">'langs:py,js files:routes*,api*'</span>, {<span class="st">'lang'</span>: [<span class="st">'py'</span>, <span class="st">'js'</span>], <span class="st">'file'</span>: [<span class="st">'routes*'</span>, <span class="st">'api*'</span>]})</span>
+<span id="cb141-11"><a href="#cb141-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'parse_query: all assertions pass'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>parse_query: all assertions pass</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="filt2wh" class="level3">
+<h3 class="anchored" data-anchor-id="filt2wh">filt2wh</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb143"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb143-1"><a href="#cb143-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb143-2"><a href="#cb143-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> filt2wh(</span>
+<span id="cb143-3"><a href="#cb143-3" aria-hidden="true" tabindex="-1"></a>    filters:<span class="bu">dict</span>, store:<span class="bu">str</span><span class="op">=</span><span class="st">'code'</span></span>
+<span id="cb143-4"><a href="#cb143-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">str</span> <span class="op">|</span> <span class="va">None</span>:</span>
+<span id="cb143-5"><a href="#cb143-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Convert a filter dict (from parse_query) to a SQL WHERE clause for the given store (code or env).</em></p>
+<div id="a0eadc5a8c3870c0" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb144"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb144-1"><a href="#cb144-1" aria-hidden="true" tabindex="-1"></a>filt2wh(parseq(<span class="st">'how do I merge dicts package:fastcore path:data*'</span>)[<span class="dv">1</span>], <span class="st">'env'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>"(json_extract(metadata, '$.path') like '%data%') AND (package='fastcore')"</code></pre>
+</div>
+</div>
+<div id="3e2c013dea3f2160" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb146"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb146-1"><a href="#cb146-1" aria-hidden="true" tabindex="-1"></a>filt2wh({<span class="st">'type'</span>: [<span class="st">'FunctionDef'</span>]}, <span class="st">'code'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>"(json_extract(metadata, '$.type') = 'FunctionDef')"</code></pre>
+</div>
+</div>
+<div id="8fdf1b30" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb148"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb148-1"><a href="#cb148-1" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> filt2wh({<span class="st">'file'</span>: [<span class="st">'routes*'</span>]}, <span class="st">'code'</span>) <span class="op">==</span> <span class="st">"(path LIKE '</span><span class="sc">%r</span><span class="st">outes%')"</span></span>
+<span id="cb148-2"><a href="#cb148-2" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> filt2wh({<span class="st">'path'</span>: [<span class="st">'api/*'</span>]}, <span class="st">'code'</span>) <span class="op">==</span> <span class="st">"(path LIKE '%api/%')"</span></span>
+<span id="cb148-3"><a href="#cb148-3" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> filt2wh({<span class="st">'lang'</span>: [<span class="st">'py'</span>]}, <span class="st">'code'</span>) <span class="op">==</span> <span class="st">"(json_extract(metadata, '$.lang') = '.py')"</span></span>
+<span id="cb148-4"><a href="#cb148-4" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> filt2wh({<span class="st">'lang'</span>: [<span class="st">'python'</span>]}, <span class="st">'code'</span>) <span class="op">==</span> <span class="st">"(json_extract(metadata, '$.lang') = '.py')"</span></span>
+<span id="cb148-5"><a href="#cb148-5" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> filt2wh({<span class="st">'package'</span>: [<span class="st">'fasthtml'</span>]}, <span class="st">'env'</span>) <span class="op">==</span> <span class="st">"(package='fasthtml')"</span></span>
+<span id="cb148-6"><a href="#cb148-6" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> filt2wh({<span class="st">'package'</span>: [<span class="st">'fasthtml'</span>, <span class="st">'monsterui'</span>]}, <span class="st">'env'</span>) <span class="op">==</span> <span class="st">"(package='fasthtml' OR package='monsterui')"</span></span>
+<span id="cb148-7"><a href="#cb148-7" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> filt2wh({<span class="st">'type'</span>: [<span class="st">'FunctionDef'</span>]}, <span class="st">'code'</span>) <span class="op">==</span> <span class="st">"(json_extract(metadata, '$.type') = 'FunctionDef')"</span></span>
+<span id="cb148-8"><a href="#cb148-8" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> filt2wh({}, <span class="st">'code'</span>) <span class="kw">is</span> <span class="va">None</span></span>
+<span id="cb148-9"><a href="#cb148-9" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> filt2wh({}, <span class="st">'env'</span>) <span class="kw">is</span> <span class="va">None</span></span>
+<span id="cb148-10"><a href="#cb148-10" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> filt2wh({<span class="st">'package'</span>: [<span class="st">'fasthtml'</span>]}, <span class="st">'code'</span>) <span class="kw">is</span> <span class="va">None</span></span>
+<span id="cb148-11"><a href="#cb148-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">'filters_to_where: all assertions pass'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>filters_to_where: all assertions pass</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="kosha.pkgs2consider" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.pkgs2consider">Kosha.pkgs2consider</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb150"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb150-1"><a href="#cb150-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb150-2"><a href="#cb150-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> pkgs2consider(</span>
+<span id="cb150-3"><a href="#cb150-3" aria-hidden="true" tabindex="-1"></a>    sys_wide:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span></span>
+<span id="cb150-4"><a href="#cb150-4" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span><span class="bu">set</span>:</span>
+<span id="cb150-5"><a href="#cb150-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Determine which packages to consider for search based on the intersection of the packages table and the environment.</em></p>
+<hr>
+</section>
+<section id="kosha.env_context" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.env_context">Kosha.env_context</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb151"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb151-1"><a href="#cb151-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb151-2"><a href="#cb151-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> env_context(</span>
+<span id="cb151-3"><a href="#cb151-3" aria-hidden="true" tabindex="-1"></a>    q:<span class="bu">str</span>, <span class="co"># query to search (supports key:value filters)</span></span>
+<span id="cb151-4"><a href="#cb151-4" aria-hidden="true" tabindex="-1"></a>    emb_q:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, <span class="co"># query to embed; defaults to bare query after filter parsing</span></span>
+<span id="cb151-5"><a href="#cb151-5" aria-hidden="true" tabindex="-1"></a>    wide:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># whether to use wide search</span></span>
+<span id="cb151-6"><a href="#cb151-6" aria-hidden="true" tabindex="-1"></a>    columns:<span class="bu">str</span><span class="op">=</span><span class="st">'content,metadata,package'</span>, <span class="co"># comma separated columns string to return from search</span></span>
+<span id="cb151-7"><a href="#cb151-7" aria-hidden="true" tabindex="-1"></a>    where:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, <span class="co"># additional where clause to filter search results</span></span>
+<span id="cb151-8"><a href="#cb151-8" aria-hidden="true" tabindex="-1"></a>    sys_wide:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, kw:VAR_KEYWORD</span>
+<span id="cb151-9"><a href="#cb151-9" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L: <span class="co"># additional args to pass to db.search</span></span>
+<span id="cb151-10"><a href="#cb151-10" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Code search through the database to find relevant code snippets.</em></p>
+<hr>
+</section>
+<section id="kosha.watch_repo" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.watch_repo">Kosha.watch_repo</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb152"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb152-1"><a href="#cb152-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb152-2"><a href="#cb152-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> watch_repo(</span>
+<span id="cb152-3"><a href="#cb152-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">dir</span>:Path<span class="op">=</span><span class="va">None</span>, kw:VAR_KEYWORD</span>
+<span id="cb152-4"><a href="#cb152-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb152-5"><a href="#cb152-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Block and watch repo for changes, re-indexing incrementally. Ctrl-C to stop.</em></p>
+<hr>
+</section>
+<section id="kosha.awatch_repo" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.awatch_repo">Kosha.awatch_repo</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb153"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb153-1"><a href="#cb153-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb153-2"><a href="#cb153-2" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> awatch_repo(</span>
+<span id="cb153-3"><a href="#cb153-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">dir</span>:Path<span class="op">=</span><span class="va">None</span>, kw:VAR_KEYWORD</span>
+<span id="cb153-4"><a href="#cb153-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb153-5"><a href="#cb153-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Async watcher: re-indexes changed files on every watchfiles event.</em></p>
+<hr>
+</section>
+<section id="kosha.repo_context" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.repo_context">Kosha.repo_context</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb154"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb154-1"><a href="#cb154-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb154-2"><a href="#cb154-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> repo_context(</span>
+<span id="cb154-3"><a href="#cb154-3" aria-hidden="true" tabindex="-1"></a>    q:<span class="bu">str</span>, <span class="co"># query to search (supports key:value filters)</span></span>
+<span id="cb154-4"><a href="#cb154-4" aria-hidden="true" tabindex="-1"></a>    emb_q:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, <span class="co"># query to embed; defaults to bare query after filter parsing</span></span>
+<span id="cb154-5"><a href="#cb154-5" aria-hidden="true" tabindex="-1"></a>    wide:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># use wide (OR) FTS search</span></span>
+<span id="cb154-6"><a href="#cb154-6" aria-hidden="true" tabindex="-1"></a>    columns:<span class="bu">str</span><span class="op">=</span><span class="st">'content,path,metadata'</span>, <span class="co"># columns to return</span></span>
+<span id="cb154-7"><a href="#cb154-7" aria-hidden="true" tabindex="-1"></a>    where:<span class="bu">str</span><span class="op">=</span><span class="va">None</span>, <span class="co"># extra SQL filter</span></span>
+<span id="cb154-8"><a href="#cb154-8" aria-hidden="true" tabindex="-1"></a>    kw:VAR_KEYWORD</span>
+<span id="cb154-9"><a href="#cb154-9" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L: <span class="co"># additional args to pass to db.search</span></span>
+<span id="cb154-10"><a href="#cb154-10" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Semantic + keyword search through indexed repo code.</em></p>
+<hr>
+</section>
+<section id="kosha.pkg_context" class="level3">
+<h3 class="anchored" data-anchor-id="kosha.pkg_context">Kosha.pkg_context</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb155"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb155-1"><a href="#cb155-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb155-2"><a href="#cb155-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> pkg_context(</span>
+<span id="cb155-3"><a href="#cb155-3" aria-hidden="true" tabindex="-1"></a>    q:<span class="bu">str</span>, <span class="co"># the search query</span></span>
+<span id="cb155-4"><a href="#cb155-4" aria-hidden="true" tabindex="-1"></a>    limit:<span class="bu">int</span><span class="op">=</span><span class="dv">10</span>, <span class="co"># limits</span></span>
+<span id="cb155-5"><a href="#cb155-5" aria-hidden="true" tabindex="-1"></a>)<span class="op">-&gt;</span>L:</span>
+<span id="cb155-6"><a href="#cb155-6" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>FTS5+vector search over package descriptions in pkg_store.</em></p>
+<div id="805f688e3a574ca1" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb156"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb156-1"><a href="#cb156-1" aria-hidden="true" tabindex="-1"></a>first(k.repo_context(<span class="st">'how do I parse python ast'</span>, limit<span class="op">=</span><span class="dv">1</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'rowid': 256,
+ 'content': 'def parse(code=None, p=None):\n    "Parse source, tag parents, return (tree, imp, top_fns, all_fns). Cached — called freely."\n    if not code and not p: return None, {}, set(), set()\n    try: tree = ast.parse(Path(p).read_text(errors=\'replace\') if not code else code)\n    except SyntaxError: return None, {}, set(), set()\n    [setattr(c,\'parent\',n) for n in ast.walk(tree) for c in ast.iter_child_nodes(n)]\n    is_top = lambda n: isinstance(getattr(n,\'parent\',None), ast.Module)\n    is_fn  = lambda n: isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef))\n    is_nm  = lambda n: isinstance(n, ast.Name)\n    imp, imp2mod = {}, {}\n    for n in ast.walk(tree):\n        if isinstance(n, ast.Import):\n            for a in n.names: imp[a.asname or a.name.split(\'.\')[0]] = a.name.split(\'.\')[0]\n        elif isinstance(n, ast.ImportFrom):\n            pkg = (n.module or \'\').split(\'.\')[0]\n            for a in n.names:\n                if a.name != \'*\':\n\t                imp[a.asname or a.name] = pkg\n\t                if n.module: imp2mod[a.asname or a.name] = f\'{n.module}.{a.name}\'\n                else: imp.setdefault(f\'*{pkg}\', pkg)\n    top = {n.name for n in ast.walk(tree) if is_fn(n) and is_top(n)}\n    ca  = {nm for n in tree.body if isinstance(n,ast.Assign) and isinstance(n.value,ast.Call)\n           for t in n.targets\n           for nm in ([t.id] if is_nm(t) else [e.id for e in t.elts if is_nm(e)] if isinstance(t,ast.Tuple) else [])}\n    return tree, imp, top, top | ca, imp2mod',
+ 'path': '/Users/71293/code/personal/orgs/kosha/kosha/core.py',
+ 'metadata': {'path': '/Users/71293/code/personal/orgs/kosha/kosha/core.py',
+  'uploaded_at': 1778024910.6494205,
+  'name': 'parse',
+  'lang': '.py',
+  'type': 'FunctionDef',
+  'lineno': 31,
+  'end_lineno': 55,
+  'mod_name': 'kosha.core.parse',
+  'docstring': 'Parse source, tag parents, return (tree, imp, top_fns, all_fns). Cached — called freely.',
+  'public_api': True},
+ '_dist': 0.6345211267471313,
+ '_rrf_score': 0.016666666666666666}</code></pre>
+</div>
+</div>
+<div id="f5173586310407bb" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb158"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb158-1"><a href="#cb158-1" aria-hidden="true" tabindex="-1"></a>k.env_context(<span class="st">'payment page with fasthtml'</span>, limit<span class="op">=</span><span class="dv">10</span>).<span class="bu">map</span>(<span class="kw">lambda</span> d: d[<span class="st">'metadata'</span>][<span class="st">'package'</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>['monsterui', 'monsterui', 'python-fasthtml', 'python-fasthtml', 'python-fasthtml', 'python-fasthtml', 'notebook', 'python-fasthtml', 'monsterui', 'python-fasthtml']</code></pre>
+</div>
+</div>
+<div id="19f1ef47b81aba46" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb160"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb160-1"><a href="#cb160-1" aria-hidden="true" tabindex="-1"></a>k.env_context(<span class="st">'payment page with fasthtml package:fastcore'</span>, limit<span class="op">=</span><span class="dv">10</span>).<span class="bu">map</span>(<span class="kw">lambda</span> d: d[<span class="st">'metadata'</span>][<span class="st">'package'</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>['fastcore', 'fastcore', 'fastcore', 'fastcore', 'fastcore', 'fastcore', 'fastcore', 'fastcore', 'fastcore', 'fastcore']</code></pre>
+</div>
+</div>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vedicreader\.github\.io\/kosha");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/vedicreader/kosha/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>
