@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.12
+bump
+
+
+
 ## 0.0.11
 emb_doc and query within kosha class
 
