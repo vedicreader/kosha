@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.11
+emb_doc and query within kosha class
+
+
+
 ## 0.0.10
 claude install, where_to_add , skill fix, status
 
