@@ -19,7 +19,7 @@ from collections import defaultdict, Counter
 from apswutils.utils import hash_record
 from importlib.metadata import version as v, metadata as meta, distribution as dist
 from chonkie import AutoEmbeddings
-from fastcore.all import (Path, first, patch, timed_cache, L, parallel, merge, AttrDict,
+from fastcore.all import (Path, first, patch, timed_cache, L, parallel, merge, AttrDict, bind,
                           filter_keys, not_, in_, listify, true, fdelegates, parallel_async,type2str)
 from fastcore.xdg import xdg_data_home
 from tqdm import tqdm
@@ -112,12 +112,14 @@ strict_skip_folder_re = r'^[._]|^(?:tests?|examples?|docs?|build|dist)$'
 strict_skip_file_re = r'^[._]|^(?:setup\.py|conftest\.py)$'
 
 @timed_cache(3600*24)
+@fdelegates(FastEncode)
 def embedder(
-    emb_model=model  # model config AttrDict (model name, onnx_path, prompt instructions)
+    emb_model=model,  # model config AttrDict (model name, onnx_path, prompt instructions)
+	**kwargs
 ) -> 'FastEncode':
     "Load or return cached CodeRankEmbed ONNX document embedder (24h TTL)."
-    try: return FastEncode(emb_model, parallel=8, batch_size=64)
-    except Exception: return FastEncode(emb_model, parallel=1, batch_size=64)
+    try: return FastEncode(emb_model, parallel=8, batch_size=64, **kwargs)
+    except Exception: return FastEncode(emb_model, parallel=1, batch_size=64, **kwargs)
 
 @timed_cache(3600*24)
 def static_embedder(
@@ -141,8 +143,10 @@ def emb_query(
 # %% ../nbs/00_core.ipynb #8511999ac2824a0b
 class Kosha:
 	'Kosha allows you to build a context for code generation based on your repo and environment.'
-	def __init__(self, dir: Path = None, install_skill: bool = False, xdg_dir: Path = None):
+	def __init__(self, dir: Path = None, install_skill: bool = False, xdg_dir: Path = None, efn=embedder):
 		self.root, self.xdg = Path(dir or repo_root() or '.'), xdg_dir or xdg_data_home()
+		self.efn = bind(efn, md=self.xdg/'model')
+		self.emb_doc, self.emb_query = emb_doc(self.efn), emb_query(self.efn)
 		if install_skill: mv_skill_md(dir=self.root, dry_run=False)
 		self.cp, self.ce = self.root.joinpath('.kosha','code.db'), self.xdg.joinpath('kosha','env.db')
 		for p in (self.cp, self.ce): p.parent.mkdir(parents=True, exist_ok=True)
@@ -227,18 +231,19 @@ def _is_pkg_ingested(self:Kosha, pkg:str) -> bool:
 	'Check if a package is already ingested and up-to-date.'
 	return first(self.pkgs(select='name, version', where=f'name={pkg!r} and version={v(pkg)!r}'))
 
-def embed_chunk(chunk:list|L,emb_fn=emb_doc, efn=embedder):
+def embed_chunk(chunk:list|L,emb_fn=emb_doc):
 	'Embed a list of code chunks using emb_f'
 	if not (chunk): return
 	c = [b['content'] for b in chunk if b['content'] and b['content'].strip()]
 	if not c: return
-	for e,b in zip(emb_fn(efn)(c),chunk): b['embedding'] = e.tobytes()
+	for e,b in zip(emb_fn(c),chunk): b['embedding'] = e.tobytes()
 	return chunk
 
-def process_content(store, content:L, embed:bool=True, efn=embedder):
+@fdelegates(embed_chunk)
+def process_content(store, content:L, embed:bool=True, **kwargs):
 	'Embed chunks and upsert into store; no-op if content is empty.'
 	if not content: return
-	if embed: content = embed_chunk(content, efn=efn)
+	if embed: content = embed_chunk(content, **kwargs)
 	return store.insert_all(content, upsert=True, hash_id='id', hash_id_columns=['content'])
 
 @patch
@@ -264,7 +269,7 @@ def count_imp(files, own:str='') -> Counter:
 
 @patch
 @fdelegates(pkg2chunks)
-def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, efn=embedder, verbose=True, force=False, **kwargs):
+def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, force=False, **kwargs):
     'Update package metadata in the packages table.'
     assert (o:= spec(pkg)), f'pkg {pkg} is not in environment'
     if verbose: print(f'updating pkg: {pkg} ...')
@@ -286,7 +291,7 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, efn=embedder, ve
     cont_hash = {_slug(d['content']): d for d in content}
     if del_ids:=set(ex).difference(cont_hash.keys()): self.env_st.delete_where(where='id in ("%s")'%'","'.join(del_ids))
     ch = filter_keys(cont_hash, not_(in_(ex))).values()
-    if ch and self.process_env(ch, embed=embed, efn=efn):
+    if ch and self.process_env(ch, embed=embed, emb_fn=self.emb_doc):
         counts = count_imp(pkg2files(pkg, exts=['.py']),pkg.replace('-','_').split('.')[0])
         rows = [dict(from_pkg=pkg, to_pkg=dep, n_modules=n) for dep,n in counts.items() if spec(dep)]
         if rows: self.envdb.t.pkg_deps.insert_all(rows, replace=True)
@@ -304,6 +309,7 @@ def rm_pkg(self:Kosha, pkg:str, ver:str=None):
 	self.pkgs.delete_where(where=f'name={pkg!r}')
 
 @patch
+@fdelegates(process_content)
 def process_repo(self:Kosha, content=None, reembed=False, **kwargs):
 	'Embed all documents in the code store, or only those without embeddings if reembed=False.'
 	content = content or self.code_st(where=f'embedding is NULL' if not reembed else None)
@@ -314,7 +320,6 @@ def update_pkgs(self:Kosha,
     pkgs:str|list=None, # packages to sync; None syncs all installed env packages
     embed=True,         # embed chunks after indexing
     exts=code_exts,     # file extensions to include
-    efn=embedder,       # embedding function
     verbose=True,       # print progress
     force=False,        # reindex even if package version already loaded
     **kwargs            # forwarded to update_pkg
@@ -322,7 +327,7 @@ def update_pkgs(self:Kosha,
 	'Sync installed packages into the env store; if pkgs is None, syncs all env packages.'
 	pkgs = set(pkgs).intersection(env_pkg_versions(pyproject=False)) if pkgs else set(env_pkg_versions())
 	if verbose: print(f'loading pkgs {pkgs} ......')
-	kw = dict(embed=embed, exts=exts, efn=efn, verbose=verbose, force=force, **kwargs)
+	kw = dict(embed=embed, exts=exts, verbose=verbose, force=force, **kwargs)
 	for pkg in tqdm(pkgs, desc='Updating packages', unit='pkg'): self.update_pkg(pkg, **kw)
 
 @patch
@@ -332,7 +337,6 @@ def update_repo(self:Kosha,
 				embed:bool=True,  # embed chunks after parsing
 				files:L=None,     # specific paths to (re)index; None = full sync
                 exts:str=code_exts,
-                efn=embedder,       # embedding function to use for code snippets
                 verbose=True,       # verbose
                 force=False,        # reindex all files regardless of mtime
 				**kwargs              # extra args forwarded to dir2files
@@ -360,7 +364,7 @@ def update_repo(self:Kosha,
 	ex = L() if force else _content(self.code_st, where=f'path IN ({pl})', f=_slug)
 	cont_hash = {_slug(d['content']): d for d in content}
 	if dids := set(ex).difference(cont_hash.keys()): self.code_st.delete_where(where='id in ("%s")' % '","'.join(dids))
-	self.process_repo(filter_keys(cont_hash, not_(in_(ex))).values(), embed, efn=efn)
+	self.process_repo(filter_keys(cont_hash, not_(in_(ex))).values(), embed, emb_fn=self.emb_doc)
 	for f in ch: self.codedb.q(f'update {self.code_st.name} set uploaded_at=? where path=?',[f.stat().st_mtime, str(f)])
 	own = Path(dir).resolve().name
 	rows = [dict(from_module=own, to_pkg=dep, n_files=n) for dep,n in count_imp(ch,own).items() if spec(dep)]
@@ -433,16 +437,14 @@ def env_context(self:Kosha,
 				q:str,               	# query to search (supports key:value filters)
 				emb_q:str=None,     	# query to embed; defaults to bare query after filter parsing
 				wide:bool=False,    	# whether to use wide search
-				emb_fn=emb_query,		# embedding function
                 columns:str='content,metadata,package',			# comma separated columns string to return from search
                 where:str=None,			# additional where clause to filter search results
-                efn=embedder,			# embedding function to use for code snippets when updating packages
 				sys_wide=True,
 				**kw					# additional args to pass to db.search
 				) -> L:
 	'Code search through the database to find relevant code snippets.'
 	raw, fs = parseq(q)
-	emb= emb_fn(efn)(emb_q or raw)
+	emb= self.emb_query(emb_q or raw)
 	all_p = set(raw.split()).intersection(self.pkgs2consider(sys_wide)) if 'package' not in fs else []
 	for p in all_p: fs['package'].append(p)
 	wh = ' AND '.join(map(lambda p: f'({p})', L(filt2wh(fs, 'env'), where).filter(true)))
@@ -463,15 +465,13 @@ def repo_context(self:Kosha,
                 q:str,                          # query to search (supports key:value filters)
                 emb_q:str=None,                 # query to embed; defaults to bare query after filter parsing
                 wide:bool=False,                # use wide (OR) FTS search
-                emb_fn=emb_query,               # embedding function
                 columns:str='content,path,metadata', # columns to return
                 where:str=None,                 # extra SQL filter
-                efn=embedder,                   # embedding function to use for code snippets when updating repo
                 **kw                            # additional args to pass to db.search
 ) -> L:
 	'Semantic + keyword search through indexed repo code.'
 	raw, fs = parseq(q)
-	emb = emb_fn(efn)(emb_q or raw)
+	emb = self.emb_query(emb_q or raw)
 	wh = filt2wh(fs, 'code')
 	if where and wh: wh = f'({where}) AND ({wh})'
 	elif where: wh = where
@@ -495,9 +495,8 @@ def watch_repo(self:Kosha, dir:Path=None, **kw):
 def pkg_context(self:Kosha,
                 q:str, # the search query
                 limit:int=10, # limits
-                efn=embedder
-                ) -> L:
+) -> L:
 	'FTS5+vector search over package descriptions in pkg_store.'
-	emb = emb_query(efn)(q).tobytes()
+	emb = self.emb_query(q).tobytes()
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if isinstance(r.get('metadata'), str) else r
 	return L(self.envdb.search(q, emb, columns=['content','metadata'], table_name='pkg_store', limit=limit)).map(fn)

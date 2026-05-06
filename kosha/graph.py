@@ -12,7 +12,7 @@ from collections import defaultdict
 from litesearch import *
 from fastcore.all import (Path, L, patch, parallel_async, tuplify, first, fdelegates, globtastic, bind, true, dict2obj,
                           listify, filter_keys, merge, in_)
-from .core import arun, Kosha, embedder, parse, has_init, env_pkg_versions
+from .core import arun, Kosha, parse, has_init, env_pkg_versions
 from pyan.analyzer import CallGraphVisitor
 from pyan.anutils import Scope, ExecuteInInnerScope
 
@@ -542,7 +542,6 @@ def public_api(self: Kosha,
 def sync(self: Kosha,
          pkgs=None, # list of package names to sync (e.g. ['httpx', 'fastcore']); if None, sync all env packages
          dir=None, # directory to sync; if None, sync all of root
-         emb=embedder, # optional embedder for graph sync; if None, skip embedding and graph sync steps
          verbose=True, # print progress messages
          in_parallel=False, # run repo, env, and graph sync in parallel
          force=False, # ignore file mtimes and reprocess all files
@@ -553,8 +552,8 @@ def sync(self: Kosha,
 	'Sync code store, env store, and code graph. Runs in a daemon thread by default.'
 	dir, pkgs = dir or self.root, pkgs or set(env_pkg_versions(pyproject,depth))
 	g_pkgs = set(pkgs) if force else set(pkgs) - set(L(self.pkgs(select='distinct name')).attrgot('name'))
-	ts = [bind(self.update_repo, dir, efn=emb, verbose=verbose, force=force, embed=embed),
-		  bind(self.update_pkgs, pkgs, efn=emb, verbose=verbose, force=force, embed=embed),
+	ts = [bind(self.update_repo, dir, verbose=verbose, force=force, embed=embed),
+		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed),
 		  bind(self.graph.sync, dir=dir, pkgs=g_pkgs, force=force)]
 	if in_parallel: return arun(parallel_async(lambda f: f(), ts))
 	else: return L(ts).map(lambda f: f())
