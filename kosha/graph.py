@@ -452,6 +452,9 @@ def _stale(self: CodeGraph, files, sc=None) -> list:
 	known = {r['path']: r['last_analyzed_at'] for r in self.db.t.file_index(**kw)}
 	return [f for f in files if Path(f).exists() and known.get(str(f)) != Path(f).stat().st_mtime]
 
+# %% ../nbs/01_graph.ipynb #92f3d9dd0997cbf6
+from tqdm import tqdm
+
 # %% ../nbs/01_graph.ipynb #cd099cdc
 @patch
 def sync_dir(self: CodeGraph, dir: str | Path, force=False) -> 'CodeGraph':
@@ -465,10 +468,11 @@ def sync_dir(self: CodeGraph, dir: str | Path, force=False) -> 'CodeGraph':
 	return self
 
 @patch
-def sync_pkgs(self: CodeGraph, pkgs: list[str]) -> 'CodeGraph':
+def sync_pkgs(self: CodeGraph, pkgs: list[str], in_parallel=False) -> 'CodeGraph':
 	'Incremental sync for packages: drop missing files, update changed files, add new files.'
 	if not pkgs: print('no action. pkgs empty'); return self
-	arun(parallel_async(self.from_pkg, pkgs))
+	if in_parallel: arun(parallel_async(self.from_pkg, pkgs)); return self
+	for pkg in tqdm(pkgs, desc='Syncing packages', unit='pkg'): self.from_pkg(pkg)
 	return self
 
 @patch
@@ -543,6 +547,19 @@ def public_api(self: Kosha,
 	return L(er+rr).map(fn).map(lambda r: {m: _get(r,m) for m in meta_cols.split(',')})[:limit]
 
 
+# %% ../nbs/01_graph.ipynb #e75942176786d92c
+from fastcore.all import noop, not_
+
+# %% ../nbs/01_graph.ipynb #3aaa2197
+@patch
+def status(self: Kosha, pyproject=True, depth=1) -> dict:
+	'Index freshness: file/pkg/node counts and stale file count.'
+	known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path,uploaded_at') if r['path']}
+	stale = sum(1 for p, mt in known.items() if Path(p).exists() and Path(p).stat().st_mtime != mt)
+	pkgs=merge(*L(self.pkgs_in_env(pyproject, depth)).map(lambda r: {r['name']: r['version']}))
+	sp = filter_keys(env_pkg_versions(pyproject,depth),not_(in_(pkgs)))
+	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale, stale_pkgs=sp)
+
 # %% ../nbs/01_graph.ipynb #6f57bfb4
 @patch
 def sync(self: Kosha,
@@ -556,9 +573,9 @@ def sync(self: Kosha,
          embed=True # whether to embed
  ) -> 'Kosha':
 	'Sync code store, env store, and code graph. Runs in a daemon thread by default.'
-	dir, pkgs = dir or self.root, set(listify(pkgs)) or set(self.status(pyproject,depth).get('stale_pkgs', {}))
+	dir, pkgs = dir or self.root, listify(pkgs) or self.status(pyproject,depth).get('stale_pkgs', {})
 	ts = [bind(self.update_repo, dir, verbose=verbose, force=force, embed=embed),
-		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed),
+		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed) if pkgs else noop,
 		  bind(self.graph.sync, dir=dir, pkgs=pkgs, force=force)]
 	if in_parallel: return arun(parallel_async(lambda f: f(), ts))
 	else: return L(ts).map(lambda f: f())
@@ -634,19 +651,6 @@ def api_call_paths(self:Kosha,
 	for fp in f: paths = paths | self.graph._bfs(fp, set(a))
 	return filter_keys(paths, in_(a))
 
-
-# %% ../nbs/01_graph.ipynb #675312c7f8ca0fb2
-from fastcore.basics import not_
-
-# %% ../nbs/01_graph.ipynb #3aaa2197
-@patch
-def status(self: Kosha, pyproject=True, depth=1) -> dict:
-	'Index freshness: file/pkg/node counts and stale file count.'
-	known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path,uploaded_at') if r['path']}
-	stale = sum(1 for p, mt in known.items() if Path(p).exists() and Path(p).stat().st_mtime != mt)
-	pkgs=merge(*L(self.pkgs_in_env()).map(lambda r: {r['name']: r['version']}))
-	sp = filter_keys(env_pkg_versions(pyproject,depth),not_(in_(pkgs)))
-	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale, stale_pkgs=sp)
 
 # %% ../nbs/01_graph.ipynb #8d82814f
 @patch

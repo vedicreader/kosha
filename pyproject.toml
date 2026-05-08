@@ -16,7 +16,6 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
-    "fastprogress>=1.1.5",
     "litesearch>=0.0.22",
     "pyan3>=2.4.3",
     "pyskills>=0.0.4",

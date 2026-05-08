@@ -24,5 +24,4 @@ from .core import Kosha
 from pyskills.core import allow
 
 __all__ = ['Kosha']
-
 allow({Kosha: ...})

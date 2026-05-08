@@ -219,7 +219,7 @@ def enrich_chunks(content: L) -> L:
 	enriched = arun(parallel_async(_enrich, non_assigns)).concat()
 	return enriched + enriched.filter(lambda d: d['metadata'].get('type')=='ClassDef').map(_cls_methods).concat()
 
-# %% ../nbs/00_core.ipynb #cd93d2c15ca33a8d
+# %% ../nbs/00_core.ipynb #ff2c87d86539d8c8
 os.environ['TOKENIZERS_PARALLELISM']='false'  # to suppress warnings from tokenizers
 @patch
 def nuke(self:Kosha):
@@ -231,7 +231,7 @@ def _is_pkg_ingested(self:Kosha, pkg:str) -> bool:
 	'Check if a package is already ingested and up-to-date.'
 	return first(self.pkgs(select='name, version', where=f'name={pkg!r} and version={v(pkg)!r}'))
 
-def embed_chunk(chunk:list|L,emb_fn=emb_doc):
+def embed_chunk(chunk:list|L,emb_fn=emb_doc(embedder)):
 	'Embed a list of code chunks using emb_f'
 	if not (chunk): return
 	c = [b['content'] for b in chunk if b['content'] and b['content'].strip()]
@@ -251,7 +251,7 @@ def process_content(store, content:L, embed:bool=True, **kwargs):
 def process_env(self:Kosha, content=None, reembed=False, **kwargs):
 	'Embed all documents in the env store, or only those without embeddings if reembed=False.'
 	content = content or self.env_st(where=f'embedding is NULL' if not reembed else None)
-	return process_content(self.env_st, content, **kwargs)
+	return process_content(self.env_st, content, emb_fn=self.emb_doc, **kwargs)
 
 def _slug(s): return hash_record({"content": s}) if s else None
 
@@ -267,9 +267,10 @@ def count_imp(files, own:str='') -> Counter:
 	L(files).map(do)
 	return c
 
+# %% ../nbs/00_core.ipynb #81bccae180ccd2d2
 @patch
 @fdelegates(pkg2chunks)
-def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, force=False, **kwargs):
+def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, force=False, imports=False, **kwargs):
     'Update package metadata in the packages table.'
     assert (o:= spec(pkg)), f'pkg {pkg} is not in environment'
     if verbose: print(f'updating pkg: {pkg} ...')
@@ -280,23 +281,23 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, fo
         print(f'forcing an update to pkg {ep}')
     pkg_par = Path(o.origin).parent.parent if o.origin else Path(o.submodule_search_locations[0])
     mod_fn = lambda p, n: '.'.join(list(Path(p).relative_to(pkg_par).with_suffix('').parts) + ([n] if n else []))
-    _get = lambda o,k1=None: o.get('metadata').get(k1,'')
-    meta_fn = lambda d: d['metadata'] | dict(mod_name=mod_fn(_get(d,'path'), _get(d,'name') or None),
-                                             package=pkg, version=v(pkg))
+    _get = lambda o,k1 = None: o.get('metadata').get(k1,'')
+    meta_fn = lambda d: d['metadata'] | dict(mod_name=mod_fn(_get(d,'path'), _get(d,'name') or None), package=pkg, version=v(pkg))
     fn = lambda d: dict(package=pkg, uploaded_at=_get(d,'uploaded_at'), metadata=meta_fn(d))
-    content = parallel(file_parse, pkg2files(pkg, exts=exts, **kwargs), threadpool=True, assigns=True,
-                       imports=kwargs.pop('imports', False)).filter(true).concat().map(lambda d: d | fn(d))
-    content, doc = enrich_chunks(content), pkg_doc(pkg)
-    ex = L() if force else _content(self.env_st, where=f'package={pkg!r}', f=_slug)
-    cont_hash = {_slug(d['content']): d for d in content}
-    if del_ids:=set(ex).difference(cont_hash.keys()): self.env_st.delete_where(where='id in ("%s")'%'","'.join(del_ids))
-    ch = filter_keys(cont_hash, not_(in_(ex))).values()
-    if ch and self.process_env(ch, embed=embed, emb_fn=self.emb_doc):
-        counts = count_imp(pkg2files(pkg, exts=['.py']),pkg.replace('-','_').split('.')[0])
-        rows = [dict(from_pkg=pkg, to_pkg=dep, n_modules=n) for dep,n in counts.items() if spec(dep)]
-        if rows: self.envdb.t.pkg_deps.insert_all(rows, replace=True)
-    if verbose: print(f'updated pkg: {pkg} with {len(ch)} new/changed chunks, {len(ex)-len(ch)} unchanged, '
-              f'{len(ex)-len(cont_hash)} removed')
+    files = pkg2files(pkg, exts=exts, **kwargs)
+    cnt = arun(parallel_async(file_parse, files, assigns=True, imports=imports)).concat().filter(true)
+    if cnt:
+	    cnt, doc = enrich_chunks(cnt.map(lambda d: d | fn(d))), pkg_doc(pkg)
+	    ex = L() if force else _content(self.env_st, where=f'package={pkg!r}', f=_slug)
+	    cont_hash = {_slug(d['content']): d for d in cnt}
+	    if dids:=set(ex).difference(cont_hash.keys()): self.env_st.delete_where(where='id in ("%s")'%'","'.join(dids))
+	    ch = filter_keys(cont_hash, not_(in_(ex))).values()
+	    if ch and self.process_env(ch, embed=embed):
+		    counts = count_imp(pkg2files(pkg, exts=['.py']),pkg.replace('-','_').split('.')[0])
+		    rows = [dict(from_pkg=pkg, to_pkg=dep, n_modules=n) for dep,n in counts.items() if spec(dep)]
+		    if rows: self.envdb.t.pkg_deps.insert_all(rows, replace=True)
+	    if verbose: print(f'updated pkg: {pkg} with {len(ch)} new/changed chunks, {len(ex)-len(ch)} unchanged, '
+				  f'{len(ex)-len(cont_hash)} removed')
     return self.pkgs.insert(dict(name=pkg, version=v(pkg), summary=_get(doc,'summary')), ignore=True)
 
 @patch
@@ -309,13 +310,6 @@ def rm_pkg(self:Kosha, pkg:str, ver:str=None):
 	self.pkgs.delete_where(where=f'name={pkg!r}')
 
 @patch
-@fdelegates(process_content)
-def process_repo(self:Kosha, content=None, reembed=False, **kwargs):
-	'Embed all documents in the code store, or only those without embeddings if reembed=False.'
-	content = content or self.code_st(where=f'embedding is NULL' if not reembed else None)
-	return process_content(self.code_st, content, **kwargs)
-
-@patch
 def update_pkgs(self:Kosha,
     pkgs:str|list=None, # packages to sync; None syncs all installed env packages
     embed=True,         # embed chunks after indexing
@@ -325,10 +319,18 @@ def update_pkgs(self:Kosha,
     **kwargs            # forwarded to update_pkg
 ):
 	'Sync installed packages into the env store; if pkgs is None, syncs all env packages.'
-	pkgs = set(pkgs).intersection(env_pkg_versions(pyproject=False)) if pkgs else set(env_pkg_versions())
-	if verbose: print(f'loading pkgs {pkgs} ......')
+	pkgs = set(pkgs) or set(env_pkg_versions())
+	if verbose: print(f'loading pkgs {pkgs} ...' if pkgs else 'No packages to load.')
+	if not pkgs: return
 	kw = dict(embed=embed, exts=exts, verbose=verbose, force=force, **kwargs)
 	for pkg in tqdm(pkgs, desc='Updating packages', unit='pkg'): self.update_pkg(pkg, **kw)
+
+# %% ../nbs/00_core.ipynb #bc7c02776d1ac2eb
+@patch
+def process_repo(self:Kosha, content=None, reembed=False):
+	'Embed all documents in the code store, or only those without embeddings if reembed=False.'
+	content = content or self.code_st(where=f'embedding is NULL' if not reembed else None)
+	return process_content(self.code_st, content, emb_fn=self.emb_doc)
 
 @patch
 @fdelegates(dir2files)
@@ -358,19 +360,21 @@ def update_repo(self:Kosha,
 	_get = lambda m,k1,k2: m.get(k1,{}).get(k2,'')
 	meta_fn = lambda d: d['metadata'] | dict(mod_name=mod_fn(_get(d,'metadata','path'),_get(d,'metadata','name')))
 	fn = lambda d: dict(path=_get(d,'metadata','path'),uploaded_at=_get(d,'metadata','uploaded_at'),metadata=meta_fn(d))
-	content = enrich_chunks(parallel(file_parse, ch, threadpool=True, progress=True, assigns=True).concat().map(
-		lambda d: d | fn(d)))
+	content = arun(parallel_async(file_parse, ch, assigns=True)).concat()
+	if not content: return
+	content = enrich_chunks(content.map(lambda d: d | fn(d)))
 	pl = ','.join(map(repr, L(ch).map(str)))
 	ex = L() if force else _content(self.code_st, where=f'path IN ({pl})', f=_slug)
 	cont_hash = {_slug(d['content']): d for d in content}
 	if dids := set(ex).difference(cont_hash.keys()): self.code_st.delete_where(where='id in ("%s")' % '","'.join(dids))
-	self.process_repo(filter_keys(cont_hash, not_(in_(ex))).values(), embed, emb_fn=self.emb_doc)
+	self.process_repo(filter_keys(cont_hash, not_(in_(ex))).values(), embed)
 	for f in ch: self.codedb.q(f'update {self.code_st.name} set uploaded_at=? where path=?',[f.stat().st_mtime, str(f)])
 	own = Path(dir).resolve().name
 	rows = [dict(from_module=own, to_pkg=dep, n_files=n) for dep,n in count_imp(ch,own).items() if spec(dep)]
 	if rows: self.code_rd.insert_all(rows, replace=True)
 	if verbose: print('synced repo')
 
+# %% ../nbs/00_core.ipynb #cd93d2c15ca33a8d
 @patch
 def prune_old_versions(self:Kosha, pkg:str):
 	'Keep only the latest version of a package in the database.'
@@ -386,9 +390,9 @@ def prune_old_pkgs(self:Kosha):
 	L(self.pkgs(select='name')).attrgot('name').map(self.prune_old_versions)
 
 @patch
-def pkgs_in_env(self:Kosha, pyproject=False) -> list:
+def pkgs_in_env(self:Kosha, pyproject=False, depth=1) -> list:
 	'Intersection of the packages table with packages installed in the environment.'
-	st_pkgs, inst_pkgs = L(self.pkgs(select='name, version')), env_pkg_versions(pyproject=pyproject)
+	st_pkgs, inst_pkgs = L(self.pkgs(select='name, version')), env_pkg_versions(pyproject, depth)
 	return st_pkgs.filter(lambda p: p['name'] in inst_pkgs and inst_pkgs[p['name']] == p['version'])
 
 # %% ../nbs/00_core.ipynb #b1c2d3e4f5a6b7c8
