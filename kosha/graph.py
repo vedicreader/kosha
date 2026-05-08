@@ -556,7 +556,7 @@ def sync(self: Kosha,
          embed=True # whether to embed
  ) -> 'Kosha':
 	'Sync code store, env store, and code graph. Runs in a daemon thread by default.'
-	dir, pkgs = dir or self.root, pkgs or set(self.status(pyproject,depth).get('stale_pkgs', {}))
+	dir, pkgs = dir or self.root, set(listify(pkgs)) or set(self.status(pyproject,depth).get('stale_pkgs', {}))
 	ts = [bind(self.update_repo, dir, verbose=verbose, force=force, embed=embed),
 		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed),
 		  bind(self.graph.sync, dir=dir, pkgs=pkgs, force=force)]
