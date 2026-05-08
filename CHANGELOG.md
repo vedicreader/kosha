@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.13
+bind + partial graph add + stale pkg fix
+
+
+
 ## 0.0.12
 bump
 
