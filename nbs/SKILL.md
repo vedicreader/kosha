@@ -15,7 +15,11 @@ FTS5 + vector search + call graph over your repo and installed packages.
 ```python
 from kosha import Kosha
 k = Kosha()
-k.sync(in_parallel=True)  # incremental — near-instant on repeat runs
+print(k.status())  # always check first
+# → {'files': 2, 'packages': 172, 'stale_files': 0, 'stale_pkgs': ['some-pkg']}
+# Only sync if the packages you actually need appear in stale_pkgs.
+# If they're absent from stale_pkgs, skip sync and go straight to env_context.
+k.sync(in_parallel=True)  # skip if required packages are not in stale_pkgs
 ```
 
 Use `clikernel` if available (state persists, no re-import cost). Otherwise `.venv/bin/python -c "..."`.
@@ -39,6 +43,8 @@ Every coding task runs through the same questions. Use kosha to answer them befo
 `context(q, graph=True)` is the right default for any task that touches more than one module.
 `env_context` is for package-only searches (no repo results, faster).
 
+**`env_context(q)` is already a semantic similarity search.** The query is embedded via coderank and matched against stored vectors — passing any natural language description, code snippet, or function name finds semantically similar code. There is no need for a separate `similar()` helper; just call `env_context('description of what you want')` directly.
+
 **Check status first.** If `stale_files > 0` or `stale_pkgs` is non-empty, run `k.sync()` before querying — stale results look like missing results.
 
 ---
@@ -60,6 +66,14 @@ k.env_context('package:dockeasy type:FunctionDef run command', limit=10)
 
 **Anti-pattern:** invoking this skill, then immediately grepping files.
 `env_context` searches all installed packages semantically. Grep only finds exact strings in files you already know to look in.
+
+**Need more info on a package?** Use `pkg_url` to get the repo/docs URL, then websearch for specifics (changelog, API docs, migration guides):
+
+```python
+from kosha.core import pkg_url
+print(pkg_url('litesearch'))   # → 'https://github.com/Karthik777/litesearch'
+# then: WebSearch(f"site:{pkg_url('litesearch')} offset pagination")
+```
 
 ---
 
@@ -234,6 +248,38 @@ Available commands: `sync`, `context`, `repo_context`, `env_context`, `ni`, `top
 
 ---
 
+## Kosha databases are litesearch databases
+
+`k.db` (repo index) and `k.envdb` (package index) are both `litesearch.Database` objects. You can use the full litesearch API directly on them — create extra tables, run raw SQL, insert custom records.
+
+```python
+# Access the underlying databases
+k.db     # repo index (your project files)
+k.envdb  # package index (installed packages)
+
+# Create a custom store — e.g. an LLM-summary layer for undocumented functions
+summaries = k.envdb.get_store(name='summaries')
+summaries.insert_all([{
+    'content': 'one-line summary of what this function does',
+    'metadata': '{"mod_name": "dockeasy.core.fasthtml_app", "source": "agent"}',
+}])
+
+# Query by mod_name with raw SQL
+list(k.envdb.q(
+    "SELECT metadata, content FROM store WHERE json_extract(metadata, '$.mod_name') = ?",
+    ['dockeasy.core.fasthtml_app']
+))
+
+# Check what stores/tables exist — fastlite uses .t
+k.envdb.db.t
+```
+
+**Agent summary layer pattern:** when `env_context` returns a result with no docstring, write a one-liner to a `summaries` store keyed by `mod_name`. Future sessions query it before falling back to reading raw source — amortizes the cost of understanding undocumented code across sessions.
+
+See the `/litesearch` skill for the full API: `FastEncode`, FTS query preprocessing with `pre()`, hybrid search options, and indexing Python packages from scratch.
+
+---
+
 ## Quick reference
 
 | Method | When to use |
@@ -248,3 +294,4 @@ Available commands: `sync`, `context`, `repo_context`, `env_context`, `ni`, `top
 | `k.public_api(pkg)` | What a package exports (not just what's in `__all__`) |
 | `k.where_to_add(description)` | Find file:line insertion point for new code |
 | `k.api_call_paths(from_pkg, to_pkg)` | Shortest paths from one package's public API to another's |
+| `pkg_url('pkg')` | Repo/docs URL for a package — use with websearch when you need docs, changelogs, or migration info |

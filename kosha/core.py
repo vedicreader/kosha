@@ -444,12 +444,12 @@ def env_context(self:Kosha,
 				) -> L:
 	'Code search through the database to find relevant code snippets.'
 	raw, fs = parseq(q)
-	emb= self.emb_query(emb_q or raw)
+	fq, emb = pre(raw, wide=wide, extract_kw=False), self.emb_query(emb_q or raw)
 	all_p = set(raw.split()).intersection(self.pkgs2consider(sys_wide)) if 'package' not in fs else []
 	for p in all_p: fs['package'].append(p)
 	wh = ' AND '.join(map(lambda p: f'({p})', L(filt2wh(fs, 'env'), where).filter(true)))
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if 'metadata' in r else r
-	return L(self.envdb.search(pre(raw, wide=wide), emb.tobytes(), columns.split(','), where=wh, **kw)).map(fn)
+	return L(self.envdb.search(fq, emb.tobytes(), columns.split(','), where=wh, **kw)).map(fn)
 
 @patch
 def pkgs2consider(self: Kosha, sys_wide=True) -> set:
@@ -471,12 +471,12 @@ def repo_context(self:Kosha,
 ) -> L:
 	'Semantic + keyword search through indexed repo code.'
 	raw, fs = parseq(q)
-	emb = self.emb_query(emb_q or raw)
+	fq, emb = pre(raw, wide=wide, extract_kw=False), self.emb_query(emb_q or raw)
 	wh = filt2wh(fs, 'code')
 	if where and wh: wh = f'({where}) AND ({wh})'
 	elif where: wh = where
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if 'metadata' in r else r
-	return L(self.codedb.search(pre(raw, wide=wide), emb.tobytes(), columns.split(','), where=wh, **kw)).map(fn)
+	return L(self.codedb.search(fq, emb.tobytes(), columns.split(','), where=wh, **kw)).map(fn)
 
 @patch
 async def awatch_repo(self:Kosha, dir:Path=None, **kw):

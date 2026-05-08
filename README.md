@@ -99,6 +99,14 @@ Package names in the query are auto-detected as filters. `package:`,
 k.env_context('package:fastcore path:xtras atomic save', limit=8)
 ```
 
+**Need more info on a package?** Call `pkg_url` to get its repo/docs
+URL, then use websearch for changelogs, API docs, or migration guides:
+
+``` python
+from kosha.core import pkg_url
+pkg_url('litesearch')  # → 'https://github.com/Karthik777/litesearch'
+```
+
 ## 2 — Find existing patterns
 
 *Any task that adds or modifies behaviour. Run before touching files.*

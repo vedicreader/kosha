@@ -181,9 +181,8 @@ def static_edges(sources:dict[str,str]=None, filenames:list[str]=None, root:str=
 		return ([_e(f'{c.namespace}.{c.name}', cl, 'static', 1.0)
 				 for c,ts in v.uses_edges.items() if c.namespace and c.namespace != '*'
 				 for t in ts if '^^^' not in (t.name or '') and (cl := _callee(c,t))],
-				{f"{n.namespace}.{n.name}":
-					 {'node':f"{n.namespace}.{n.name}",
-					  'flavor':str(n.flavor).split('.')[-1].lower(), 'file':n.filename or ''}
+				{f"{n.namespace}.{n.name}": {'node':f"{n.namespace}.{n.name}",
+				                             'flavor':str(n.flavor).split('.')[-1].lower(), 'file':n.filename or ''}
 				 for nlist in v.nodes.values() for n in nlist if hasattr(n,'name') and n.namespace})
 	except Exception as ex: print(f"pyan3 static analysis failed: {ex}"); return [], {}
 
@@ -243,8 +242,15 @@ def _add_dyn(self:CodeGraph, mod_map:dict):
 		self.db.t.co_dispatch.insert_all([{'group_id':base+i,'node':nd} for i,grp in enumerate(groups) for nd in grp])
 	return new_nodes
 
+_cf = frozenset({'partial', 'bind', 'curry'})
+def _is_cf(node):
+	'True if node is a Call to a known callable factory (partial, bind, etc.).'
+	if not isinstance(node, ast.Call) : return False
+	if not (isinstance(node.func, ast.Name) or isinstance(node.func, ast.Attribute)): return False
+	return in_(node.func.id,_cf) if isinstance(node.func, ast.Name) else in_(node.func.attr,_cf)
+
 def _lambda_nodes(sources:dict[str,str]=None, filenames:list[str]=None, root:str=None) -> dict:
-	'Extract module-level `name = lambda ...` nodes; same signature as static_edges.'
+	'Extract module-level `name = lambda/partial/bind ...` nodes.'
 	if filenames:
 		fn = lambda p: '.'.join(Path(p).relative_to(root).with_suffix('').parts)
 		sources = {fn(p): (Path(p).read_text(errors='replace'), str(p)) for p in filenames}
@@ -253,7 +259,8 @@ def _lambda_nodes(sources:dict[str,str]=None, filenames:list[str]=None, root:str
 			for mod, (src, file) in sources.items()
 			for tree, *_ in [parse(src)] if tree
 			for n in tree.body
-			if isinstance(n, ast.Assign) and isinstance(n.value, ast.Lambda)
+			if isinstance(n, ast.Assign)
+			and (isinstance(n.value, ast.Lambda) or _is_cf(n.value))
 			for t in n.targets if isinstance(t, ast.Name)}
 
 @patch
@@ -461,7 +468,6 @@ def sync_dir(self: CodeGraph, dir: str | Path, force=False) -> 'CodeGraph':
 def sync_pkgs(self: CodeGraph, pkgs: list[str]) -> 'CodeGraph':
 	'Incremental sync for packages: drop missing files, update changed files, add new files.'
 	if not pkgs: print('no action. pkgs empty'); return self
-
 	arun(parallel_async(self.from_pkg, pkgs))
 	return self
 
@@ -550,11 +556,10 @@ def sync(self: Kosha,
          embed=True # whether to embed
  ) -> 'Kosha':
 	'Sync code store, env store, and code graph. Runs in a daemon thread by default.'
-	dir, pkgs = dir or self.root, pkgs or set(env_pkg_versions(pyproject,depth))
-	g_pkgs = set(pkgs) if force else set(pkgs) - set(L(self.pkgs(select='distinct name')).attrgot('name'))
+	dir, pkgs = dir or self.root, pkgs or set(self.status(pyproject,depth).get('stale_pkgs', {}))
 	ts = [bind(self.update_repo, dir, verbose=verbose, force=force, embed=embed),
 		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed),
-		  bind(self.graph.sync, dir=dir, pkgs=g_pkgs, force=force)]
+		  bind(self.graph.sync, dir=dir, pkgs=pkgs, force=force)]
 	if in_parallel: return arun(parallel_async(lambda f: f(), ts))
 	else: return L(ts).map(lambda f: f())
 
@@ -630,16 +635,17 @@ def api_call_paths(self:Kosha,
 	return filter_keys(paths, in_(a))
 
 
+# %% ../nbs/01_graph.ipynb #675312c7f8ca0fb2
+from fastcore.basics import not_
+
 # %% ../nbs/01_graph.ipynb #3aaa2197
 @patch
-def status(self: Kosha) -> dict:
+def status(self: Kosha, pyproject=True, depth=1) -> dict:
 	'Index freshness: file/pkg/node counts and stale file count.'
 	known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path,uploaded_at') if r['path']}
 	stale = sum(1 for p, mt in known.items() if Path(p).exists() and Path(p).stat().st_mtime != mt)
-	pkgs=merge(*L(self.pkgs(select='name,version')).map(lambda r: {r['name']: r['version']}))
-	e = env_pkg_versions(pyproject=False)
-	pkgs = filter_keys(pkgs, in_(e))
-	sp = [k for k in pkgs if pkgs[k] != e[k]]
+	pkgs=merge(*L(self.pkgs_in_env()).map(lambda r: {r['name']: r['version']}))
+	sp = filter_keys(env_pkg_versions(pyproject,depth),not_(in_(pkgs)))
 	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale, stale_pkgs=sp)
 
 # %% ../nbs/01_graph.ipynb #8d82814f
