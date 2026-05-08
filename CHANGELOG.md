@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.15
+remove fastprogress, early stop with index
+
+
+
 ## 0.0.14
 code graph bug fix
 
