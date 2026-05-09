@@ -18,36 +18,38 @@ from pyan.anutils import Scope, ExecuteInInnerScope
 
 # %% ../nbs/01_graph.ipynb #eb2b59dfd7c9a091
 try:
-	# Bug 1 fix: auto-register missing nested lambda scopes
-	def _safe_enter(self):
-		o = self.analyzer
-		o.name_stack.append(self.scopename)
-		try: inner_ns = o.get_node_of_current_namespace().get_name()
-		except Exception: inner_ns = '.'.join(o.name_stack)
-		if inner_ns not in o.scopes: o.scopes[inner_ns] = Scope.from_names(self.scopename, [])
-		o.scope_stack.append(o.scopes[inner_ns])
-		o.context_stack.append(self.scopename)
-		self.inner_ns = inner_ns
-		return self
-	ExecuteInInnerScope.__enter__ = _safe_enter
+	if not getattr(CallGraphVisitor, '_kosha_patched', False):
+		# Bug 1 fix: auto-register missing nested lambda scopes
+		def _safe_enter(self):
+			o = self.analyzer
+			o.name_stack.append(self.scopename)
+			try: inner_ns = o.get_node_of_current_namespace().get_name()
+			except Exception: inner_ns = '.'.join(o.name_stack)
+			if inner_ns not in o.scopes: o.scopes[inner_ns] = Scope.from_names(self.scopename, [])
+			o.scope_stack.append(o.scopes[inner_ns])
+			o.context_stack.append(self.scopename)
+			self.inner_ns = inner_ns
+			return self
+		ExecuteInInnerScope.__enter__ = _safe_enter
 
-	# Bug 2 fix: guard None namespace in postprocessing
-	_ANON = {'<listcomp>','<setcomp>','<dictcomp>','<genexpr>','<lambda>'}
-	_orig_gp = CallGraphVisitor.get_parent_node
-	def _safe_gp(self, n):
-		if n.namespace is None: return None
-		return _orig_gp(self, n)
-	def _safe_collapse(self):
-		for name in list(self.nodes):
-			if name.partition('.')[0] not in _ANON: continue
-			for n in self.nodes[name]:
-				if n.namespace is None: continue
-				pn = self.get_parent_node(n)
-				if pn is None: continue
-				for n2 in self.uses_edges.get(n, []): self.add_uses_edge(pn, n2)
-				n.defined = False
-	CallGraphVisitor.get_parent_node = _safe_gp
-	CallGraphVisitor.collapse_inner  = _safe_collapse
+		# Bug 2 fix: guard None namespace in postprocessing
+		_ANON = {'<listcomp>','<setcomp>','<dictcomp>','<genexpr>','<lambda>'}
+		_orig_gp = CallGraphVisitor.get_parent_node
+		def _safe_gp(self, n):
+			if n.namespace is None: return None
+			return _orig_gp(self, n)
+		def _safe_collapse(self):
+			for name in list(self.nodes):
+				if name.partition('.')[0] not in _ANON: continue
+				for n in self.nodes[name]:
+					if n.namespace is None: continue
+					pn = self.get_parent_node(n)
+					if pn is None: continue
+					for n2 in self.uses_edges.get(n, []): self.add_uses_edge(pn, n2)
+					n.defined = False
+		CallGraphVisitor.get_parent_node = _safe_gp
+		CallGraphVisitor.collapse_inner  = _safe_collapse
+		CallGraphVisitor._kosha_patched = True
 except ImportError: pass
 
 # %% ../nbs/01_graph.ipynb #af482cb1
@@ -273,15 +275,17 @@ def _add_static(self:CodeGraph, sources:dict[str,str]=None, filenames:list[str]=
 	return set(meta) | set(L(s_edges).attrgot('caller')) | set(L(s_edges).attrgot('callee'))
 
 @patch
-def from_sources(self:CodeGraph, sources:dict[str,str]):
+def from_sources(self:CodeGraph, sources:dict[str,str], centrality:bool=True):
 	'Build from {module_name: source_str}.'
-	return self._centrality(self._add_static(sources=sources) | self._add_dyn(sources))
+	nodes = self._add_static(sources=sources) | self._add_dyn(sources)
+	return self._centrality(nodes) if centrality else self
 
 # %% ../nbs/01_graph.ipynb #3150593a339dd430
 @patch
 def process_files(self:CodeGraph,
     files,     # list of .py file paths to analyse
-    root=None  # package root; auto-detected via __init__.py walk if None
+    root=None, # package root; auto-detected via __init__.py walk if None
+    centrality:bool=True  # recompute PageRank after this batch (set False to debounce; call ._centrality() once at the end)
 ):
 	'Build static + dynamic call-graph edges for the given source files and recompute centrality.'
 	if root is None or not files: root = files[0] if files else '.'
@@ -291,33 +295,34 @@ def process_files(self:CodeGraph,
 	nodes = self._add_static(filenames=files, root=root)
 	fn = lambda p: '.'.join(Path(p).relative_to(root).with_suffix('').parts)
 	nodes |= self._add_dyn({fn(p): Path(p) for p in files})
-	return self._centrality(nodes)
+	return self._centrality(nodes) if centrality else self
 
 @patch
 @fdelegates(globtastic)
-def from_dir(self:CodeGraph, dir: str | Path, **kwargs) -> 'CodeGraph':
+def from_dir(self:CodeGraph, dir: str | Path, centrality:bool=True, **kwargs) -> 'CodeGraph':
 	'Build from .py files under path — pyan reads files directly.'
 	files = dir2files(dir, exts=['.py'], func=os.path.join, **kwargs)
-	return self.process_files(files, Path(dir).parent)
+	return self.process_files(files, Path(dir).parent, centrality=centrality)
 
 @patch
-def from_file(self: CodeGraph, path:str|Path) -> 'CodeGraph':
+def from_file(self: CodeGraph, path:str|Path, centrality:bool=True) -> 'CodeGraph':
 	'Build from a single .py file. Module name derived from filename.'
 	p = Path(path).resolve()
 	pkg_root, parts = p.parent, [p.with_suffix('').name]
 	while has_init(pkg_root):
 		parts.insert(0, pkg_root.name)
 		pkg_root = pkg_root.parent
-	return self._centrality(self._add_static(filenames=[str(p)], root=pkg_root) | self._add_dyn({'.'.join(parts): p}))
+	nodes = self._add_static(filenames=[str(p)], root=pkg_root) | self._add_dyn({'.'.join(parts): p})
+	return self._centrality(nodes) if centrality else self
 
 @patch
 @fdelegates(globtastic)
-def from_pkg(self: CodeGraph, pkg: str, **kwargs) -> 'CodeGraph':
+def from_pkg(self: CodeGraph, pkg: str, centrality:bool=True, **kwargs) -> 'CodeGraph':
     'Build from an installed package. Uses pyan3 on the package source files.'
     s = spec(pkg)
     if not s: raise ValueError(f"{pkg!r} not installed")
     p = Path(s.origin).parent if s.origin else Path(s.submodule_search_locations[0])
-    return self.from_dir(p, **kwargs)
+    return self.from_dir(p, centrality=centrality, **kwargs)
 
 # %% ../nbs/01_graph.ipynb #511f144aaca872f8
 @patch
@@ -457,35 +462,46 @@ from tqdm import tqdm
 
 # %% ../nbs/01_graph.ipynb #cd099cdc
 @patch
-def sync_dir(self: CodeGraph, dir: str | Path, force=False) -> 'CodeGraph':
+def sync_dir(self: CodeGraph, dir: str | Path, force=False, centrality:bool=True) -> 'CodeGraph':
 	'Incremental sync for a directory: drop missing files, update changed files, add new files.'
 	if not dir: print('no action. dir empty'); return self
 	files = dir2files(dir, exts=['.py'], func=os.path.join)
 	known=set(L(self.db.t.file_index(select='distinct path', where='root=?', where_args=[str(dir)])).attrgot('path'))
 	for f in known - set(files): self._drop_file(f)
 	fs = files if force else self._stale(files, str(dir))
-	if fs: self.process_files(fs, str(dir)) and self._index_files(fs, str(dir))
+	if fs:
+		# Debounce: skip per-call PageRank; final ._centrality() happens in sync().
+		self.process_files(fs, str(dir), centrality=False) and self._index_files(fs, str(dir))
+	if centrality and fs: self._centrality()
 	return self
 
 @patch
-def sync_pkgs(self: CodeGraph, pkgs: list[str], in_parallel=False) -> 'CodeGraph':
+def sync_pkgs(self: CodeGraph, pkgs: list[str], in_parallel=False, centrality:bool=True) -> 'CodeGraph':
 	'Incremental sync for packages: drop missing files, update changed files, add new files.'
 	if not pkgs: print('no action. pkgs empty'); return self
-	if in_parallel: arun(parallel_async(self.from_pkg, pkgs)); return self
-	for pkg in tqdm(pkgs, desc='Syncing packages', unit='pkg'): self.from_pkg(pkg)
+	# Debounce centrality across packages — A2 fix.
+	if in_parallel: arun(parallel_async(lambda p: self.from_pkg(p, centrality=False), pkgs))
+	else:
+		for pkg in tqdm(pkgs, desc='Syncing packages', unit='pkg'): self.from_pkg(pkg, centrality=False)
+	if centrality: self._centrality()
 	return self
 
 @patch
 def sync(self: CodeGraph, dir=None, pkgs=None, force=False) -> 'CodeGraph':
-	'Incremental sync: from_dir per dir, from_pkg per pkg; manage file_index.'
-	self.sync_dir(dir, force) and self.sync_pkgs(pkgs)
+	'Incremental sync: from_dir per dir, from_pkg per pkg; manage file_index. Centrality recomputed once at the end.'
+	# Pass centrality=False to both sub-syncs and recompute PageRank a single time at the end.
+	if dir: self.sync_dir(dir, force, centrality=False)
+	if pkgs: self.sync_pkgs(pkgs, centrality=False)
+	if dir or pkgs: self._centrality()
 	return self
 
 # %% ../nbs/01_graph.ipynb #27493762895c4be6
 @patch(as_prop=True)
 def graph(self: Kosha) -> CodeGraph:
-	'code graph for this kosha instance'
-	return CodeGraph(self.root.joinpath('.kosha','graph.db'))
+	'code graph for this kosha instance (memoized — opens graph.db once per Kosha instance).'
+	if not hasattr(self, '_graph'):
+		self._graph = CodeGraph(self.root.joinpath('.kosha','graph.db'))
+	return self._graph
 
 @patch(as_prop=True)
 def graphdb(self: Kosha):
@@ -556,7 +572,7 @@ def status(self: Kosha, pyproject=True, depth=1) -> dict:
 	'Index freshness: file/pkg/node counts and stale file count.'
 	known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path,uploaded_at') if r['path']}
 	stale = sum(1 for p, mt in known.items() if Path(p).exists() and Path(p).stat().st_mtime != mt)
-	pkgs=merge(*L(self.pkgs_in_env(pyproject, depth)).map(lambda r: {r['name']: r['version']}))
+	pkgs={r['name']: r['version'] for r in self.pkgs_in_env(pyproject, depth)}
 	sp = filter_keys(env_pkg_versions(pyproject,depth),not_(in_(pkgs)))
 	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale, stale_pkgs=sp)
 
@@ -566,7 +582,7 @@ def sync(self: Kosha,
          pkgs=None, # list of package names to sync (e.g. ['httpx', 'fastcore']); if None, sync all env packages
          dir=None, # directory to sync; if None, sync all of root
          verbose=True, # print progress messages
-         in_parallel=False, # run repo, env, and graph sync in parallel
+         in_parallel=False, # run repo, env, and graph sync in parallel; also fans env packages out across threads
          force=False, # ignore file mtimes and reprocess all files
          pyproject=True, # if True, auto-detect env packages from pyproject.toml; if False, use pkgs argument as-is
          depth=1, # depth for pyproject env package detection; ignored if pyproject=False
@@ -575,7 +591,7 @@ def sync(self: Kosha,
 	'Sync code store, env store, and code graph. Runs in a daemon thread by default.'
 	dir, pkgs = dir or self.root, listify(pkgs) or self.status(pyproject,depth).get('stale_pkgs', {})
 	ts = [bind(self.update_repo, dir, verbose=verbose, force=force, embed=embed),
-		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed) if pkgs else noop,
+		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed, in_parallel=in_parallel) if pkgs else noop,
 		  bind(self.graph.sync, dir=dir, pkgs=pkgs, force=force)]
 	if in_parallel: return arun(parallel_async(lambda f: f(), ts))
 	else: return L(ts).map(lambda f: f())
@@ -594,11 +610,22 @@ def context(self: Kosha,
 ) -> L:
 	'Fan-out semantic search: parse filters, run repo + env searches, merge with chained RRF.'
 	def _tag(res, pref): return L(res).map(lambda r: r | dict(_src_id=f'{pref}:{r.get("rowid", id(r))}'))
+	# Embed the query exactly once and pass via emb_q= so repo/env don't each re-embed.
+	from kosha.core import parseq
+	raw, _ = parseq(q)
+	emb_q = raw  # text key the cached embedder can hash on
 	items = []
-	if repo: items.append(('repo', bind(self.repo_context, q, limit=limit*2, columns=columns, **kw)))
-	if env: items.append(('env', bind(self.env_context, q, limit=limit*2, columns=columns,sys_wide=sys_wide, **kw)))
-	results = L(arun(parallel_async(lambda f: (f[0],f[1]()), items)))
-	results = results.map(lambda r: _tag(r[1], r[0]))
+	if repo: items.append(('repo', bind(self.repo_context, q, emb_q=emb_q, limit=limit*2, columns=columns, **kw)))
+	if env: items.append(('env',  bind(self.env_context,  q, emb_q=emb_q, limit=limit*2, columns=columns, sys_wide=sys_wide, **kw)))
+	# Real threadpool — A1 fix. parallel_async runs sync calls sequentially on one event loop.
+	from concurrent.futures import ThreadPoolExecutor
+	if len(items) > 1:
+		with ThreadPoolExecutor(max_workers=len(items)) as ex:
+			pairs = list(zip([t[0] for t in items], ex.map(lambda f: f(), [t[1] for t in items])))
+	else:
+		pairs = [(items[0][0], items[0][1]())] if items else []
+	results = L(pairs).map(lambda r: _tag(r[1], r[0]))
+	if not results: return L()
 	rrf = bind(rrf_merge, limit=limit*2, id_key='_src_id')
 	res = L(L(results[1:]).reduce(lambda m,rs: rrf(m,rs), results[0]))
 	if compact:

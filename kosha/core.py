@@ -16,10 +16,11 @@ __all__ = ['cr_instr', 'model', 'strict_skip_folder_re', 'strict_skip_file_re', 
 import ast, os, re
 from ast import get_source_segment as gs
 from collections import defaultdict, Counter
+from functools import lru_cache
 from apswutils.utils import hash_record
 from importlib.metadata import version as v, metadata as meta, distribution as dist
 from chonkie import AutoEmbeddings
-from fastcore.all import (Path, first, patch, timed_cache, L, parallel, merge, AttrDict, bind,
+from fastcore.all import (Path, first, patch, timed_cache, L, parallel, merge, AttrDict, bind, chunked,
                           filter_keys, not_, in_, listify, true, fdelegates, parallel_async,type2str)
 from fastcore.xdg import xdg_data_home
 from tqdm import tqdm
@@ -27,19 +28,21 @@ from json import loads as jl
 from litesearch import *
 
 # %% ../nbs/00_core.ipynb #bfe18701edf5102
-@timed_cache(maxsize=512)
+@timed_cache(maxsize=4096)
 def parse(code=None, p=None):
-    "Parse source, tag parents, return (tree, imp, top_fns, all_fns). Cached — called freely."
-    if not code and not p: return None, {}, set(), set()
+    "Parse source, tag parents, return (tree, imp, top_fns, all_fns, imp2mod). Cached — called freely."
+    if not code and not p: return None, {}, set(), set(), {}
     try: tree = ast.parse(Path(p).read_text(errors='replace') if not code else code)
-    except SyntaxError: return None, {}, set(), set()
+    except SyntaxError: return None, {}, set(), set(), {}
     [setattr(c,'parent',n) for n in ast.walk(tree) for c in ast.iter_child_nodes(n)]
     is_top = lambda n: isinstance(getattr(n,'parent',None), ast.Module)
     is_fn  = lambda n: isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef))
     is_nm  = lambda n: isinstance(n, ast.Name)
-    imp, imp2mod = {}, {}
+    imp, imp2mod, top = {}, {}, set()
+    # Single pass: imports + top-level fn names
     for n in ast.walk(tree):
-        if isinstance(n, ast.Import):
+        if is_fn(n) and is_top(n): top.add(n.name)
+        elif isinstance(n, ast.Import):
             for a in n.names: imp[a.asname or a.name.split('.')[0]] = a.name.split('.')[0]
         elif isinstance(n, ast.ImportFrom):
             pkg = (n.module or '').split('.')[0]
@@ -48,7 +51,6 @@ def parse(code=None, p=None):
 	                imp[a.asname or a.name] = pkg
 	                if n.module: imp2mod[a.asname or a.name] = f'{n.module}.{a.name}'
                 else: imp.setdefault(f'*{pkg}', pkg)
-    top = {n.name for n in ast.walk(tree) if is_fn(n) and is_top(n)}
     ca  = {nm for n in tree.body if isinstance(n,ast.Assign) and isinstance(n.value,ast.Call)
            for t in n.targets
            for nm in ([t.id] if is_nm(t) else [e.id for e in t.elts if is_nm(e)] if isinstance(t,ast.Tuple) else [])}
@@ -65,9 +67,10 @@ def mv_skill_md(dry_run=True, dir=None) -> None:
 	if not (src := base.joinpath('SKILL.md')).exists(): return
 	root = dir or repo_root() or '.'
 	ts = [Path(root)/'.agents/skills/kosha/SKILL.md', Path('.claude/skills/kosha/SKILL.md')]
-	if dry_run: print(f'Copying {src} to: {list(map(str,ts))}')
-	else: [p.mk_write(src.read_text(encoding='utf-8'))for p in ts]
-	print(f'Installed → {list(map(str,ts))}')
+	if dry_run: print(f'Would copy {src} to: {list(map(str,ts))}')
+	else:
+		[p.mk_write(src.read_text(encoding='utf-8'))for p in ts]
+		print(f'Installed → {list(map(str,ts))}')
 
 # %% ../nbs/00_core.ipynb #8b67e1dd013da45b
 def arun(coro) -> any:
@@ -80,6 +83,7 @@ def arun(coro) -> any:
 
 # %% ../nbs/00_core.ipynb #e5909953befa8a39
 _req_nm = re.compile(r'^[\w][\w.-]*')
+_spec_cached = lru_cache(maxsize=None)(spec)
 
 def pkg_trans_deps(seeds:list, depth:int=2) -> L:
 	'BFS over importlib.metadata requires: return seeds + all transitive deps up to depth levels (installed only, no optional extras).'
@@ -90,7 +94,7 @@ def pkg_trans_deps(seeds:list, depth:int=2) -> L:
 			try:
 				for req in (dist(pkg).requires or []):
 					if 'extra ==' in req: continue
-					if (m := _req_nm.match(req)) and spec(m.group(0)): nxt.add(m.group(0))
+					if (m := _req_nm.match(req)) and _spec_cached(m.group(0)): nxt.add(m.group(0))
 			except Exception: pass
 		nxt -= seen
 		if not nxt: break
@@ -103,7 +107,7 @@ def env_pkg_versions(pyproject=True, depth:int=1) -> dict:
 	passing depth traverse multiple layers of dependencies'''
 	pkgs = installed_packages(pyproject=pyproject)
 	if pyproject and depth: pkgs = pkg_trans_deps(pkgs, depth)
-	return merge(*pkgs.map(lambda p: {dist(p).metadata['Name']: dist(p).version}))
+	return {dist(p).metadata['Name']: dist(p).version for p in pkgs}
 
 # %% ../nbs/00_core.ipynb #3ccb8e947caec348
 cr_instr = AttrDict(query="Represent this query for searching relevant code: {text}", document="{text}")
@@ -117,9 +121,18 @@ def embedder(
     emb_model=model,  # model config AttrDict (model name, onnx_path, prompt instructions)
 	**kwargs
 ) -> 'FastEncode':
-    "Load or return cached CodeRankEmbed ONNX document embedder (24h TTL)."
-    try: return FastEncode(emb_model, parallel=8, batch_size=64, **kwargs)
-    except Exception: return FastEncode(emb_model, parallel=1, batch_size=64, **kwargs)
+    "Load or return cached CodeRankEmbed ONNX document embedder (24h TTL). Hardware-aware: tunes parallel/batch_size to host (override via KOSHA_EMBED_PARALLEL / KOSHA_EMBED_BATCH)."
+    cpu = os.cpu_count() or 1
+    par = int(os.environ.get('KOSHA_EMBED_PARALLEL') or min(8, cpu))
+    bs  = int(os.environ.get('KOSHA_EMBED_BATCH') or 64)
+    # Downshift batch size on RAM-constrained hosts (Pi-class) when possible
+    try:
+        ram_gb = (os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')) / (1024**3)
+        if ram_gb < 4: bs = min(bs, 16)
+        elif ram_gb < 8: bs = min(bs, 32)
+    except (ValueError, AttributeError, OSError): pass
+    try: return FastEncode(emb_model, parallel=par, batch_size=bs, **kwargs)
+    except Exception: return FastEncode(emb_model, parallel=1, batch_size=bs, **kwargs)
 
 @timed_cache(3600*24)
 def static_embedder(
@@ -199,15 +212,18 @@ def enrich_chunks(content: L) -> L:
 	all_map = merge(*assigns.filter(lambda d: '__all__' in _c(d)).map(lambda d: {_m(d,'path'): _get__all(d)}))
 	fwa = set(all_map)
 	def _enrich(d):
-		nm, pth = _m(d,'name'), _m(d,'path')
-		try: doc = ast.get_docstring(ast.parse(_c(d)).body[0])
+		nm, pth, src = _m(d,'name'), _m(d,'path'), _c(d)
+		# Reuse cached parse() — single AST per chunk shared with _cls_methods below.
+		tree, *_ = parse(src)
+		try: doc = ast.get_docstring(tree.body[0]) if tree and tree.body else None
 		except: doc = None
 		return d | {'metadata': d['metadata'] | dict(docstring=doc,
 			public_api=(nm in all_map[pth]) if pth in fwa else bool(nm and not nm.startswith('_')))}
 	def _cls_methods(d):
 		src, m = _c(d), d['metadata']
-		try: cls = ast.parse(src).body[0]
-		except: return L()
+		tree, *_ = parse(src)
+		if tree is None or not tree.body: return L()
+		cls = tree.body[0]
 		if not isinstance(cls, ast.ClassDef): return L()
 		pub, mod, off = m.get('public_api',False), m.get('mod_name',''), (m.get('lineno') or 1)-1
 		is_fn = lambda n: isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and gs(src, n)
@@ -216,7 +232,7 @@ def enrich_chunks(content: L) -> L:
 			public_api=pub and (not n.name.startswith('_') or n.name.startswith('__')),
 			docstring=ast.get_docstring(n), lineno=off+n.lineno, end_lineno=off+(n.end_lineno or n.lineno))}
 		return L(cls.body).filter(is_fn).map(mk)
-	enriched = arun(parallel_async(_enrich, non_assigns)).concat()
+	enriched = non_assigns.map(_enrich)
 	return enriched + enriched.filter(lambda d: d['metadata'].get('type')=='ClassDef').map(_cls_methods).concat()
 
 # %% ../nbs/00_core.ipynb #ff2c87d86539d8c8
@@ -231,12 +247,16 @@ def _is_pkg_ingested(self:Kosha, pkg:str) -> bool:
 	'Check if a package is already ingested and up-to-date.'
 	return first(self.pkgs(select='name, version', where=f'name={pkg!r} and version={v(pkg)!r}'))
 
-def embed_chunk(chunk:list|L,emb_fn=emb_doc(embedder)):
-	'Embed a list of code chunks using emb_f'
+def embed_chunk(chunk:list|L,emb_fn=emb_doc(embedder), batch_size:int=256):
+	'Embed a list of code chunks using emb_fn, batched to bound peak memory.'
 	if not (chunk): return
 	c = [b['content'] for b in chunk if b['content'] and b['content'].strip()]
 	if not c: return
-	for e,b in zip(emb_fn(c),chunk): b['embedding'] = e.tobytes()
+	non_empty = [b for b in chunk if b['content'] and b['content'].strip()]
+	embs = []
+	for batch in chunked(c, batch_size):
+		embs.extend(emb_fn(batch))
+	for e,b in zip(embs, non_empty): b['embedding'] = e.tobytes()
 	return chunk
 
 @fdelegates(embed_chunk)
@@ -293,8 +313,9 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, fo
 	    if dids:=set(ex).difference(cont_hash.keys()): self.env_st.delete_where(where='id in ("%s")'%'","'.join(dids))
 	    ch = filter_keys(cont_hash, not_(in_(ex))).values()
 	    if ch and self.process_env(ch, embed=embed):
-		    counts = count_imp(pkg2files(pkg, exts=['.py']),pkg.replace('-','_').split('.')[0])
-		    rows = [dict(from_pkg=pkg, to_pkg=dep, n_modules=n) for dep,n in counts.items() if spec(dep)]
+		    py_files = L(files).filter(lambda f: str(f).endswith('.py'))
+		    counts = count_imp(py_files, pkg.replace('-','_').split('.')[0])
+		    rows = [dict(from_pkg=pkg, to_pkg=dep, n_modules=n) for dep,n in counts.items() if _spec_cached(dep)]
 		    if rows: self.envdb.t.pkg_deps.insert_all(rows, replace=True)
 	    if verbose: print(f'updated pkg: {pkg} with {len(ch)} new/changed chunks, {len(ex)-len(ch)} unchanged, '
 				  f'{len(ex)-len(cont_hash)} removed')
@@ -316,14 +337,20 @@ def update_pkgs(self:Kosha,
     exts=code_exts,     # file extensions to include
     verbose=True,       # print progress
     force=False,        # reindex even if package version already loaded
+    in_parallel=False,  # process packages with a bounded threadpool
+    n_workers:int=4,    # threads when in_parallel=True
     **kwargs            # forwarded to update_pkg
 ):
 	'Sync installed packages into the env store; if pkgs is None, syncs all env packages.'
-	pkgs = set(pkgs) or set(env_pkg_versions())
+	pkgs = set(pkgs) if pkgs else set(env_pkg_versions())
 	if verbose: print(f'loading pkgs {pkgs} ...' if pkgs else 'No packages to load.')
 	if not pkgs: return
 	kw = dict(embed=embed, exts=exts, verbose=verbose, force=force, **kwargs)
-	for pkg in tqdm(pkgs, desc='Updating packages', unit='pkg'): self.update_pkg(pkg, **kw)
+	if in_parallel and len(pkgs) > 1:
+		# threadpool — embedder + sqlite release the GIL on I/O and ONNX inference
+		parallel(lambda p: self.update_pkg(p, **kw), list(pkgs), threadpool=True, n_workers=n_workers, progress=verbose)
+	else:
+		for pkg in tqdm(pkgs, desc='Updating packages', unit='pkg'): self.update_pkg(pkg, **kw)
 
 # %% ../nbs/00_core.ipynb #bc7c02776d1ac2eb
 @patch
@@ -348,7 +375,8 @@ def update_repo(self:Kosha,
 	if files is None:
 		known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path, uploaded_at') if r['path']}
 		all_files = dir2files(str(dir), strict_skip_file_re, strict_skip_folder_re,exts=exts, **kwargs)
-		to_remove = L(known.keys()).filter(lambda k: k not in all_files.map(str)).concat()
+		all_str = set(map(str, all_files))   # precompute once — O(N+M) instead of O(N·M)
+		to_remove = L(known.keys()).filter(lambda k: k not in all_str)
 		ch = all_files if force else L(all_files).filter(lambda f: str(f) not in known or known[str(f)] != f.stat().st_mtime)
 	else: ch,to_remove = L(files).map(Path).partition(lambda f: f.exists() and f.suffix in exts)
 	if to_remove: self.code_st.delete_where(where=f'path in ({",".join(to_remove.map(repr))})')
@@ -458,7 +486,7 @@ def env_context(self:Kosha,
 @patch
 def pkgs2consider(self: Kosha, sys_wide=True) -> set:
 	'Determine which packages to consider for search based on the intersection of the packages table and the environment.'
-	ex_pkgs = merge(*L(self.pkgs(select='name, version')).map(lambda d: {d['name']: d['version']}))
+	ex_pkgs = {d['name']: d['version'] for d in self.pkgs(select='name, version')}
 	if sys_wide: return ex_pkgs.keys()
 	env_pkgs = env_pkg_versions()
 	return {p for p in env_pkgs if p in ex_pkgs and env_pkgs[p] == ex_pkgs[p]}
@@ -501,6 +529,6 @@ def pkg_context(self:Kosha,
                 limit:int=10, # limits
 ) -> L:
 	'FTS5+vector search over package descriptions in pkg_store.'
-	emb = self.emb_query(q).tobytes()
+	fq, emb = pre(q, extract_kw=False), self.emb_query(q).tobytes()
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if isinstance(r.get('metadata'), str) else r
-	return L(self.envdb.search(q, emb, columns=['content','metadata'], table_name='pkg_store', limit=limit)).map(fn)
+	return L(self.envdb.search(fq, emb, columns=['content','metadata'], table_name='pkg_store', limit=limit)).map(fn)

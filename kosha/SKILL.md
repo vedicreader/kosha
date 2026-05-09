@@ -67,6 +67,14 @@ k.env_context('package:dockeasy type:FunctionDef run command', limit=10)
 **Anti-pattern:** invoking this skill, then immediately grepping files.
 `env_context` searches all installed packages semantically. Grep only finds exact strings in files you already know to look in.
 
+**Need more info on a package?** Use `pkg_url` to get the repo/docs URL, then websearch for specifics (changelog, API docs, migration guides):
+
+```python
+from kosha.core import pkg_url
+print(pkg_url('litesearch'))   # → 'https://github.com/Karthik777/litesearch'
+# then: WebSearch(f"site:{pkg_url('litesearch')} offset pagination")
+```
+
 ---
 
 ## Filter syntax
@@ -155,8 +163,8 @@ k.ni('myapp.routes.get_user')['co_dispatched']
 ```python
 results = k.context('your task description', limit=20, compact=True)
 for r in results:
-    print(f"{r['mod_name']}  line {r['lineno']}  pagerank={r['pagerank']:.5f}")
-    print(f"  {r['signature']}")
+    print(f"{r['mod_name']}  line {r['lineno']}")
+    print(f"  {r['sig']}")
     if r['docstring']: print(f"  # {r['docstring'][:80]}")
 # Once you've identified 2-3 candidates, use ni() to drill into them
 ```
@@ -242,11 +250,11 @@ Available commands: `sync`, `context`, `repo_context`, `env_context`, `ni`, `top
 
 ## Kosha databases are litesearch databases
 
-`k.db` (repo index) and `k.envdb` (package index) are both `litesearch.Database` objects. You can use the full litesearch API directly on them — create extra tables, run raw SQL, insert custom records.
+`k.codedb` (repo index) and `k.envdb` (package index) are both `litesearch.Database` objects. You can use the full litesearch API directly on them — create extra tables, run raw SQL, insert custom records.
 
 ```python
 # Access the underlying databases
-k.db     # repo index (your project files)
+k.codedb # repo index (your project files)
 k.envdb  # package index (installed packages)
 
 # Create a custom store — e.g. an LLM-summary layer for undocumented functions
@@ -262,8 +270,8 @@ list(k.envdb.q(
     ['dockeasy.core.fasthtml_app']
 ))
 
-# Check what stores/tables exist — fastlite uses .t
-k.envdb.db.t
+# Check what stores/tables exist (fastlite-style .t accessor)
+k.envdb.t
 ```
 
 **Agent summary layer pattern:** when `env_context` returns a result with no docstring, write a one-liner to a `summaries` store keyed by `mod_name`. Future sessions query it before falling back to reading raw source — amortizes the cost of understanding undocumented code across sessions.
@@ -286,3 +294,4 @@ See the `/litesearch` skill for the full API: `FastEncode`, FTS query preprocess
 | `k.public_api(pkg)` | What a package exports (not just what's in `__all__`) |
 | `k.where_to_add(description)` | Find file:line insertion point for new code |
 | `k.api_call_paths(from_pkg, to_pkg)` | Shortest paths from one package's public API to another's |
+| `pkg_url('pkg')` | Repo/docs URL for a package — use with websearch when you need docs, changelogs, or migration info |
