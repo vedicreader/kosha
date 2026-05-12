@@ -20,6 +20,7 @@ print(k.status())  # always check first
 # Only sync if the packages you actually need appear in stale_pkgs.
 # If they're absent from stale_pkgs, skip sync and go straight to env_context.
 k.sync(in_parallel=True)  # skip if required packages are not in stale_pkgs
+k.sync(force_graph=True)  # force graph rebuild on existing DB without re-embedding (e.g. after a kosha update)
 ```
 
 Use `clikernel` if available (state persists, no re-import cost). Otherwise `.venv/bin/python -c "..."`.
@@ -285,6 +286,7 @@ See the `/litesearch` skill for the full API: `FastEncode`, FTS query preprocess
 | Method | When to use |
 |--------|-------------|
 | `k.status()` | Start of session — returns `{files, packages, graph_nodes, stale_files, stale_pkgs}` |
+| `k.sync(force_graph=True)` | Rebuild call graph on existing DB without re-embedding |
 | `k.context(q, graph=True)` | Default: any task touching existing code |
 | `k.context(q, compact=True)` | Triage many results — returns slim dicts, no full code bodies |
 | `k.env_context(q)` | Package-only; faster when repo results aren't needed |
