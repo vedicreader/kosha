@@ -33,19 +33,21 @@ def _print_results(results):
         callers = r.get('callers', [])
         if callers: print(f"Callers: {', '.join(list(callers)[:5])}")
 
-# %% ../nbs/03_cli.ipynb #cell-sync
+# %% ../nbs/03_cli.ipynb #2e60df2d883b1665
 @call_parse
 def sync(
     pkgs:str=None,       # comma-separated package names; defaults to all pyproject.toml deps
     parallel:bool=False, # run repo, env, and graph sync in parallel
     embed:bool=True,     # embed code chunks (set False for fast metadata-only update)
+    force:bool=False,    # force re-sync of all files (ignoring freshness)
+    force_graph:bool=False, # force re-sync of call graph (ignoring freshness
 ):
     'Sync repo + env packages + call graph into .kosha/ databases.'
     k = Kosha()
     pkg_list = pkgs.split(',') if pkgs else None
-    k.sync(pkgs=pkg_list, in_parallel=parallel, embed=embed)
+    k.sync(pkgs=pkg_list, in_parallel=parallel, embed=embed, force=force, force_graph=force_graph)
 
-# %% ../nbs/03_cli.ipynb #cell-context
+# %% ../nbs/03_cli.ipynb #4eb86463e047cf97
 @call_parse
 def context(
     query:str,           # search query (supports key:value filters e.g. package:fastcore)
