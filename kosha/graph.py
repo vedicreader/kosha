@@ -589,7 +589,6 @@ def public_api(self: Kosha,
 	rr = self.code_st(where=f'{_dir_cond} AND {wh}',limit=limit,**kw)
 	return L(er+rr).map(fn).map(lambda r: {m: _get(r,m) for m in meta_cols.split(',')})[:limit]
 
-
 # %% ../nbs/01_graph.ipynb #e75942176786d92c
 from fastcore.all import not_
 
@@ -706,7 +705,6 @@ def api_call_paths(self:Kosha,
 	paths = {}
 	for fp in f: paths = paths | self.graph._bfs(fp, set(a))
 	return filter_keys(paths, in_(a))
-
 
 # %% ../nbs/01_graph.ipynb #8d82814f
 @patch
