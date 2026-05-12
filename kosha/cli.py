@@ -231,6 +231,9 @@ _DISPATCH = {
     'sync':           lambda k, a: (k.sync(**a), 'synced')[1],
     'status':         lambda k, a: k.status(),
     'where_to_add':   lambda k, a: k.where_to_add(**a),
+    'short_path':     lambda k, a: k.short_path(**a),
+    'neighbors':      lambda k, a: k.neighbors(**a),
+    'dep_stack':      lambda k, a: k.dep_stack(**a),
 }
 
 @call_parse

@@ -20,6 +20,7 @@ print(k.status())  # always check first
 # Only sync if the packages you actually need appear in stale_pkgs.
 # If they're absent from stale_pkgs, skip sync and go straight to env_context.
 k.sync(in_parallel=True)  # skip if required packages are not in stale_pkgs
+k.sync(force_graph=True)  # force graph rebuild on existing DB without re-embedding (e.g. after a kosha update)
 ```
 
 Use `clikernel` if available (state persists, no re-import cost). Otherwise `.venv/bin/python -c "..."`.
@@ -163,8 +164,8 @@ k.ni('myapp.routes.get_user')['co_dispatched']
 ```python
 results = k.context('your task description', limit=20, compact=True)
 for r in results:
-    print(f"{r['mod_name']}  line {r['lineno']}  pagerank={r['pagerank']:.5f}")
-    print(f"  {r['signature']}")
+    print(f"{r['mod_name']}  line {r['lineno']}")
+    print(f"  {r['sig']}")
     if r['docstring']: print(f"  # {r['docstring'][:80]}")
 # Once you've identified 2-3 candidates, use ni() to drill into them
 ```
@@ -250,11 +251,11 @@ Available commands: `sync`, `context`, `repo_context`, `env_context`, `ni`, `top
 
 ## Kosha databases are litesearch databases
 
-`k.db` (repo index) and `k.envdb` (package index) are both `litesearch.Database` objects. You can use the full litesearch API directly on them — create extra tables, run raw SQL, insert custom records.
+`k.codedb` (repo index) and `k.envdb` (package index) are both `litesearch.Database` objects. You can use the full litesearch API directly on them — create extra tables, run raw SQL, insert custom records.
 
 ```python
 # Access the underlying databases
-k.db     # repo index (your project files)
+k.codedb # repo index (your project files)
 k.envdb  # package index (installed packages)
 
 # Create a custom store — e.g. an LLM-summary layer for undocumented functions
@@ -270,8 +271,8 @@ list(k.envdb.q(
     ['dockeasy.core.fasthtml_app']
 ))
 
-# Check what stores/tables exist — fastlite uses .t
-k.envdb.db.t
+# Check what stores/tables exist (fastlite-style .t accessor)
+k.envdb.t
 ```
 
 **Agent summary layer pattern:** when `env_context` returns a result with no docstring, write a one-liner to a `summaries` store keyed by `mod_name`. Future sessions query it before falling back to reading raw source — amortizes the cost of understanding undocumented code across sessions.
@@ -285,6 +286,7 @@ See the `/litesearch` skill for the full API: `FastEncode`, FTS query preprocess
 | Method | When to use |
 |--------|-------------|
 | `k.status()` | Start of session — returns `{files, packages, graph_nodes, stale_files, stale_pkgs}` |
+| `k.sync(force_graph=True)` | Rebuild call graph on existing DB without re-embedding |
 | `k.context(q, graph=True)` | Default: any task touching existing code |
 | `k.context(q, compact=True)` | Triage many results — returns slim dicts, no full code bodies |
 | `k.env_context(q)` | Package-only; faster when repo results aren't needed |

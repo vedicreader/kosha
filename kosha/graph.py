@@ -11,7 +11,7 @@ from json import loads as jl
 from collections import defaultdict
 from litesearch import *
 from fastcore.all import (Path, L, patch, parallel_async, tuplify, first, fdelegates, globtastic, bind, true, dict2obj,
-                          listify, filter_keys, merge, in_)
+                          listify, filter_keys, in_)
 from .core import arun, Kosha, parse, has_init, env_pkg_versions
 from pyan.analyzer import CallGraphVisitor
 from pyan.anutils import Scope, ExecuteInInnerScope
@@ -59,16 +59,17 @@ class CodeGraph:
 		self.path = path
 		self.db = database(path)
 		ge, gn, cd, fi = self.db.t.graph_edges, self.db.t.graph_nodes, self.db.t.co_dispatch, self.db.t.file_index
+		pa = self.db.t.pending_attr_calls
+		pa.create(caller=str, method=str, pkgs=str, if_not_exists=True, pk='caller,method')
 		ge.create(id=int, caller=str, callee=str, kind=str, confidence=float, if_not_exists=True, pk='id')
 		ge.create_index(['caller'], if_not_exists=True)
 		ge.create_index(['callee'], if_not_exists=True)
 		ge.create_index(['kind'], if_not_exists=True)
-		gn.create(node=str, flavor=str, file=str, pagerank=float, in_degree=int,
-				  out_degree=int, if_not_exists=True, pk='node')
+		gn.create(node=str,flavor=str,file=str,pagerank=float,in_degree=int,out_degree=int,if_not_exists=True,pk='node')
 		cd.create(group_id=int, node=str, if_not_exists=True)
 		fi.create(path=str, root=str, last_analyzed_at=float, if_not_exists=True, pk='path')
 		fi.create_index(['root'], if_not_exists=True)
-		self.ge, self.gn, self.cd, self.fi = ge, gn, cd, fi
+		self.ge, self.gn, self.cd, self.fi, self.pa = ge, gn, cd, fi, pa
 
 	def nuke(self): [t.drop() for t in (self.ge, self.gn, self.cd, self.fi)]
 
@@ -152,6 +153,49 @@ def dyn_edges(src:str, module:str) -> list[dict]:
 	        sum(L(tree.body).filter(lambda n: isinstance(n,ast.Assign))
 	            .map(lambda n: _co_edges(n, module, top)), []))
 
+# %% ../nbs/01_graph.ipynb #f0b09470cf1cdff7
+def _attr_calls(fn): return {c.func.attr for c in ast.walk(fn) if isinstance(c, ast.Call) and
+	isinstance(c.func, ast.Attribute) and isinstance(c.func.value, ast.Attribute) and _root(c.func) == 'self'}
+
+def _attr_call_hints(sources=None, filenames=None, root=None, meta=None) -> list[dict]:
+	'Collect (caller, method, pkgs) for self.attr.method() calls in indexed fn bodies.'
+	if filenames:
+		fn = lambda p: '.'.join(Path(p).relative_to(root).with_suffix('').parts)
+		srcs = {fn(p): Path(p).read_text(errors='replace') for p in filenames}
+	else: srcs = sources or {}
+	meta, hints = meta or {}, []
+	is_mod = lambda mod, n: isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and f'{mod}.{n.name}' in meta
+	for mod, src in srcs.items():
+		tree, imp, *_ = parse(src)
+		if tree is None: continue
+		seen = {}
+		for i, (k, v) in enumerate(imp.items()): seen[k[1:] if k.startswith('*') else v] = i
+		pkgs = ','.join(p for p, _ in sorted(seen.items(), key=lambda x: x[1]))
+		for fn in L(ast.walk(tree)).filter(lambda n: is_mod(mod, n)):
+			for m in _attr_calls(fn): hints.append({'caller': f'{mod}.{fn.name}', 'method': m, 'pkgs': pkgs})
+	return hints
+
+# %% ../nbs/01_graph.ipynb #b455f8af20519012
+@patch
+def resolve_attr_calls(self: CodeGraph) -> 'CodeGraph':
+	'Post-sync: resolve pending attr_call hints into edges using populated graph_nodes.'
+	ex, ne, nn = {(r['caller'], r['callee']) for r in self.ge(select='caller,callee')}, [], set()
+	for r in self.pa():
+		if not r['pkgs']: continue
+		m,p,calr = r['method'], r['pkgs'], r['caller']
+		pkgs = {pkg: i for i, pkg in enumerate(p.split(','))}
+		cn = L(self.gn(select='node',where=f'node like "%.{m}"')).filter(lambda r: r['node'].split('.')[0] in pkgs)
+		if not cn: continue
+		callee = max(cn.attrgot('node'), key=lambda n: pkgs.get(n.split('.')[0], -1))
+		if (calr, callee) not in ex:
+			ne.append(_e(calr, callee, 'attr_call', 0.7))
+			ex.add((calr, callee))
+			nn |= {calr, callee}
+	if ne:
+		self.ge.insert_all(ne)
+		self._centrality(nn)
+	return self
+
 # %% ../nbs/01_graph.ipynb #14c0ab3d
 def _build_imap(sources=None, filenames=None, root=None):
 	'Build {module: {local_name: qualified_name}} for resolving None-namespace callee nodes.'
@@ -178,12 +222,13 @@ def static_edges(sources:dict[str,str]=None, filenames:list[str]=None, root:str=
 				for i in range(len(parts), 0, -1):
 					if (m:='.'.join(parts[:i])) in imap and t.name in imap[m]: return imap[m][t.name]
 			return None
-		return ([_e(f'{c.namespace}.{c.name}', cl, 'static', 1.0)
-				 for c,ts in v.uses_edges.items() if c.namespace and c.namespace != '*'
-				 for t in ts if '^^^' not in (t.name or '') and (cl := _callee(c,t))],
-				{f"{n.namespace}.{n.name}": {'node':f"{n.namespace}.{n.name}",
-				                             'flavor':str(n.flavor).split('.')[-1].lower(), 'file':n.filename or ''}
-				 for nlist in v.nodes.values() for n in nlist if hasattr(n,'name') and n.namespace})
+		edges = [_e(f'{c.namespace}.{c.name}', cl, 'static', 1.0)
+		         for c,ts in v.uses_edges.items() if c.namespace and c.namespace != '*'
+				 for t in ts if '^^^' not in (t.name or '') and (cl := _callee(c,t))]
+		meta = {f'{n.namespace}.{n.name}': {'node':f'{n.namespace}.{n.name}',
+			'flavor':str(n.flavor).split('.')[-1].lower(),'file':n.filename or ''}
+			for nlist in v.nodes.values() for n in nlist if hasattr(n,'name') and n.namespace}
+		return edges, meta
 	except Exception as ex: print(f"pyan3 static analysis failed: {ex}"); return [], {}
 
 # %% ../nbs/01_graph.ipynb #617b3082
@@ -268,20 +313,24 @@ def _add_static(self:CodeGraph, sources:dict[str,str]=None, filenames:list[str]=
 	"Add static edges from sources dict. Uses pyan3 for full-corpus analysis."
 	s_edges, meta = static_edges(sources=sources, filenames=filenames, root=root)
 	meta |= _lambda_nodes(sources=sources, filenames=filenames, root=root)
+	hints = _attr_call_hints(sources=sources, filenames=filenames, root=root, meta=meta)
 	if s_edges: self.db.t.graph_edges.insert_all(s_edges)
 	if meta: self.db.t.graph_nodes.insert_all(meta.values(), upsert=True, pk='node')
+	if hints: self.pa.insert_all(hints, ignore=True)
 	return set(meta) | set(L(s_edges).attrgot('caller')) | set(L(s_edges).attrgot('callee'))
 
 @patch
 def from_sources(self:CodeGraph, sources:dict[str,str]):
 	'Build from {module_name: source_str}.'
-	return self._centrality(self._add_static(sources=sources) | self._add_dyn(sources))
+	nodes = self._add_static(sources=sources) | self._add_dyn(sources)
+	self._centrality(nodes)
+	return self.resolve_attr_calls()
 
 # %% ../nbs/01_graph.ipynb #3150593a339dd430
 @patch
 def process_files(self:CodeGraph,
     files,     # list of .py file paths to analyse
-    root=None  # package root; auto-detected via __init__.py walk if None
+    root=None, # package root; auto-detected via __init__.py walk if None
 ):
 	'Build static + dynamic call-graph edges for the given source files and recompute centrality.'
 	if root is None or not files: root = files[0] if files else '.'
@@ -291,7 +340,9 @@ def process_files(self:CodeGraph,
 	nodes = self._add_static(filenames=files, root=root)
 	fn = lambda p: '.'.join(Path(p).relative_to(root).with_suffix('').parts)
 	nodes |= self._add_dyn({fn(p): Path(p) for p in files})
-	return self._centrality(nodes)
+	self._centrality(nodes)
+	return self.resolve_attr_calls()
+
 
 @patch
 @fdelegates(globtastic)
@@ -299,16 +350,6 @@ def from_dir(self:CodeGraph, dir: str | Path, **kwargs) -> 'CodeGraph':
 	'Build from .py files under path — pyan reads files directly.'
 	files = dir2files(dir, exts=['.py'], func=os.path.join, **kwargs)
 	return self.process_files(files, Path(dir).parent)
-
-@patch
-def from_file(self: CodeGraph, path:str|Path) -> 'CodeGraph':
-	'Build from a single .py file. Module name derived from filename.'
-	p = Path(path).resolve()
-	pkg_root, parts = p.parent, [p.with_suffix('').name]
-	while has_init(pkg_root):
-		parts.insert(0, pkg_root.name)
-		pkg_root = pkg_root.parent
-	return self._centrality(self._add_static(filenames=[str(p)], root=pkg_root) | self._add_dyn({'.'.join(parts): p}))
 
 @patch
 @fdelegates(globtastic)
@@ -381,7 +422,6 @@ def _bfs(self: CodeGraph, src:str, targets:set) -> dict:
 		for r in dict2obj(_get(fro)):
 			if r.callee in par: continue
 			par[r.callee] = r.caller
-			if r.callee in fnd: continue
 			path, n = [], r.callee
 			while n is not None: path.append(n); n = par[n]
 			fnd[r.callee] = L(reversed(path))
@@ -471,21 +511,24 @@ def sync_dir(self: CodeGraph, dir: str | Path, force=False) -> 'CodeGraph':
 def sync_pkgs(self: CodeGraph, pkgs: list[str], in_parallel=False) -> 'CodeGraph':
 	'Incremental sync for packages: drop missing files, update changed files, add new files.'
 	if not pkgs: print('no action. pkgs empty'); return self
-	if in_parallel: arun(parallel_async(self.from_pkg, pkgs)); return self
-	for pkg in tqdm(pkgs, desc='Syncing packages', unit='pkg'): self.from_pkg(pkg)
+	if in_parallel: arun(parallel_async(lambda p: self.from_pkg(p), pkgs))
+	else: [self.from_pkg(pkg) for pkg in tqdm(pkgs, desc='loading code graph for packages', unit='pkg')]
 	return self
 
 @patch
 def sync(self: CodeGraph, dir=None, pkgs=None, force=False) -> 'CodeGraph':
-	'Incremental sync: from_dir per dir, from_pkg per pkg; manage file_index.'
-	self.sync_dir(dir, force) and self.sync_pkgs(pkgs)
+	'Incremental sync: from_dir per dir, from_pkg per pkg; manage file_index. Centrality recomputed once at the end.'
+	if force: self.pa.delete_where()
+	if dir: self.sync_dir(dir, force)
+	if pkgs: self.sync_pkgs(pkgs)
 	return self
 
 # %% ../nbs/01_graph.ipynb #27493762895c4be6
 @patch(as_prop=True)
 def graph(self: Kosha) -> CodeGraph:
-	'code graph for this kosha instance'
-	return CodeGraph(self.root.joinpath('.kosha','graph.db'))
+	'code graph for this kosha instance (memoized — opens graph.db once per Kosha instance).'
+	if not hasattr(self, '_graph'): self._graph = CodeGraph(self.root.joinpath('.kosha','graph.db'))
+	return self._graph
 
 @patch(as_prop=True)
 def graphdb(self: Kosha):
@@ -546,9 +589,8 @@ def public_api(self: Kosha,
 	rr = self.code_st(where=f'{_dir_cond} AND {wh}',limit=limit,**kw)
 	return L(er+rr).map(fn).map(lambda r: {m: _get(r,m) for m in meta_cols.split(',')})[:limit]
 
-
 # %% ../nbs/01_graph.ipynb #e75942176786d92c
-from fastcore.all import noop, not_
+from fastcore.all import not_
 
 # %% ../nbs/01_graph.ipynb #3aaa2197
 @patch
@@ -556,7 +598,7 @@ def status(self: Kosha, pyproject=True, depth=1) -> dict:
 	'Index freshness: file/pkg/node counts and stale file count.'
 	known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path,uploaded_at') if r['path']}
 	stale = sum(1 for p, mt in known.items() if Path(p).exists() and Path(p).stat().st_mtime != mt)
-	pkgs=merge(*L(self.pkgs_in_env(pyproject, depth)).map(lambda r: {r['name']: r['version']}))
+	pkgs={r['name']: r['version'] for r in self.pkgs_in_env(pyproject, depth)}
 	sp = filter_keys(env_pkg_versions(pyproject,depth),not_(in_(pkgs)))
 	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale, stale_pkgs=sp)
 
@@ -566,17 +608,19 @@ def sync(self: Kosha,
          pkgs=None, # list of package names to sync (e.g. ['httpx', 'fastcore']); if None, sync all env packages
          dir=None, # directory to sync; if None, sync all of root
          verbose=True, # print progress messages
-         in_parallel=False, # run repo, env, and graph sync in parallel
+         in_parallel=False, # run repo, env, and graph sync in parallel; also fans env packages out across threads
          force=False, # ignore file mtimes and reprocess all files
+         force_graph=False, # whether to force graph recomputation even if no files changed; ignored if force=True
          pyproject=True, # if True, auto-detect env packages from pyproject.toml; if False, use pkgs argument as-is
          depth=1, # depth for pyproject env package detection; ignored if pyproject=False
          embed=True # whether to embed
  ) -> 'Kosha':
 	'Sync code store, env store, and code graph. Runs in a daemon thread by default.'
-	dir, pkgs = dir or self.root, listify(pkgs) or self.status(pyproject,depth).get('stale_pkgs', {})
+	dir = dir or self.root
+	pkgs = listify(pkgs) or self.status(pyproject,depth).get('stale_pkgs', {})
 	ts = [bind(self.update_repo, dir, verbose=verbose, force=force, embed=embed),
-		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed) if pkgs else noop,
-		  bind(self.graph.sync, dir=dir, pkgs=pkgs, force=force)]
+		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed),
+		  bind(self.graph.sync, dir=dir, pkgs=pkgs, force=force_graph or force)]
 	if in_parallel: return arun(parallel_async(lambda f: f(), ts))
 	else: return L(ts).map(lambda f: f())
 
@@ -594,11 +638,22 @@ def context(self: Kosha,
 ) -> L:
 	'Fan-out semantic search: parse filters, run repo + env searches, merge with chained RRF.'
 	def _tag(res, pref): return L(res).map(lambda r: r | dict(_src_id=f'{pref}:{r.get("rowid", id(r))}'))
+	# Embed the query exactly once and pass via emb_q= so repo/env don't each re-embed.
+	from kosha.core import parseq
+	raw, _ = parseq(q)
+	emb_q = raw  # text key the cached embedder can hash on
 	items = []
-	if repo: items.append(('repo', bind(self.repo_context, q, limit=limit*2, columns=columns, **kw)))
-	if env: items.append(('env', bind(self.env_context, q, limit=limit*2, columns=columns,sys_wide=sys_wide, **kw)))
-	results = L(arun(parallel_async(lambda f: (f[0],f[1]()), items)))
-	results = results.map(lambda r: _tag(r[1], r[0]))
+	if repo: items.append(('repo', bind(self.repo_context, q, emb_q=emb_q, limit=limit*2, columns=columns, **kw)))
+	if env: items.append(('env',  bind(self.env_context,  q, emb_q=emb_q, limit=limit*2, columns=columns, sys_wide=sys_wide, **kw)))
+	# Real threadpool — A1 fix. parallel_async runs sync calls sequentially on one event loop.
+	from concurrent.futures import ThreadPoolExecutor
+	if len(items) > 1:
+		with ThreadPoolExecutor(max_workers=len(items)) as ex:
+			pairs = list(zip([t[0] for t in items], ex.map(lambda f: f(), [t[1] for t in items])))
+	else:
+		pairs = [(items[0][0], items[0][1]())] if items else []
+	results = L(pairs).map(lambda r: _tag(r[1], r[0]))
+	if not results: return L()
 	rrf = bind(rrf_merge, limit=limit*2, id_key='_src_id')
 	res = L(L(results[1:]).reduce(lambda m,rs: rrf(m,rs), results[0]))
 	if compact:
@@ -650,7 +705,6 @@ def api_call_paths(self:Kosha,
 	paths = {}
 	for fp in f: paths = paths | self.graph._bfs(fp, set(a))
 	return filter_keys(paths, in_(a))
-
 
 # %% ../nbs/01_graph.ipynb #8d82814f
 @patch
