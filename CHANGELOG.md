@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.17
+codegraph chunking
+
+
+
 ## 0.0.16
 cross package link, performance , force_graph
 
