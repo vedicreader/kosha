@@ -11,10 +11,11 @@ from json import loads as jl
 from collections import defaultdict
 from litesearch import *
 from fastcore.all import (Path, L, patch, parallel_async, tuplify, first, fdelegates, globtastic, bind, true, dict2obj,
-                          listify, filter_keys, in_)
+                          listify, filter_keys, in_, chunked)
 from .core import arun, Kosha, parse, has_init, env_pkg_versions
 from pyan.analyzer import CallGraphVisitor
 from pyan.anutils import Scope, ExecuteInInnerScope
+from tqdm import tqdm
 
 # %% ../nbs/01_graph.ipynb #eb2b59dfd7c9a091
 try:
@@ -320,24 +321,29 @@ def _add_static(self:CodeGraph, sources:dict[str,str]=None, filenames:list[str]=
 	return set(meta) | set(L(s_edges).attrgot('caller')) | set(L(s_edges).attrgot('callee'))
 
 @patch
-def from_sources(self:CodeGraph, sources:dict[str,str]):
+def from_sources(self:CodeGraph, sources:dict[str,str], chunk_size=50):
 	'Build from {module_name: source_str}.'
-	nodes = self._add_static(sources=sources) | self._add_dyn(sources)
+	items, nodes = list(sources.items()), set()
+	for ch in tqdm(chunked(items, chunk_size), desc='Processing sources', unit='chunk'):
+		nodes |= self._add_static(sources=dict(ch))
+	nodes |= self._add_dyn(sources)
 	self._centrality(nodes)
 	return self.resolve_attr_calls()
 
 # %% ../nbs/01_graph.ipynb #3150593a339dd430
 @patch
 def process_files(self:CodeGraph,
-    files,     # list of .py file paths to analyse
-    root=None, # package root; auto-detected via __init__.py walk if None
-):
-	'Build static + dynamic call-graph edges for the given source files and recompute centrality.'
-	if root is None or not files: root = files[0] if files else '.'
+	  files,  # list of .py file paths to analyse
+	  root=None,  # package root; auto-detected via __init__.py walk if None
+	  sz=50,  # max files per pyan3 pass; reduce for very large packages
+) -> CodeGraph:
+	'Build call-graph edges for the given source files and recompute centrality.'
+	if not files: return self
 	pkg_dir = Path(str(files[0])).parent
 	while has_init(pkg_dir): pkg_dir = pkg_dir.parent
-	root = str(pkg_dir)
-	nodes = self._add_static(filenames=files, root=root)
+	root, n, nodes = str(pkg_dir), len(files), set()
+	for ch in tqdm(chunked(files, sz), desc='Processing files', unit='chunk'):
+		nodes |= self._add_static(filenames=list(ch), root=root)
 	fn = lambda p: '.'.join(Path(p).relative_to(root).with_suffix('').parts)
 	nodes |= self._add_dyn({fn(p): Path(p) for p in files})
 	self._centrality(nodes)

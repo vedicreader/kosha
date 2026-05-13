@@ -16,6 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
+    "fastprogress>=1.1.6",
     "litesearch>=0.0.22",
     "pyan3>=2.4.3",
     "pyskills>=0.0.4",
@@ -50,6 +51,7 @@ lib_path = "kosha"
 
 [dependency-groups]
 dev = [
+    "lisette>=0.1.32",
     "nbdev>=3.0.15",
     "notebook>=7.5.5",
 ]
