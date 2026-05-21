@@ -338,10 +338,11 @@ def update_pkgs(self:Kosha,
 
 # %% ../nbs/00_core.ipynb #a62a554620a32e84
 @patch
-def process_repo(self:Kosha, content=None, reembed=False):
+@fdelegates(process_content)
+def process_repo(self:Kosha, content=None, reembed=False, **kwargs):
 	'Embed all documents in the code store, or only those without embeddings if reembed=False.'
 	content = content or self.code_st(where=f'embedding is NULL' if not reembed else None)
-	return process_content(self.code_st, content, emb_fn=self.emb_doc)
+	return process_content(self.code_st, content, emb_fn=self.emb_doc, **kwargs)
 
 @patch
 @fdelegates(dir2files)
@@ -366,9 +367,15 @@ def update_repo(self:Kosha,
 	if to_remove: self.code_st.delete_where(where=f'path in ({",".join(to_remove.map(repr))})')
 	if not ch: return
 	if verbose: print(f'syncing files {ch} .....')
-	o = Path(str(ch[0])).parent
-	while has_init(o): o = o.parent
-	mod_fn = lambda p, n: '.'.join(list(Path(p).relative_to(o).with_suffix('').parts)+([n] if n else []))
+	roots = {}
+	def imp_root(p):  # import root of p: climb out of any nested packages
+		d = Path(p).parent
+		if d not in roots:
+			r = d
+			while has_init(r): r = r.parent
+			roots[d] = r
+		return roots[d]
+	mod_fn = lambda p, n: '.'.join(list(Path(p).relative_to(imp_root(p)).with_suffix('').parts)+([n] if n else []))
 	_get = lambda m,k1,k2: m.get(k1,{}).get(k2,'')
 	meta_fn = lambda d: d['metadata'] | dict(mod_name=mod_fn(_get(d,'metadata','path'),_get(d,'metadata','name')))
 	fn = lambda d: dict(path=_get(d,'metadata','path'),uploaded_at=_get(d,'metadata','uploaded_at'),metadata=meta_fn(d))
@@ -384,7 +391,7 @@ def update_repo(self:Kosha,
 	to_add = filter_keys(cont_hash, not_(in_(ex)))
 	if not to_add: return
 	if verbose: print(f'adding {len(to_add)} new/updated chunks to code store...')
-	self.process_repo(to_add.values(), embed)
+	self.process_repo(to_add.values(), embed=embed)
 	for f in ch: self.codedb.q(f'update {self.code_st.name} set uploaded_at=? where path=?',[f.stat().st_mtime, str(f)])
 	if verbose:print({'changed':len(to_add),'same':max(0,len(ex)-len(to_add)),'removed': max(0,len(ex)-len(cont_hash))})
 	own = Path(dir).resolve().name

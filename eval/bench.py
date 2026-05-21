@@ -38,8 +38,8 @@ def build_index(fresh=False):
         sys.exit("CodeRankEmbed embedder unavailable -- this harness needs the ONNX "
                  "model. Run where huggingface.co is reachable, or with the model "
                  "cached locally (kosha itself requires it to function).")
-    # Index the kosha/ package directory: update_repo derives one package root
-    # from the first file, so a mixed repo root (kosha/ + eval/) breaks it.
+    # Index just the kosha/ package: the eval corpus is kosha's own source,
+    # not the eval/ harness files.
     k.update_repo(REPO / 'kosha', embed=True, verbose=False)
     return k
 
