@@ -15,6 +15,13 @@ FTS5 + vector search + call graph over your repo and installed packages.
 ```python
 from kosha import Kosha
 k = Kosha()
+
+# Cold start: read the digest for instant architectural context
+import pathlib
+digest_path = pathlib.Path('.kosha/DIGEST.md')
+if digest_path.exists(): print(digest_path.read_text())
+else: print(k.digest())  # generate it now; also writes .kosha/DIGEST.md
+
 print(k.status())  # always check first
 # → {'files': 2, 'packages': 172, 'stale_files': 0, 'stale_pkgs': ['some-pkg']}
 # Only sync if the packages you actually need appear in stale_pkgs.
@@ -285,6 +292,7 @@ See the `/litesearch` skill for the full API: `FastEncode`, FTS query preprocess
 
 | Method | When to use |
 |--------|-------------|
+| `k.digest()` | Cold start — generates `.kosha/DIGEST.md`: modules, top nodes, public API, dep layers |
 | `k.status()` | Start of session — returns `{files, packages, graph_nodes, stale_files, stale_pkgs}` |
 | `k.sync(force_graph=True)` | Rebuild call graph on existing DB without re-embedding |
 | `k.context(q, graph=True)` | Default: any task touching existing code |
