@@ -178,7 +178,6 @@ def pkg_url(pkg: str) -> str | None:
     return (urls.get('source code') or urls.get('repository') or urls.get('source') or
             urls.get('github') or m.get('Home-page') or next(iter(urls.values()), None))
 
-
 # %% ../nbs/00_core.ipynb #466153b80488af15
 def pkg_doc(pkg) -> dict:
 	'Build pkg_store content dict: content=summary+readme, metadata=json.'
@@ -189,7 +188,6 @@ def pkg_doc(pkg) -> dict:
 	cont = summary+'\n'+(m.get_payload() or _get('Description') or '')[:2000].strip()
 	return dict(content=cont, metadata=dict(name=pkg, version=v(pkg), keywords=_get('Keywords'),
 	                                        requires=reqs, summary=summary, url=pkg_url(pkg)))
-
 
 # %% ../nbs/00_core.ipynb #34b20a9569e7b893
 def has_init(d: Path) -> bool:
@@ -338,17 +336,17 @@ def update_pkgs(self:Kosha,
 
 # %% ../nbs/00_core.ipynb #a62a554620a32e84
 @patch
-def process_repo(self:Kosha, content=None, reembed=False):
+@fdelegates(process_content)
+def process_repo(self:Kosha, content=None, reembed=False, **kwargs):
 	'Embed all documents in the code store, or only those without embeddings if reembed=False.'
 	content = content or self.code_st(where=f'embedding is NULL' if not reembed else None)
-	return process_content(self.code_st, content, emb_fn=self.emb_doc)
+	return process_content(self.code_st, content, emb_fn=self.emb_doc, **kwargs)
 
 @patch
 @fdelegates(dir2files)
 def update_repo(self:Kosha,
 				dir:Path=None,    # directory to index; defaults to repo root
 				embed:bool=True,  # embed chunks after parsing
-				files:L=None,     # specific paths to (re)index; None = full sync
                 exts:str=code_exts,
                 verbose=True,       # verbose
                 force=False,        # reindex all files regardless of mtime
@@ -356,13 +354,11 @@ def update_repo(self:Kosha,
 				):
 	'Index or update repo code chunks. Pass files= for incremental update (e.g. from watcher).'
 	dir = Path(dir or self.root)
-	if files is None:
-		known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path, uploaded_at') if r['path']}
-		all_files = dir2files(str(dir), strict_skip_file_re, strict_skip_folder_re,exts=exts, **kwargs)
-		all_str = set(map(str, all_files))
-		to_remove = L(known.keys()).filter(lambda k: k not in all_str)
-		ch = all_files if force else L(all_files).filter(lambda f: str(f) not in known or known[str(f)] != f.stat().st_mtime)
-	else: ch,to_remove = L(files).map(Path).partition(lambda f: f.exists() and f.suffix in exts)
+	known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path, uploaded_at') if r['path']}
+	all_files = dir2files(str(dir), strict_skip_file_re, strict_skip_folder_re,exts=exts, **kwargs)
+	all_str = set(map(str, all_files))
+	to_remove = L(known.keys()).filter(lambda k: k not in all_str)
+	ch = all_files if force else L(all_files).filter(lambda f: str(f) not in known or known[str(f)] != f.stat().st_mtime)
 	if to_remove: self.code_st.delete_where(where=f'path in ({",".join(to_remove.map(repr))})')
 	if not ch: return
 	if verbose: print(f'syncing files {ch} .....')
@@ -384,7 +380,7 @@ def update_repo(self:Kosha,
 	to_add = filter_keys(cont_hash, not_(in_(ex)))
 	if not to_add: return
 	if verbose: print(f'adding {len(to_add)} new/updated chunks to code store...')
-	self.process_repo(to_add.values(), embed)
+	self.process_repo(to_add.values(), embed=embed)
 	for f in ch: self.codedb.q(f'update {self.code_st.name} set uploaded_at=? where path=?',[f.stat().st_mtime, str(f)])
 	if verbose:print({'changed':len(to_add),'same':max(0,len(ex)-len(to_add)),'removed': max(0,len(ex)-len(cont_hash))})
 	own = Path(dir).resolve().name

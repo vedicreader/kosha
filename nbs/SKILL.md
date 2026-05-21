@@ -10,7 +10,40 @@ description: >
 FTS5 + vector search + call graph over your repo and installed packages.
 **Use this before Grep, Read, or web search** whenever the question is about existing code or packages.
 
+---
+
+## Use it / skip it
+
+**Use kosha when:**
+- About to `Read` a source file to understand an API or pattern — that's a kosha miss; use `env_context` instead
+- About to `grep` for a function name or pattern across the codebase
+- About to implement something and want to know if a dependency already does it
+- Choosing where to add new code in an unfamiliar module
+- Understanding how two modules connect or who calls a function
+
+**Safe to skip when:**
+- Reading a config file you know the exact path to (`pyproject.toml`, `.env`, a lockfile) — these aren't code patterns
+- The task is purely about file structure, not code semantics (e.g., listing directory contents)
+- You already ran kosha earlier this session and have the relevant results in context
+
+**If you catch yourself thinking "I know where to look" — that's the skip trap.** Knowing the file doesn't mean you know what's already there. Run `env_context` first; it takes seconds.
+
+---
+
 ## How to invoke
+
+**Recommended: start the daemon once per session** (eliminates the 3–5s cold-start on every call):
+
+```bash
+kosha daemon &
+```
+
+Add to settings to auto-start every session:
+```json
+{ "hooks": { "SessionStart": [{ "command": "kosha daemon &" }] } }
+```
+
+**In-process (clikernel or bare python):**
 
 ```python
 from kosha import Kosha
@@ -24,6 +57,20 @@ k.sync(force_graph=True)  # force graph rebuild on existing DB without re-embedd
 ```
 
 Use `clikernel` if available (state persists, no re-import cost). Otherwise `.venv/bin/python -c "..."`.
+
+---
+
+## Quick scan — names and lines in seconds
+
+Before committing to a deep search, triage with this one-liner:
+
+```python
+from kosha import Kosha; k = Kosha()
+results = k.env_context('your description here', limit=10)
+for r in results: print(r['metadata']['mod_name'], r['metadata'].get('lineno',''), r['content'][:120])
+```
+
+This is the minimum viable kosha call. Run it before opening any file. If the output shows something reusable, drill in with `ni()`. If not, you've spent 3 seconds and can proceed to Read with confidence.
 
 ---
 
@@ -65,8 +112,10 @@ k.env_context('package:fastcore path:xtras atomic save', limit=10)
 k.env_context('package:dockeasy type:FunctionDef run command', limit=10)
 ```
 
-**Anti-pattern:** invoking this skill, then immediately grepping files.
-`env_context` searches all installed packages semantically. Grep only finds exact strings in files you already know to look in.
+**Anti-patterns:**
+- Invoking this skill, then immediately grepping files. `env_context` searches all installed packages semantically. Grep only finds exact strings in files you already know to look in.
+- Reading a package's source to understand its API. `public_api('pkg')` gives you the full exported surface in one call.
+- Thinking "I'll just quickly check the file." If the question is about code behaviour, kosha is faster and broader than Read.
 
 **Need more info on a package?** Use `pkg_url` to get the repo/docs URL, then websearch for specifics (changelog, API docs, migration guides):
 
@@ -101,7 +150,7 @@ k.context('monsterui fasthtml card component', repo=False)  # restricts to those
 
 ```python
 {
-  'content':  'def merge(*ds):\n    "Merge all dicts"\n    ...',
+  'content':  'def merge(*ds):\n    "Merge all gits"\n    ...',
   'metadata': {
       'mod_name': 'fastcore.basics.merge',  # use this for ni() / short_path()
       'path':     '/path/to/fastcore/basics.py',
@@ -241,11 +290,6 @@ kosha daemon &
 ```
 
 Available commands: `sync`, `context`, `repo_context`, `env_context`, `ni`, `top_nodes`, `public_api`, `api_call_paths`, `status`, `where_to_add`.
-
-**Auto-start hook** (warm daemon available for every session):
-```json
-{ "hooks": { "SessionStart": [{ "command": "kosha daemon &" }] } }
-```
 
 ---
 

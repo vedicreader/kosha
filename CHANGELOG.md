@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.18
+update_repo bug fix and skill to use daemon as a start
+
+
+
 ## 0.0.17
 codegraph chunking
 
