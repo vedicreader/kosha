@@ -9,8 +9,8 @@ and performing context-aware searches."""
 # %% auto #0
 __all__ = ['cr_instr', 'model', 'strict_skip_folder_re', 'strict_skip_file_re', 'parse', 'repo_root', 'mv_skill_md', 'arun',
            'pkg_trans_deps', 'env_pkg_versions', 'embedder', 'static_embedder', 'emb_doc', 'emb_query', 'Kosha',
-           'pkg_url', 'pkg_doc', 'has_init', 'enrich_chunks', 'embed_chunk', 'process_content', 'count_imp', 'parseq',
-           'filt2wh']
+           'pkg_url', 'pkg_doc', 'has_init', 'imp_root', 'enrich_chunks', 'embed_chunk', 'process_content', 'count_imp',
+           'parseq', 'filt2wh']
 
 # %% ../nbs/00_core.ipynb #d979fe142033f158
 import ast, os, re
@@ -194,6 +194,13 @@ def has_init(d: Path) -> bool:
 	'True if dir is a Python package root: has __init__.py or a C-extension __init__*.so.'
 	return (d / '__init__.py').exists() or bool(list(d.glob('__init__*.so')))
 
+def imp_root(p: Path) -> Path:
+	'Import root of p: the nearest ancestor directory without __init__.py.'
+	r = Path(p).parent
+	while has_init(r): r = r.parent
+	return r
+
+
 # %% ../nbs/00_core.ipynb #96ec0897c5cba140
 def enrich_chunks(content: L) -> L:
 	'Set public_api+docstring flags on non-assign chunks and explode ClassDefs into method sub-chunks.'
@@ -362,9 +369,7 @@ def update_repo(self:Kosha,
 	if to_remove: self.code_st.delete_where(where=f'path in ({",".join(to_remove.map(repr))})')
 	if not ch: return
 	if verbose: print(f'syncing files {ch} .....')
-	o = Path(str(ch[0])).parent
-	while has_init(o): o = o.parent
-	mod_fn = lambda p, n: '.'.join(list(Path(p).relative_to(o).with_suffix('').parts)+([n] if n else []))
+	mod_fn = lambda p, n: '.'.join(list(Path(p).relative_to(imp_root(p)).with_suffix('').parts)+([n] if n else []))
 	_get = lambda m,k1,k2: m.get(k1,{}).get(k2,'')
 	meta_fn = lambda d: d['metadata'] | dict(mod_name=mod_fn(_get(d,'metadata','path'),_get(d,'metadata','name')))
 	fn = lambda d: dict(path=_get(d,'metadata','path'),uploaded_at=_get(d,'metadata','uploaded_at'),metadata=meta_fn(d))

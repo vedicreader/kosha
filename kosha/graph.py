@@ -12,7 +12,7 @@ from collections import defaultdict
 from litesearch import *
 from fastcore.all import (Path, L, patch, parallel_async, tuplify, first, fdelegates, globtastic, bind, true, dict2obj,
                           listify, filter_keys, in_, chunked)
-from .core import arun, Kosha, parse, has_init, env_pkg_versions
+from .core import arun, Kosha, parse, has_init, imp_root, env_pkg_versions
 from pyan.analyzer import CallGraphVisitor
 from pyan.anutils import Scope, ExecuteInInnerScope
 from tqdm import tqdm
@@ -339,16 +339,18 @@ def process_files(self:CodeGraph,
 ) -> CodeGraph:
 	'Build call-graph edges for the given source files and recompute centrality.'
 	if not files: return self
-	pkg_dir = Path(str(files[0])).parent
-	while has_init(pkg_dir): pkg_dir = pkg_dir.parent
-	root, n, nodes = str(pkg_dir), len(files), set()
-	for ch in tqdm(chunked(files, sz), desc='Processing files', unit='chunk'):
-		nodes |= self._add_static(filenames=list(ch), root=root)
-	fn = lambda p: '.'.join(Path(p).relative_to(root).with_suffix('').parts)
+	if root: files_by_root = {Path(root): list(files)}
+	else:
+		files_by_root = {}
+		for f in files: files_by_root.setdefault(imp_root(f), []).append(f)
+	n, nodes = len(files), set()
+	for r, flist in files_by_root.items():
+		for ch in tqdm(chunked(flist, sz), desc='Processing files', unit='chunk'):
+			nodes |= self._add_static(filenames=list(ch), root=str(r))
+	fn = lambda p: '.'.join(Path(p).relative_to(root or imp_root(p)).with_suffix('').parts)
 	nodes |= self._add_dyn({fn(p): Path(p) for p in files})
 	self._centrality(nodes)
 	return self.resolve_attr_calls()
-
 
 @patch
 @fdelegates(globtastic)

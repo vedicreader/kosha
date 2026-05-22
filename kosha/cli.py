@@ -36,6 +36,7 @@ def _print_results(results):
 # %% ../nbs/03_cli.ipynb #2e60df2d883b1665
 @call_parse
 def sync(
+    dir:str=None,        # directory to sync; defaults to repo root
     pkgs:str=None,       # comma-separated package names; defaults to all pyproject.toml deps
     parallel:bool=False, # run repo, env, and graph sync in parallel
     embed:bool=True,     # embed code chunks (set False for fast metadata-only update)
@@ -45,7 +46,7 @@ def sync(
     'Sync repo + env packages + call graph into .kosha/ databases.'
     k = Kosha()
     pkg_list = pkgs.split(',') if pkgs else None
-    k.sync(pkgs=pkg_list, in_parallel=parallel, embed=embed, force=force, force_graph=force_graph)
+    k.sync(dir=dir, pkgs=pkg_list, in_parallel=parallel, embed=embed, force=force, force_graph=force_graph)
 
 # %% ../nbs/03_cli.ipynb #4eb86463e047cf97
 @call_parse
