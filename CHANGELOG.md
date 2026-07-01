@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.20
+make skills succinct
+
+
+
 ## 0.0.19
 files processing for mono repos
 

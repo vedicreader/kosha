@@ -3,133 +3,70 @@ name: kosha
 description: >
   Surface repo code and installed package snippets before writing new code.
   Run at the start of any task that touches existing patterns or packages.
+  Skip when it's a small change and you know the exact file to look at.
 ---
 
 # kosha — repo + package memory for coding agents
 
 FTS5 + vector search + call graph over your repo and installed packages.
-**Use this before Grep, Read, or web search** whenever the question is about existing code or packages.
+**Use before Grep, Read, or web search** whenever the question is about existing code or packages.
 
----
+## When to use / skip
 
-## Use it / skip it
+**Use when** you're about to `Read` a source file to learn an API, `grep` for a
+function/pattern, check whether a dependency already does something, or decide where
+new code goes. "I know where to look" is the skip trap — knowing the file ≠ knowing
+what's already there.
 
-**Use kosha when:**
-- About to `Read` a source file to understand an API or pattern — that's a kosha miss; use `env_context` instead
-- About to `grep` for a function name or pattern across the codebase
-- About to implement something and want to know if a dependency already does it
-- Choosing where to add new code in an unfamiliar module
-- Understanding how two modules connect or who calls a function
+**Skip when** the path is a known config/lockfile (not code), the task is pure file
+structure, or you already have the relevant kosha results in context.
 
-**Safe to skip when:**
-- Reading a config file you know the exact path to (`pyproject.toml`, `.env`, a lockfile) — these aren't code patterns
-- The task is purely about file structure, not code semantics (e.g., listing directory contents)
-- You already ran kosha earlier this session and have the relevant results in context
+## Invoke
 
-**If you catch yourself thinking "I know where to look" — that's the skip trap.** Knowing the file doesn't mean you know what's already there. Run `env_context` first; it takes seconds.
-
----
-
-## How to invoke
-
-**Recommended: start the daemon once per session** (eliminates the 3–5s cold-start on every call):
+Start the daemon once per session to avoid the ~3–5s embedding cold-start on every call:
 
 ```bash
 kosha daemon &
 ```
 
-Add to settings to auto-start every session:
-```json
-{ "hooks": { "SessionStart": [{ "command": "kosha daemon &" }] } }
-```
-
-**In-process (clikernel or bare python):**
+In-process (`clikernel` if available, else `.venv/bin/python`):
 
 ```python
 from kosha import Kosha
 k = Kosha()
-print(k.status())  # always check first
-# → {'files': 2, 'packages': 172, 'stale_files': 0, 'stale_pkgs': ['some-pkg']}
-# Only sync if the packages you actually need appear in stale_pkgs.
-# If they're absent from stale_pkgs, skip sync and go straight to env_context.
-k.sync(in_parallel=True)  # skip if required packages are not in stale_pkgs
-k.sync(force_graph=True)  # force graph rebuild on existing DB without re-embedding (e.g. after a kosha update)
+k.status()   # always first → {files, packages, graph_nodes, stale_files, stale_pkgs}
+k.sync(in_parallel=True)   # ONLY if files/pkgs you need are stale; stale looks like missing
 ```
 
-Use `clikernel` if available (state persists, no re-import cost). Otherwise `.venv/bin/python -c "..."`.
-
----
-
-## Quick scan — names and lines in seconds
-
-Before committing to a deep search, triage with this one-liner:
+**Quick scan (the minimum viable call)** — run before opening any file:
 
 ```python
-from kosha import Kosha; k = Kosha()
-results = k.env_context('your description here', limit=10)
-for r in results: print(r['metadata']['mod_name'], r['metadata'].get('lineno',''), r['content'][:120])
+for r in k.env_context('description of what you want', limit=10):
+    print(r['metadata']['mod_name'], r['metadata'].get('lineno',''), r['content'][:120])
 ```
 
-This is the minimum viable kosha call. Run it before opening any file. If the output shows something reusable, drill in with `ni()`. If not, you've spent 3 seconds and can proceed to Read with confidence.
-
----
-
-## The decision loop
-
-Every coding task runs through the same questions. Use kosha to answer them before touching files.
+## Methods
 
 | Question | Call |
 |----------|------|
 | Is the index fresh? | `k.status()` |
-| Does this already exist in a dependency? | `k.env_context('description', limit=8)` |
-| What pattern is used here / how is this done in the repo? | `k.context('description', graph=True, limit=15)` |
-| Who calls this function, and what does it call? | `k.ni('pkg.module.fn')` |
-| How does module A connect to module B? | `k.short_path('a.fn', 'b.fn')` |
-| What is the real public API surface for a package? | `k.public_api('pkg')` |
-| Where do I add my new code? | `k.where_to_add('description', limit=5)` |
+| Does this exist in a dependency? (package-only, faster) | `k.env_context('desc', limit=8)` |
+| What pattern is used in the repo? (default; add repo results + graph) | `k.context('desc', graph=True, limit=15)` |
+| Repo-only search | `k.repo_context('desc')` |
+| Triage many results without full code bodies | `k.context('desc', compact=True)` |
+| Who calls this / what does it call / registered peers? | `k.ni('pkg.mod.fn')` |
+| How do two nodes connect? | `k.short_path('a.fn', 'b.fn')` |
+| What's a package's real public API? (`__all__` + `@patch`) | `k.public_api('pkg')` |
+| Where do I add new code? (returns `file:line` insertion points) | `k.where_to_add('desc', limit=5)` |
+| Rebuild call graph without re-embedding (e.g. after kosha update) | `k.sync(force_graph=True)` |
 
-`context(q, graph=True)` is the right default for any task that touches more than one module.
-`env_context` is for package-only searches (no repo results, faster).
-
-**`env_context(q)` is already a semantic similarity search.** The query is embedded via coderank and matched against stored vectors — passing any natural language description, code snippet, or function name finds semantically similar code. There is no need for a separate `similar()` helper; just call `env_context('description of what you want')` directly.
-
-**Check status first.** If `stale_files > 0` or `stale_pkgs` is non-empty, run `k.sync()` before querying — stale results look like missing results.
-
----
-
-## Before writing code — always check first
-
-```python
-# About to implement atomic file writes?
-results = k.env_context('atomic write temp file permissions chmod', limit=8)
-for r in results: print(r['metadata']['mod_name'], '\n', r['content'][:200])
-# → surfaces fastcore.xtras.atomic_save — reuse it
-
-# User says "fastcore has X" or "check xtras for Y" — use filters, not grep:
-k.env_context('package:fastcore path:xtras atomic save', limit=10)
-
-# Scoped to a specific package and path:
-k.env_context('package:dockeasy type:FunctionDef run command', limit=10)
-```
-
-**Anti-patterns:**
-- Invoking this skill, then immediately grepping files. `env_context` searches all installed packages semantically. Grep only finds exact strings in files you already know to look in.
-- Reading a package's source to understand its API. `public_api('pkg')` gives you the full exported surface in one call.
-- Thinking "I'll just quickly check the file." If the question is about code behaviour, kosha is faster and broader than Read.
-
-**Need more info on a package?** Use `pkg_url` to get the repo/docs URL, then websearch for specifics (changelog, API docs, migration guides):
-
-```python
-from kosha.core import pkg_url
-print(pkg_url('litesearch'))   # → 'https://github.com/Karthik777/litesearch'
-# then: WebSearch(f"site:{pkg_url('litesearch')} offset pagination")
-```
-
----
+`context(q, graph=True)` is the right default once a task touches more than one module.
+`env_context` is already a semantic similarity search — pass any description, snippet, or
+function name; no separate `similar()` needed.
 
 ## Filter syntax
 
-Filters combine with natural language in one query string:
+Filters combine with natural language in one query string; bare package names auto-detect as `package:`.
 
 | Token | Example | Effect |
 |-------|---------|--------|
@@ -139,205 +76,28 @@ Filters combine with natural language in one query string:
 | `lang:ext` | `lang:py` | Filter by language |
 | `type:node` | `type:FunctionDef` | Filter by AST node type |
 
-Bare package names in the query are auto-detected as package filters:
-```python
-k.context('monsterui fasthtml card component', repo=False)  # restricts to those packages
-```
-
----
-
-## Interpreting a result
+## Reading a result
 
 ```python
-{
-  'content':  'def merge(*ds):\n    "Merge all gits"\n    ...',
-  'metadata': {
-      'mod_name': 'fastcore.basics.merge',  # use this for ni() / short_path()
-      'path':     '/path/to/fastcore/basics.py',
-      'lineno':   655,
-      'type':     'FunctionDef',
-      'package':  'fastcore',               # env results only
-  },
-  'pagerank':      0.00027,  # centrality — higher = more load-bearing, touch carefully
-  'in_degree':     8,
-  'out_degree':    12,
-  'callers':       ['fastcore.script.call_parse._f', ...],
-  'callees':       ['fastcore.basics.NS.__iter__', ...],
-  'co_dispatched': [],       # see below
-}
+{'content': 'def merge(...): ...',
+ 'metadata': {'mod_name': 'fastcore.basics.merge',  # use for ni()/short_path()
+              'path': '...', 'lineno': 655, 'type': 'FunctionDef', 'package': 'fastcore'},
+ 'pagerank': 0.00027,          # centrality = blast radius; high → load-bearing, touch carefully
+ 'callers': [...], 'callees': [...],
+ 'co_dispatched': [...]}
 ```
 
-**`pagerank` tells you blast radius.** High-pagerank nodes are load-bearing — changes ripple widely.
+**`co_dispatched`** — functions assigned together at module level (route groups, handler
+tables, plugin registries). When adding a new handler, this shows the peers to pattern-match
+and where the registration lives, without reading the glue code.
 
----
+## Pointers
 
-## Graph navigation
-
-```python
-# Full structural picture of one node
-info = k.ni('fastcore.basics.merge')
-# info['callers']       — who calls this → where to hook in upstream
-# info['callees']       — what it calls → what you can reuse downstream
-# info['co_dispatched'] — registered peers (see below)
-
-# Shortest call chain between two nodes
-path = k.short_path('kosha.core.Kosha.sync', 'litesearch.core.search')
-
-# Nodes within 2 hops
-k.neighbors('kosha.core.Kosha', depth=2)
-
-# Top-k nodes by PageRank for a package
-k.graph.ranked(k=10, module='fastcore')
-
-# Public API (respects __all__ + @patch methods)
-k.public_api('fastcore')
-k.public_api('fastcore.basics')  # scoped to submodule
-```
-
-### `co_dispatched` — the most non-obvious signal
-
-Functions assigned together in the same list, dict, or tuple at module level — route groups, handler tables, plugin registrations. When you need to add a new handler, `co_dispatched` shows you which functions are peers and where the registration lives, without reading the glue code.
-
-```python
-k.ni('myapp.routes.get_user')['co_dispatched']
-# → ['myapp.routes.create_user', 'myapp.routes.delete_user']
-# These three are registered together → follow the same pattern, add yours at the same site
-```
-
----
-
-## Compact mode — scan many results quickly
-
-`context(q, compact=True)` returns slim dicts instead of full code bodies — useful when you need to triage 15+ results before drilling in:
-
-```python
-results = k.context('your task description', limit=20, compact=True)
-for r in results:
-    print(f"{r['mod_name']}  line {r['lineno']}")
-    print(f"  {r['sig']}")
-    if r['docstring']: print(f"  # {r['docstring'][:80]}")
-# Once you've identified 2-3 candidates, use ni() to drill into them
-```
-
----
-
-## Where to add new code
-
-`where_to_add(description)` combines `context` + `co_dispatched` to return `file:line` insertion points:
-
-```python
-pts = k.where_to_add('add a new route handler', limit=5)
-for p in pts:
-    print(f"{p['path']}:{p['insert_after']}  ({p['node']})")
-    if p['co_dispatched']: print(f"  peers: {p['co_dispatched'][:3]}")
-# → tells you the exact file:line to add after, and which peers to pattern-match
-```
-
----
-
-## Full structural plan (complex tasks)
-
-```python
-from itertools import combinations
-
-# 1. Find key functions with structural context
-results = k.context('your task description', limit=20, graph=True)
-
-# 2. Map call chains between the top results
-nodes = [r['metadata']['mod_name'] for r in results[:8]]
-paths = [p for a, b in combinations(nodes, 2) if (p := k.short_path(a, b))]
-paths.sort(key=len)   # shortest = tightest coupling
-
-# 3. Drill into join points
-for node in nodes[:5]:
-    info = k.ni(node)
-    print(node, '| callers:', list(info['callers'])[:3], '| co_dispatched:', list(info['co_dispatched']))
-
-# 4. Ground the plan in mod_name + lineno
-for r in results[:5]:
-    m = r['metadata']
-    print(f"{m['mod_name']}  line {m.get('lineno','?')}  pagerank={r.get('pagerank',0):.5f}")
-```
-
----
-
-## Daemon mode — use this in Claude Code sessions
-
-The first kosha call in a session pays a ~3–5s embedding model cold-start. Daemon mode starts one
-warm process and routes all subsequent calls through it via JSON on stdin/stdout.
-
-**Start once per session:**
-```bash
-kosha daemon &
-```
-
-**Send requests:**
-```
-→ {"cmd":"context","args":{"q":"your task","limit":15,"graph":true}}
-← {"ok":true,"result":[...]}
-
-→ {"cmd":"env_context","args":{"q":"package:fastcore atomic save","limit":8}}
-← {"ok":true,"result":[...]}
-
-→ {"cmd":"ni","args":{"mod_name":"fastcore.basics.merge"}}
-← {"ok":true,"result":{"callers":[...],"callees":[...],"co_dispatched":[]}}
-
-→ {"cmd":"public_api","args":{"pkg":"fastcore"}}
-← {"ok":true,"result":[...]}
-
-→ {"cmd":"sync","args":{}}
-← {"ok":true,"result":"synced"}
-```
-
-Available commands: `sync`, `context`, `repo_context`, `env_context`, `ni`, `top_nodes`, `public_api`, `api_call_paths`, `status`, `where_to_add`.
-
----
-
-## Kosha databases are litesearch databases
-
-`k.codedb` (repo index) and `k.envdb` (package index) are both `litesearch.Database` objects. You can use the full litesearch API directly on them — create extra tables, run raw SQL, insert custom records.
-
-```python
-# Access the underlying databases
-k.codedb # repo index (your project files)
-k.envdb  # package index (installed packages)
-
-# Create a custom store — e.g. an LLM-summary layer for undocumented functions
-summaries = k.envdb.get_store(name='summaries')
-summaries.insert_all([{
-    'content': 'one-line summary of what this function does',
-    'metadata': '{"mod_name": "dockeasy.core.fasthtml_app", "source": "agent"}',
-}])
-
-# Query by mod_name with raw SQL
-list(k.envdb.q(
-    "SELECT metadata, content FROM store WHERE json_extract(metadata, '$.mod_name') = ?",
-    ['dockeasy.core.fasthtml_app']
-))
-
-# Check what stores/tables exist (fastlite-style .t accessor)
-k.envdb.t
-```
-
-**Agent summary layer pattern:** when `env_context` returns a result with no docstring, write a one-liner to a `summaries` store keyed by `mod_name`. Future sessions query it before falling back to reading raw source — amortizes the cost of understanding undocumented code across sessions.
-
-See the `/litesearch` skill for the full API: `FastEncode`, FTS query preprocessing with `pre()`, hybrid search options, and indexing Python packages from scratch.
-
----
-
-## Quick reference
-
-| Method | When to use |
-|--------|-------------|
-| `k.status()` | Start of session — returns `{files, packages, graph_nodes, stale_files, stale_pkgs}` |
-| `k.sync(force_graph=True)` | Rebuild call graph on existing DB without re-embedding |
-| `k.context(q, graph=True)` | Default: any task touching existing code |
-| `k.context(q, compact=True)` | Triage many results — returns slim dicts, no full code bodies |
-| `k.env_context(q)` | Package-only; faster when repo results aren't needed |
-| `k.repo_context(q)` | Repo-only; when you know the answer is in this codebase |
-| `k.ni(node)` | After finding a node — understand its structural position |
-| `k.short_path(a, b)` | How two modules connect |
-| `k.public_api(pkg)` | What a package exports (not just what's in `__all__`) |
-| `k.where_to_add(description)` | Find file:line insertion point for new code |
-| `k.api_call_paths(from_pkg, to_pkg)` | Shortest paths from one package's public API to another's |
-| `pkg_url('pkg')` | Repo/docs URL for a package — use with websearch when you need docs, changelogs, or migration info |
+- **Daemon protocol:** send JSON `{"cmd": "...", "args": {...}}` on stdin. Commands: `sync`,
+  `context`, `repo_context`, `env_context`, `ni`, `top_nodes`, `public_api`, `api_call_paths`,
+  `status`, `where_to_add`.
+- **Package docs:** `from kosha.core import pkg_url` → repo/docs URL; feed to WebFetch (or
+  fossick if installed) for usage examples, or WebSearch for changelogs. nbdev docs anchor on
+  the function name (`#fn`); GitHub → `read_gh_file`.
+- **`k.codedb` / `k.envdb` are `litesearch.Database` objects** — full litesearch API (custom
+  stores, raw SQL) works directly. See the `/litesearch` skill.
