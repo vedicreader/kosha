@@ -9,7 +9,7 @@ __all__ = ['CMDS', 'sync', 'context', 'repo_context', 'env_context', 'ni', 'watc
 
 # %% ../nbs/03_cli.ipynb #cell-imports
 import json, sys
-from fastcore.script import call_parse, Param
+from fastcore.script import call_parse
 from .core import Kosha, env_pkg_versions
 
 # %% ../nbs/03_cli.ipynb #cell-helpers

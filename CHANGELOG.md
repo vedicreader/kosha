@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.21
+cli fix
+
+
+
 ## 0.0.20
 make skills succinct
 
