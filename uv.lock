@@ -2509,7 +2509,6 @@ dependencies = [
     { name = "ghapi", marker = "python_full_version >= '3.11'" },
     { name = "pyyaml", marker = "python_full_version >= '3.11'" },
     { name = "setuptools", marker = "python_full_version >= '3.11'" },
-    { name = "tomli", marker = "python_version < '0'" },
     { name = "watchdog", marker = "python_full_version >= '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/23/26/20ab143f144bc79ad5358285599a937dd31d9d0840a10fc63eac4091cb37/nbdev-3.2.0.tar.gz", hash = "sha256:4c94fc4f6751b536ad3518b01710e343244f6a3c84f98d9a74384aa322b2d4c4", size = 72546 }
