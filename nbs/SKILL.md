@@ -59,6 +59,9 @@ for r in k.env_context('description of what you want', limit=10):
 | What's a package's real public API? (`__all__` + `@patch`) | `k.public_api('pkg')` |
 | Where do I add new code? (returns `file:line` insertion points) | `k.where_to_add('desc', limit=5)` |
 | Rebuild call graph without re-embedding (e.g. after kosha update) | `k.sync(force_graph=True)` |
+| What's similar to the code at file:line (+ its graph neighborhood)? | `k.find_related('src/x.py', line=42)` |
+| Tokens saved vs reading whole files | `k.savings()` |
+| Measure retrieval quality after a change (relative A/B only) | `kosha bench --compare` |
 
 `context(q, graph=True)` is the right default once a task touches more than one module.
 `env_context` is already a semantic similarity search — pass any description, snippet, or
@@ -95,7 +98,14 @@ and where the registration lives, without reading the glue code.
 
 - **Daemon protocol:** send JSON `{"cmd": "...", "args": {...}}` on stdin. Commands: `sync`,
   `context`, `repo_context`, `env_context`, `ni`, `top_nodes`, `public_api`, `api_call_paths`,
-  `status`, `where_to_add`.
+  `status`, `where_to_add`, `find_related`, `savings`.
+- **MCP:** `kosha mcp` runs a stdio MCP server (tools: search, env_search, find_related,
+  node_info, where_to_add, public_api, status, sync). `kosha install` writes `.mcp.json`
+  (Claude Code) and `.cursor/mcp.json` (Cursor) automatically.
+- **Profiles:** default `fast` = static potion-code embeddings (millisecond CPU indexing);
+  `KOSHA_PROFILE=accurate` = CodeRankEmbed ONNX. Switching profiles requires `k.sync(force=True)`.
+- **Auto-sync:** `k.context()` re-indexes changed repo files automatically (throttled;
+  disable with `KOSHA_AUTOSYNC=0`). `.gitignore` and `.koshaignore` are respected at index time.
 - **Package docs:** `from kosha.core import pkg_url` → repo/docs URL; feed to WebFetch (or
   fossick if installed) for usage examples, or WebSearch for changelogs. nbdev docs anchor on
   the function name (`#fn`); GitHub → `read_gh_file`.

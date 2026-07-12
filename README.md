@@ -26,6 +26,33 @@ skill automatically:
 Kosha(install_skill=True)   # writes .agents/skills/kosha/ and .claude/skills/kosha/
 ```
 
+## Profiles, rerank & agent integrations (v0.1.0)
+
+**Embedding profiles** — the default `fast` profile uses static `potion-code-16M`
+embeddings (Model2Vec): millisecond CPU indexing and queries, no transformer inference.
+Set `KOSHA_PROFILE=accurate` (or `Kosha(profile='accurate')`) for the CodeRankEmbed ONNX
+transformer. Switching profiles requires re-embedding: `k.sync(force=True)`.
+
+**Code-aware rerank** — after RRF, results are re-ordered with definition-of-symbol,
+identifier-stem, pagerank, public-API, file-coherence and noise (tests/examples) signals.
+Symbol-like queries (`parseConfig`, `rrf_merge`) leverage the full graph priors; natural
+language queries keep their RRF ordering mostly intact. Disable with `context(rerank=False)`.
+camelCase/snake_case subtokens are matched in both directions (`parseConfig` ⇄ `parse_config`).
+
+**`find_related`** — `k.find_related('kosha/core.py', line=430)` returns chunks semantically
+similar to the code at that location plus its call-graph neighborhood.
+
+**MCP server** — `kosha mcp` runs a zero-dependency stdio MCP server (tools: `search`,
+`env_search`, `find_related`, `node_info`, `where_to_add`, `public_api`, `status`, `sync`).
+`kosha install` writes `.mcp.json` (Claude Code) and `.cursor/mcp.json` (Cursor) alongside
+the skill, and prints setup one-liners for Codex and OpenCode.
+
+**Auto-sync & ignore rules** — `context()` re-indexes changed repo files first (throttled;
+`KOSHA_AUTOSYNC=0` disables). `.gitignore` and `.koshaignore` are respected at index time.
+
+**Telemetry & eval** — `kosha savings` shows tokens saved vs reading matched files in full;
+`kosha bench --compare` runs a self-retrieval NDCG@10/Recall@k A/B of rerank vs plain RRF.
+
 ## Sync
 
 Once per session; subsequent calls are incremental (only changed files
