@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.23
+code graph is parallel
+
+
+
 ## 0.0.22
 static embedder
 

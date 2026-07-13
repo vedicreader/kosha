@@ -40,15 +40,15 @@ def _print_results(results):
 def sync(
     dir:str=None,        # directory to sync; defaults to repo root
     pkgs:str=None,       # comma-separated package names; defaults to all pyproject.toml deps
-    parallel:bool=False, # run repo, env, and graph sync in parallel
+    parallel:bool=True, # run repo, env, and graph sync in parallel
     embed:bool=True,     # embed code chunks (set False for fast metadata-only update)
     force:bool=False,    # force re-sync of all files (ignoring freshness)
-    force_graph:bool=False, # force re-sync of call graph (ignoring freshness
+    sync_graph:bool=False, # sync call graph (ignoring freshness
 ):
     'Sync repo + env packages + call graph into .kosha/ databases.'
     k = Kosha()
     pkg_list = pkgs.split(',') if pkgs else None
-    k.sync(dir=dir, pkgs=pkg_list, in_parallel=parallel, embed=embed, force=force, force_graph=force_graph)
+    k.sync(dir=dir, pkgs=pkg_list, in_parallel=parallel, embed=embed, force=force, sync_graph=sync_graph)
 
 # %% ../nbs/03_cli.ipynb #4eb86463e047cf97
 @call_parse
@@ -239,6 +239,7 @@ _DISPATCH = {
     'short_path':     lambda k, a: k.short_path(**a),
     'neighbors':      lambda k, a: k.neighbors(**a),
     'dep_stack':      lambda k, a: k.dep_stack(**a),
+	'nuke':             lambda k, a: (k.nuke(**a), 'nuked')[1],
 }
 
 @call_parse
@@ -264,6 +265,8 @@ def install():
     mv_skill_md(dry_run=False, dir=repo_root())
 
 
+
+
 # %% ../nbs/03_cli.ipynb #cell-cmds
 CMDS = {
     'sync':           sync,
@@ -279,7 +282,8 @@ CMDS = {
     'daemon':         daemon,
     'status':         status,
     'where-to-add':   where_to_add,
-    'install':         install,
+    'install':        install,
+	'nuke':           nuke,
 }
 
 def main():

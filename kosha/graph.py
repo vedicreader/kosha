@@ -13,7 +13,7 @@ from json import loads as jl
 from collections import defaultdict
 from litesearch import *
 from fastcore.all import (Path, L, patch, parallel_async, tuplify, first, fdelegates, globtastic, bind, true, dict2obj,
-                          listify, filter_keys, in_, chunked)
+                          listify, filter_keys, in_, chunked, noop, parallel)
 from .core import arun, Kosha, parse, has_init, imp_root, env_pkg_versions
 from pyan.analyzer import CallGraphVisitor
 from pyan.anutils import Scope, ExecuteInInnerScope
@@ -64,10 +64,7 @@ class CodeGraph:
 		ge, gn, cd, fi = self.db.t.graph_edges, self.db.t.graph_nodes, self.db.t.co_dispatch, self.db.t.file_index
 		pa = self.db.t.pending_attr_calls
 		pa.create(caller=str, method=str, pkgs=str, if_not_exists=True, pk='caller,method')
-		ge.create(id=int, caller=str, callee=str, kind=str, confidence=float, if_not_exists=True, pk='id')
-		ge.create_index(['caller'], if_not_exists=True)
-		ge.create_index(['callee'], if_not_exists=True)
-		ge.create_index(['kind'], if_not_exists=True)
+		ge.create(caller=str, callee=str, kind=str, confidence=float, if_not_exists=True, pk=('caller','callee','kind'))
 		gn.create(node=str,flavor=str,file=str,pagerank=float,in_degree=int,out_degree=int,if_not_exists=True,pk='node')
 		cd.create(group_id=int, node=str, if_not_exists=True)
 		fi.create(path=str, root=str, last_analyzed_at=float, if_not_exists=True, pk='path')
@@ -284,7 +281,7 @@ def _add_dyn(self:CodeGraph, mod_map:dict):
 				d_edges.append(e)
 				existing.add((fr,t))
 			new_nodes |= {fr,t}
-	if d_edges: self.db.t.graph_edges.insert_all(d_edges)
+	if d_edges: self.db.t.graph_edges.insert_all(d_edges, upsert=True, pk=('caller','callee','kind'))
 	if groups:
 		base = first(self.db.q('SELECT COALESCE(MAX(group_id)+1,0) n FROM co_dispatch'))['n']
 		self.db.t.co_dispatch.insert_all([{'group_id':base+i,'node':nd} for i,grp in enumerate(groups) for nd in grp])
@@ -310,6 +307,27 @@ def _lambda_nodes(sources:dict[str,str]=None, filenames:list[str]=None, root:str
 			if isinstance(n, ast.Assign)
 			and (isinstance(n.value, ast.Lambda) or _is_cf(n.value))
 			for t in n.targets if isinstance(t, ast.Name)}
+#
+# @patch
+# def _add_static(self:CodeGraph, sources:dict[str,str]=None, filenames:list[str]=None, root:str=None):
+# 	"Add static edges from sources dict. Uses pyan3 for full-corpus analysis."
+# 	s_edges, meta = static_edges(sources=sources, filenames=filenames, root=root)
+# 	meta |= _lambda_nodes(sources=sources, filenames=filenames, root=root)
+# 	hints = _attr_call_hints(sources=sources, filenames=filenames, root=root, meta=meta)
+# 	if s_edges: self.db.t.graph_edges.insert_all(s_edges, upsert=True, pk=('caller','callee','kind'))
+# 	if meta: self.db.t.graph_nodes.insert_all(meta.values(), upsert=True, pk='node')
+# 	if hints: self.pa.insert_all(hints, upsert=True, pk=('caller','method'),ignore=True)
+# 	return set(meta) | set(L(s_edges).attrgot('caller')) | set(L(s_edges).attrgot('callee'))
+#
+# @patch
+# def from_sources(self:CodeGraph, sources:dict[str,str], chunk_size=50):
+# 	'Build from {module_name: source_str}.'
+# 	items, nodes = list(sources.items()), set()
+# 	for ch in tqdm(chunked(items, chunk_size), desc='Processing sources', unit='chunk'):
+# 		nodes |= self._add_static(sources=dict(ch))
+# 	nodes |= self._add_dyn(sources)
+# 	self._centrality(nodes)
+# 	return self.resolve_attr_calls()
 
 @patch
 def _add_static(self:CodeGraph, sources:dict[str,str]=None, filenames:list[str]=None, root:str=None):
@@ -317,17 +335,18 @@ def _add_static(self:CodeGraph, sources:dict[str,str]=None, filenames:list[str]=
 	s_edges, meta = static_edges(sources=sources, filenames=filenames, root=root)
 	meta |= _lambda_nodes(sources=sources, filenames=filenames, root=root)
 	hints = _attr_call_hints(sources=sources, filenames=filenames, root=root, meta=meta)
-	if s_edges: self.db.t.graph_edges.insert_all(s_edges)
-	if meta: self.db.t.graph_nodes.insert_all(meta.values(), upsert=True, pk='node')
-	if hints: self.pa.insert_all(hints, ignore=True)
-	return set(meta) | set(L(s_edges).attrgot('caller')) | set(L(s_edges).attrgot('callee'))
+	return meta, s_edges, hints
 
 @patch
 def from_sources(self:CodeGraph, sources:dict[str,str], chunk_size=50):
 	'Build from {module_name: source_str}.'
 	items, nodes = list(sources.items()), set()
-	for ch in tqdm(chunked(items, chunk_size), desc='Processing sources', unit='chunk'):
-		nodes |= self._add_static(sources=dict(ch))
+	res = parallel(lambda p: self._add_static(sources=dict(p)),list(chunked(items,chunk_size)),threadpool=True,progress=True)
+	for (m,e,h) in res:
+		if e: self.db.t.graph_edges.insert_all(e, upsert=True, pk=('caller','callee','kind'))
+		if m: self.db.t.graph_nodes.insert_all(m.values(), upsert=True, pk='node')
+		if h: self.pa.insert_all(h, upsert=True, pk=('caller','method'),ignore=True)
+		nodes |= set(m) | set(L(e).attrgot('caller')) | set(L(e).attrgot('callee'))
 	nodes |= self._add_dyn(sources)
 	self._centrality(nodes)
 	return self.resolve_attr_calls()
@@ -347,8 +366,13 @@ def process_files(self:CodeGraph,
 		for f in files: files_by_root.setdefault(imp_root(f), []).append(f)
 	n, nodes = len(files), set()
 	for r, flist in files_by_root.items():
-		for ch in tqdm(chunked(flist, sz), desc='Processing files', unit='chunk'):
-			nodes |= self._add_static(filenames=list(ch), root=str(r))
+		res = parallel(lambda p: self._add_static(filenames=list(p), root=str(r)),list(chunked(flist,sz)),
+		               threadpool=True,progress=True)
+		for (m,e,h) in res:
+			if e: self.db.t.graph_edges.insert_all(e, upsert=True, pk=('caller','callee','kind'))
+			if m: self.db.t.graph_nodes.insert_all(m.values(), upsert=True, pk='node')
+			if h: self.pa.insert_all(h, upsert=True, pk=('caller','method'),ignore=True)
+			nodes |= set(m) | set(L(e).attrgot('caller')) | set(L(e).attrgot('callee'))
 	fn = lambda p: '.'.join(Path(p).relative_to(root or imp_root(p)).with_suffix('').parts)
 	nodes |= self._add_dyn({fn(p): Path(p) for p in files})
 	self._centrality(nodes)
@@ -514,15 +538,15 @@ def sync_dir(self: CodeGraph, dir: str | Path, force=False) -> 'CodeGraph':
 	known=set(L(self.db.t.file_index(select='distinct path', where='root=?', where_args=[str(dir)])).attrgot('path'))
 	for f in known - set(files): self._drop_file(f)
 	fs = files if force else self._stale(files, str(dir))
+	fs = self._stale(fs, str(dir))
 	if fs: self.process_files(fs, str(dir)) and self._index_files(fs, str(dir))
 	return self
 
 @patch
-def sync_pkgs(self: CodeGraph, pkgs: list[str], in_parallel=False) -> 'CodeGraph':
+def sync_pkgs(self: CodeGraph, pkgs: list[str]) -> 'CodeGraph':
 	'Incremental sync for packages: drop missing files, update changed files, add new files.'
 	if not pkgs: print('no action. pkgs empty'); return self
-	if in_parallel: arun(parallel_async(lambda p: self.from_pkg(p), pkgs))
-	else: [self.from_pkg(pkg) for pkg in tqdm(pkgs, desc='loading code graph for packages', unit='pkg')]
+	for pkg in tqdm(pkgs, desc='loading code graph for packages', unit='pkg'): self.from_pkg(pkg)
 	return self
 
 @patch
@@ -618,9 +642,9 @@ def sync(self: Kosha,
          pkgs=None, # list of package names to sync (e.g. ['httpx', 'fastcore']); if None, sync all env packages
          dir=None, # directory to sync; if None, sync all of root
          verbose=True, # print progress messages
-         in_parallel=False, # run repo, env, and graph sync in parallel; also fans env packages out across threads
+         in_parallel=True, # run repo, env, and graph sync in parallel; also fans env packages out across threads
          force=False, # ignore file mtimes and reprocess all files
-         force_graph=False, # whether to force graph recomputation even if no files changed; ignored if force=True
+         sync_graph=True, # whether to force graph recomputation even if no files changed; ignored if force=True
          pyproject=True, # if True, auto-detect env packages from pyproject.toml; if False, use pkgs argument as-is
          depth=1, # depth for pyproject env package detection; ignored if pyproject=False
          embed=True # whether to embed
@@ -630,8 +654,8 @@ def sync(self: Kosha,
 	pkgs = listify(pkgs) or self.status(pyproject,depth).get('stale_pkgs', {})
 	ts = [bind(self.update_repo, dir, verbose=verbose, force=force, embed=embed),
 		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed),
-		  bind(self.graph.sync, dir=dir, pkgs=pkgs, force=force_graph or force)]
-	if in_parallel: return arun(parallel_async(lambda f: f(), ts))
+		  bind(self.graph.sync, dir=dir, pkgs=pkgs, force=force) if sync_graph else noop]
+	if in_parallel: return parallel(lambda f: f(), ts, threadpool=True, progress=True)
 	else: return L(ts).map(lambda f: f())
 
 @patch
@@ -647,7 +671,7 @@ def context(self: Kosha,
 			**kw                  # forwarded to env_context / repo_context
 ) -> L:
 	'Fan-out semantic search: parse filters, run repo + env searches, merge with chained RRF.'
-	self.sync()
+	self.update_repo()
 	def _tag(res, pref): return L(res).map(lambda r: r | dict(_src_id=f'{pref}:{r.get("rowid", id(r))}'))
 	# Embed the query exactly once and pass via emb_q= so repo/env don't each re-embed.
 	from kosha.core import parseq

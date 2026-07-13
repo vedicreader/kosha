@@ -29,7 +29,7 @@ Start the daemon once per session to avoid the ~3–5s embedding cold-start on e
 kosha daemon &
 ```
 
-In-process (`clikernel` if available, else `.venv/bin/python`):
+In-process (`uv run kosha` > `clikernel` if available > `.venv/bin/python`):
 
 ```python
 from kosha import Kosha

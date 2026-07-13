@@ -138,26 +138,29 @@ def static_embedder(
 	**kwargs
 ) -> 'BaseEmbeddings':
     'Load or return cached static (potion-retrieval) embedder (24h TTL).'
-    return AutoEmbeddings().get_embeddings(emb_model)
+    m=AutoEmbeddings().get_embeddings(emb_model)
+    setattr(m,'model_dict', {'model': m.model_name_or_path})
+    return m
 
 def emb_doc(
     e  # embedder factory — callable returning a FastEncode or AutoEmbeddings instance
 ):
     'Curry an embedder factory into a document-embedding function `t,**kw -> embedding`.'
-    return lambda t, **kw: e().encode_document(t,**kw) if isinstance(e(), FastEncode) else e().embed_batch(listify(t))
+    return lambda t, **kw: e.encode_document(t,**kw) if isinstance(e, FastEncode) else e.embed_batch(listify(t))
 
 def emb_query(
     e  # embedder factory — callable returning a FastEncode or AutoEmbeddings instance
 ):
     'Curry an embedder factory into a query-embedding function `t,**kw -> embedding`.'
-    return lambda t, **kw: e().encode_query(t,**kw) if isinstance(e(), FastEncode) else e().embed_batch(listify(t))
+    return lambda t, **kw: e.encode_query(t,**kw) if isinstance(e, FastEncode) else e.embed_batch(listify(t))
 
 # %% ../nbs/00_core.ipynb #b18bbd41de289e55
 class Kosha:
 	'Kosha allows you to build a context for code generation based on your repo and environment.'
 	def __init__(self, dir: Path = None, install_skill: bool = False, xdg_dir: Path = None, efn=static_embedder):
 		self.root, self.xdg = Path(dir or repo_root() or '.'), xdg_dir or xdg_data_home()
-		self.efn = bind(efn, md=self.xdg/f'kosha/model')
+		self.efn = efn(md=self.xdg/f'kosha/model')
+		self.model = self.efn.model_dict['model']
 		self.emb_doc, self.emb_query = emb_doc(self.efn), emb_query(self.efn)
 		if install_skill: mv_skill_md(dir=self.root, dry_run=False)
 		self.cp, self.ce = self.root.joinpath('.kosha','code.db'), self.xdg.joinpath('kosha','env.db')
@@ -241,16 +244,17 @@ def enrich_chunks(content: L) -> L:
 # %% ../nbs/00_core.ipynb #7451e504be3f89b4
 os.environ['TOKENIZERS_PARALLELISM']='false'  # to suppress warnings from tokenizers
 @patch
-def nuke(self:Kosha):
+def nuke(self:Kosha, env=False):
 	'Reset the databases by dropping all tables.'
-	for p in (self.cp, self.ce): p.parent.delete()
+	self.cp.parent.delete()
+	if env: self.ce.parent.delete()
 
 @patch
 def _is_pkg_ingested(self:Kosha, pkg:str) -> bool:
 	'Check if a package is already ingested and up-to-date.'
 	return first(self.pkgs(select='name, version', where=f'name={pkg!r} and version={v(pkg)!r}'))
 
-def embed_chunk(chunk:list|L,emb_fn=emb_doc(embedder), **kwargs):
+def embed_chunk(chunk:list|L,emb_fn=emb_doc(static_embedder), **kwargs):
 	'Embed a list of code chunks using emb_fn, batched to bound peak memory.'
 	if not chunk: return
 	c = [b for b in chunk if b['content'] and b['content'].strip()]
@@ -336,16 +340,13 @@ def update_pkgs(self:Kosha,
     exts=code_exts,     # file extensions to include
     verbose=True,       # print progress
     force=False,        # reindex even if package version already loaded
-	parallel=True,		# parallel processing
     **kwargs            # forwarded to update_pkg
 ):
 	'Sync installed packages into the env store; if pkgs is None, syncs all env packages.'
 	if verbose: print(f'loading pkgs {pkgs} ...' if pkgs else 'No packages to load.')
 	if not pkgs: return
 	kw = dict(embed=embed, exts=exts, verbose=verbose, force=force, **kwargs)
-	if not parallel:
-		for pkg in tqdm(list(set(pkgs)), desc='Updating packages', unit='pkg'): self.update_pkg(pkg, **kw)
-	else: arun(parallel_async(self.update_pkg,list(set(pkgs)), pause=0.1, **kw))
+	for pkg in tqdm(list(set(pkgs)), desc='Updating packages', unit='pkg'): self.update_pkg(pkg, **kw)
 
 # %% ../nbs/00_core.ipynb #a62a554620a32e84
 @patch
