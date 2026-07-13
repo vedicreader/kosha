@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.22
+static embedder
+
+
+
 ## 0.0.21
 cli fix
 
