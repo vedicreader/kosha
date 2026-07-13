@@ -647,6 +647,7 @@ def context(self: Kosha,
 			**kw                  # forwarded to env_context / repo_context
 ) -> L:
 	'Fan-out semantic search: parse filters, run repo + env searches, merge with chained RRF.'
+	self.sync()
 	def _tag(res, pref): return L(res).map(lambda r: r | dict(_src_id=f'{pref}:{r.get("rowid", id(r))}'))
 	# Embed the query exactly once and pass via emb_q= so repo/env don't each re-embed.
 	from kosha.core import parseq
@@ -660,8 +661,7 @@ def context(self: Kosha,
 	if len(items) > 1:
 		with ThreadPoolExecutor(max_workers=len(items)) as ex:
 			pairs = list(zip([t[0] for t in items], ex.map(lambda f: f(), [t[1] for t in items])))
-	else:
-		pairs = [(items[0][0], items[0][1]())] if items else []
+	else: pairs = [(items[0][0], items[0][1]())] if items else []
 	results = L(pairs).map(lambda r: _tag(r[1], r[0]))
 	if not results: return L()
 	rrf = bind(rrf_merge, limit=limit*2, id_key='_src_id')
