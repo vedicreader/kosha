@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.0.24
+fixes cli bug
+
+
+
 ## 0.0.23
 code graph is parallel
 

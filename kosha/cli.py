@@ -7,7 +7,7 @@ Docs: https://vedicreader.github.io/kosha/cli.html.md"""
 
 # %% auto #0
 __all__ = ['CMDS', 'sync', 'context', 'repo_context', 'env_context', 'ni', 'watch', 'public_api', 'api_paths', 'dep_stack',
-           'top_nodes', 'status', 'where_to_add', 'daemon', 'install', 'main']
+           'top_nodes', 'status', 'where_to_add', 'nuke', 'daemon', 'install', 'main']
 
 # %% ../nbs/03_cli.ipynb #cell-imports
 import json, sys
@@ -223,6 +223,15 @@ def where_to_add(
             print(f"  {r['path']}:{r['insert_after']}  ({r['node']})")
             if co: print(f"    peers: {co}")
 
+
+# %% ../nbs/03_cli.ipynb #3c1799aaece78c40
+@call_parse
+def nuke(env=False # delete env cache
+):
+    'Delete all kosha data and caches.'
+    if env: print("Deleting env cache...")
+    Kosha().nuke(env=env)
+    print("deleted kosha cache.")
 
 # %% ../nbs/03_cli.ipynb #cell-daemon
 _DISPATCH = {
