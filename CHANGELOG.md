@@ -2,6 +2,10 @@
 
 <!-- do not remove -->
 
+## 0.0.25
+boosting + denoising
+
+
 ## 0.0.24
 fixes cli bug
 

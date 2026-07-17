@@ -51,7 +51,7 @@ lib_path = "kosha"
 
 [dependency-groups]
 dev = [
-    "lisette>=0.1.32",
+    "fossick>=0.0.10",
     "nbdev>=3.0.15",
     "notebook>=7.5.5",
 ]

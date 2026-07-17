@@ -423,16 +423,18 @@ def pkgs_in_env(self:Kosha, pyproject=False, depth=1) -> list:
 
 # %% ../nbs/00_core.ipynb #b57c6ce49a9c9fe5
 _filter_keys = frozenset({'file', 'files', 'path', 'paths', 'package', 'packages', 'lang', 'langs', 'type', 'types'})
-_filter_pat = re.compile(r'\b(' + '|'.join(_filter_keys) + r'):(\S+)')
+_filter_pat = re.compile(r'\b(' + '|'.join(_filter_keys) + r')(!?):(\S+)')
 _filter_norm = {'files': 'file', 'paths': 'path', 'packages': 'package', 'langs': 'lang', 'types': 'type'}
 
 def parseq(q: str) -> tuple:
-    'Parse key:value filter tokens from a query. Returns (bare_query, filters_dict).'
+    'Parse key:value filter tokens from a query. A trailing `!` marks a strict/hard filter (e.g. `package!:x`), stored under the `key!` key. Returns (bare_query, filters).'
     filters = defaultdict(list)
     for m in _filter_pat.finditer(q):
         key = _filter_norm.get(m.group(1), m.group(1))
-        filters[key].extend(m.group(2).split(','))
+        if m.group(2): key += '!'
+        filters[key].extend(m.group(3).split(','))
     return _filter_pat.sub('', q).strip() or q, filters
+
 
 # %% ../nbs/00_core.ipynb #cf6546c6ae4242f2
 _glob2like = {'*': '%', '?': '_'}
@@ -457,7 +459,7 @@ def filt2wh(filters: dict, store: str = 'code') -> str | None:
 	if store == 'code': c = list_or(map(lambda p: f'path LIKE {p!r}',path_wh)) + lang_wh
 	elif store == 'env':
 		c = list_or(map(lambda p: je('path','like',p),path_wh)) + lang_wh
-		if pkgs:=_get('package'): c += list_or(map(lambda p: f'package={p!r}',pkgs))
+		if pkgs:=_get('package!'): c += list_or(map(lambda p: f'package={p!r}',pkgs))
 	c += list_or(map(lambda r: je('type',v=r), _get('type')))
 	return ' AND '.join(c) if c else None
 
@@ -469,14 +471,12 @@ def env_context(self:Kosha,
 				wide:bool=False,    	# whether to use wide search
                 columns:str='content,metadata,package',			# comma separated columns string to return from search
                 where:str=None,			# additional where clause to filter search results
-				sys_wide=True,
+				sys_wide=True,          # kept for API compatibility; soft-package boosting is applied in Kosha.context
 				**kw					# additional args to pass to db.search
 				) -> L:
-	'Code search through the database to find relevant code snippets.'
+	'Code search over the env store. Only `package!:` hard-filters; soft `package:` is left for context() to boost.'
 	raw, fs = parseq(q)
 	fq, emb = pre(raw, wide=wide, extract_kw=False), self.emb_query(emb_q or raw)
-	all_p = set(raw.split()).intersection(self.pkgs2consider(sys_wide)) if 'package' not in fs else []
-	for p in all_p: fs['package'].append(p)
 	wh = ' AND '.join(map(lambda p: f'({p})', L(filt2wh(fs, 'env'), where).filter(true)))
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if 'metadata' in r else r
 	return L(self.envdb.search(fq, emb.tobytes(), columns.split(','), where=wh, **kw)).map(fn)
@@ -488,6 +488,7 @@ def pkgs2consider(self: Kosha, sys_wide=True) -> set:
 	if sys_wide: return ex_pkgs.keys()
 	env_pkgs = env_pkg_versions()
 	return {p for p in env_pkgs if p in ex_pkgs and env_pkgs[p] == ex_pkgs[p]}
+
 
 # %% ../nbs/00_core.ipynb #d395d7d7c6bd2fae
 @patch

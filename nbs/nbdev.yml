@@ -7,3 +7,8 @@ website:
   description: "kosha (कोश) — a treasury of your repo and environment context for coding agents. FTS5 + vector search + call graph, no LLMs required."
   repo-branch: main
   repo-url: "https://github.com/vedicreader/kosha"
+
+format-links:
+  - html
+  - format: commonmark
+    text: Markdown
