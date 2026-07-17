@@ -127,4 +127,5 @@ d = { 'settings': { 'branch': 'main',
                              'kosha.graph._root': ('graph.html#_root', 'kosha/graph.py'),
                              'kosha.graph.dyn_edges': ('graph.html#dyn_edges', 'kosha/graph.py'),
                              'kosha.graph.is_sys_pkg': ('graph.html#is_sys_pkg', 'kosha/graph.py'),
-                             'kosha.graph.static_edges': ('graph.html#static_edges', 'kosha/graph.py')}}}
+                             'kosha.graph.static_edges': ('graph.html#static_edges', 'kosha/graph.py')},
+            'kosha.skill': {}}}
