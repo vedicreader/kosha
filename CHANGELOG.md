@@ -2,6 +2,10 @@
 
 <!-- do not remove -->
 
+## 0.0.26
+hnsw ann
+
+
 ## 0.0.25
 boosting + denoising
 
