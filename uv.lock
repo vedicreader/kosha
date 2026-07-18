@@ -2061,7 +2061,7 @@ wheels = [
 
 [[package]]
 name = "koshas"
-version = "0.0.25"
+version = "0.0.26"
 source = { editable = "." }
 dependencies = [
     { name = "fastprogress" },
@@ -2149,7 +2149,7 @@ wheels = [
 
 [[package]]
 name = "litesearch"
-version = "0.0.31"
+version = "0.0.32"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "chonkie" },
@@ -2168,9 +2168,9 @@ dependencies = [
     { name = "usearch" },
     { name = "yake" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/94/9b/6b947b9854d58309c6bf95b39a6f5bd3541dcc7ee89f3f21d2e0c53cc975/litesearch-0.0.31.tar.gz", hash = "sha256:90bec14e2d96465e8fda9ac91f4986d3e7b710febde634e42db48e0f955a8465", size = 48276 }
+sdist = { url = "https://files.pythonhosted.org/packages/bd/71/f68fb0851764a2338d824f7abc2c70b546f09b43f72083a57d8589c03d3b/litesearch-0.0.32.tar.gz", hash = "sha256:ce4a5668f99c77344acae03ebde6f154857021200ae69d4597b662fe775e89d3", size = 48539 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4c/3e/9480dce3d90a46b9817775e401a088d63087a7dcd7121c50fdb6207215c2/litesearch-0.0.31-py3-none-any.whl", hash = "sha256:6af50c4531f5381419191a45d4de27ec324821fef7d749e15e489ac8c4787779", size = 40364 },
+    { url = "https://files.pythonhosted.org/packages/93/8f/6bebaf830afd260eefed5a03c94e36e42aab3f8b751b4a85c665b8307582/litesearch-0.0.32-py3-none-any.whl", hash = "sha256:4473ef316069f49f27b6621f426891176031092d88f9d59cfaea02ba7d3711f6", size = 40557 },
 ]
 
 [[package]]
