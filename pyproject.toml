@@ -23,6 +23,9 @@ dependencies = [
     "watchfiles>=1.1.1",
 ]
 
+[project.optional-dependencies]
+mcp = ["mcp>=1.2.0"]
+
 [project.urls]
 Repository = "https://github.com/vedicreader/kosha"
 Documentation = "https://vedicreader.github.io/kosha/"
@@ -35,6 +38,7 @@ kosha = "kosha.skill"
 
 [project.scripts]
 kosha = "kosha.cli:main"
+kosha-mcp = "kosha.mcp:main"
 
 [tool.hatch.version]
 path = "kosha/__init__.py"
@@ -52,6 +56,7 @@ lib_path = "kosha"
 [dependency-groups]
 dev = [
     "fossick>=0.0.10",
+    "mcp>=1.2.0",
     "nbdev>=3.0.15",
     "notebook>=7.5.5",
 ]

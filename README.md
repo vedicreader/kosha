@@ -4734,3 +4734,36 @@ Commit `.agents/skills/kosha/SKILL.md` so every contributor picks up the skill a
 ## pyskills
 
 kosha registers as a [pyskill](https://github.com/AnswerDotAI/pyskills) (`kosha.skill`) for Python-native LLM hosts.
+
+
+## MCP server
+
+`kosha-mcp` exposes the index over the Model Context Protocol, so Claude Code, Claude Desktop, Codex, and any other MCP client can query it directly — `status`/`sync`, `context`/`repo_context`/`env_context`, `node_info`/`short_path`/`api_paths`, `where_to_add`, and more.
+
+kosha indexes the *current* repo and its venv, so the server must launch from the project root with the project's environment — `uv run` does both:
+
+``` sh
+uv add --dev 'koshas[mcp]'
+```
+
+**Claude Code** (run inside the project)
+
+``` sh
+claude mcp add kosha -- uv run kosha-mcp
+```
+
+**Codex** (`~/.codex/config.toml`; Codex launches servers from your session's working directory, so start it at the project root)
+
+``` toml
+[mcp_servers.kosha]
+command = "uv"
+args = ["run", "kosha-mcp"]
+```
+
+**Claude Desktop** (`claude_desktop_config.json` — pin the project explicitly)
+
+``` json
+{"mcpServers": {"kosha": {"command": "uv", "args": ["run", "--project", "/path/to/your/repo", "kosha-mcp"]}}}
+```
+
+The server speaks stdio by default (`kosha-mcp --http` for Streamable HTTP). See the [mcp docs](https://vedicreader.github.io/kosha/mcp.html) for the full tool list.
