@@ -2,6 +2,13 @@
 
 <!-- do not remove -->
 
+## 0.0.28
+mcp server (`kosha-mcp`), mcp as a core dep
+- new `kosha-mcp` console script — exposes the index over MCP (stdio, or `--http` for Streamable HTTP)
+- 14 tools: `status`, `sync`, `context`, `repo_context`, `env_context`, `where_to_add`, `node_info`, `neighbors`, `short_path`, `public_api`, `top_nodes`, `api_paths`, `dep_stack`, `pkg_url`
+- `mcp` promoted from optional extra to a core dependency
+
+
 ## 0.0.27
 bump
 
