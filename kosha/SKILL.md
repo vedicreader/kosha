@@ -58,7 +58,7 @@ for r in k.env_context('description of what you want', limit=10):
 | How do two nodes connect? | `k.short_path('a.fn', 'b.fn')` |
 | What's a package's real public API? (`__all__` + `@patch`) | `k.public_api('pkg')` |
 | Where do I add new code? (returns `file:line` insertion points) | `k.where_to_add('desc', limit=5)` |
-| Rebuild call graph without re-embedding (e.g. after kosha update) | `k.sync(force_graph=True)` |
+| Rebuild call graph without re-embedding (e.g. after kosha update) | `k.sync(embed=False)` |
 
 `context(q, graph=True)` is the right default once a task touches more than one module.
 `env_context` is already a semantic similarity search — pass any description, snippet, or
@@ -93,6 +93,9 @@ and where the registration lives, without reading the glue code.
 
 ## Pointers
 
+- **MCP server:** if `kosha-mcp` is configured in the host (`claude mcp add kosha -- uv run kosha-mcp`),
+  the same operations are available as MCP tools (`status`, `context`, `env_context`, `node_info`,
+  `where_to_add`, ...) — call those directly instead of the in-process API.
 - **Daemon protocol:** send JSON `{"cmd": "...", "args": {...}}` on stdin. Commands: `sync`,
   `context`, `repo_context`, `env_context`, `ni`, `top_nodes`, `public_api`, `api_call_paths`,
   `status`, `where_to_add`.

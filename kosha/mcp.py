@@ -8,10 +8,9 @@ Docs: https://vedicreader.github.io/kosha/mcp.html.md"""
 __all__ = ['mcp', 'status', 'sync', 'context', 'repo_context', 'env_context', 'where_to_add', 'node_info', 'neighbors',
            'short_path', 'public_api', 'top_nodes', 'api_paths', 'dep_stack', 'pkg_url', 'main']
 
-# %% ../nbs/04_mcp.ipynb #db49140d
+# %% ../nbs/04_mcp.ipynb #0ec0ff9f
 """MCP server for kosha — repo + package context search and call-graph tools over stdio.
-Run `kosha-mcp` from the target repo's root in its venv (e.g. `uv run kosha-mcp`);
-needs the `mcp` extra: `uv add --dev 'koshas[mcp]'`.
+Run `kosha-mcp` from the target repo's root in its venv (e.g. `uv run kosha-mcp`).
 
 Docs: https://vedicreader.github.io/kosha/mcp.html.md"""
 
@@ -20,10 +19,10 @@ from .core import Kosha, env_pkg_versions, pkg_url as _pkg_url
 
 try: from mcp.server.fastmcp import FastMCP
 except ImportError as e:
-    raise ImportError("kosha-mcp needs the optional `mcp` dependency — "
-                      "install with `uv add --dev 'koshas[mcp]'` or `pip install 'koshas[mcp]'`") from e
+    raise ImportError("kosha-mcp needs the `mcp` package (a kosha dependency) — "
+                      "reinstall kosha with `uv add --dev koshas` or `pip install koshas`") from e
 
-# %% ../nbs/04_mcp.ipynb #be59c8f8
+# %% ../nbs/04_mcp.ipynb #c83b2bc6
 mcp = FastMCP('kosha', instructions=(
     'Persistent memory of this repo and its installed packages (FTS5 + vector search + call graph). '
     'Call status first; sync if anything is stale. Before writing new code, env_context checks whether '
@@ -47,7 +46,7 @@ def _jsonable(o):
     if hasattr(o, '__iter__'): return [_jsonable(x) for x in o]
     return str(o)
 
-# %% ../nbs/04_mcp.ipynb #64a0f729
+# %% ../nbs/04_mcp.ipynb #f1bbab07
 @mcp.tool()
 def status() -> dict:
     "Index freshness: {files, packages, graph_nodes, stale_files, stale_pkgs}. Call this first; if anything is stale, sync before querying (stale looks like missing)."
@@ -60,7 +59,7 @@ def sync(dir:str|None=None, pkgs:list|None=None, embed:bool=True, force:bool=Fal
     k.sync(dir=dir, pkgs=pkgs, embed=embed, force=force, sync_graph=sync_graph)
     return _jsonable(k.status())
 
-# %% ../nbs/04_mcp.ipynb #a0de6197
+# %% ../nbs/04_mcp.ipynb #1c8111fc
 @mcp.tool()
 def context(query:str, limit:int=10, repo:bool=True, env:bool=True, graph:bool=True, compact:bool=False) -> list:
     "Fan-out semantic + keyword search over repo and installed packages, graph-enriched (callers/callees/pagerank). The right default once a task touches more than one module. compact=True returns slim dicts (mod_name, signature, docstring, lineno) for triage."
@@ -81,7 +80,7 @@ def where_to_add(description:str, limit:int=5) -> list:
     "Likely file:line insertion points for new code matching a description, with co_dispatched peers to pattern-match."
     return _jsonable(_kosha().where_to_add(description, limit=limit))
 
-# %% ../nbs/04_mcp.ipynb #8509b33b
+# %% ../nbs/04_mcp.ipynb #5d2ebcbc
 @mcp.tool()
 def node_info(mod_name:str) -> dict:
     "Callers, callees, co_dispatched peers, and pagerank for a fully-qualified node, e.g. fastcore.basics.merge. pagerank = blast radius: high means load-bearing, touch carefully."
@@ -122,7 +121,7 @@ def pkg_url(pkg:str) -> str:
     "Best repo/docs URL for an installed package — feed it to a web-fetch tool for docs, changelogs, or migration guides."
     return _pkg_url(pkg) or "not found"
 
-# %% ../nbs/04_mcp.ipynb #82373a7e
+# %% ../nbs/04_mcp.ipynb #04d1a1a6
 def main():
     "Entry point for the `kosha-mcp` console script. stdio by default; pass --http for Streamable HTTP."
     mcp.run(transport='streamable-http' if '--http' in sys.argv[1:] else 'stdio')

@@ -68,7 +68,7 @@ k.status()
 
 Re-run `k.sync()` after `uv add`, version bumps, or significant code changes. If `stale_files > 0` or `stale_pkgs` is non-empty, sync before querying.
 
-Use `k.sync(force_graph=True)` to rebuild the call graph on an existing DB without re-embedding — useful after a kosha update that changes graph logic.
+Use `k.sync(embed=False)` to rebuild the call graph on an existing DB without re-embedding — useful after a kosha update that changes graph logic.
 
 ## 1 — Check before implementing
 
@@ -236,7 +236,7 @@ from fastcore.all import L
 ```
 
 ``` python
-k.graphdb.t.graph_edges(where='callee like "%litesearch%"')
+k.graphdb.t.graph_edges(where='callee like "%litesearch%"')[:2]
 ```
 
     [{'id': 153331,
@@ -4735,15 +4735,14 @@ Commit `.agents/skills/kosha/SKILL.md` so every contributor picks up the skill a
 
 kosha registers as a [pyskill](https://github.com/AnswerDotAI/pyskills) (`kosha.skill`) for Python-native LLM hosts.
 
-
 ## MCP server
 
 `kosha-mcp` exposes the index over the Model Context Protocol, so Claude Code, Claude Desktop, Codex, and any other MCP client can query it directly — `status`/`sync`, `context`/`repo_context`/`env_context`, `node_info`/`short_path`/`api_paths`, `where_to_add`, and more.
 
-kosha indexes the *current* repo and its venv, so the server must launch from the project root with the project's environment — `uv run` does both:
+The MCP server ships with kosha (no extra needed). kosha indexes the *current* repo and its venv, so the server must launch from the project root with the project’s environment — `uv run` does both:
 
 ``` sh
-uv add --dev 'koshas[mcp]'
+uv add --dev koshas
 ```
 
 **Claude Code** (run inside the project)
@@ -4752,7 +4751,7 @@ uv add --dev 'koshas[mcp]'
 claude mcp add kosha -- uv run kosha-mcp
 ```
 
-**Codex** (`~/.codex/config.toml`; Codex launches servers from your session's working directory, so start it at the project root)
+**Codex** (`~/.codex/config.toml`; Codex launches servers from your session’s working directory, so start it at the project root)
 
 ``` toml
 [mcp_servers.kosha]
