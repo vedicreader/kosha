@@ -10,11 +10,11 @@ Docs: https://vedicreader.github.io/kosha/core.html.md"""
 
 # %% auto #0
 __all__ = ['strict_skip_folder_re', 'strict_skip_file_re', 'parse', 'repo_root', 'mv_skill_md', 'arun', 'pkg_trans_deps',
-           'env_pkg_versions', 'Kosha', 'pkg_url', 'pkg_doc', 'has_init', 'imp_root', 'enrich_chunks', 'count_imp',
-           'parseq', 'filt2wh']
+           'resolve_python', 'env_pkg_versions', 'Kosha', 'pkg_url', 'pkg_doc', 'has_init', 'imp_root', 'enrich_chunks',
+           'count_imp', 'repo_files', 'parseq', 'filt2wh']
 
 # %% ../nbs/00_core.ipynb #d979fe142033f158
-import ast, os, re
+import ast, os, re, sys, json, hashlib, subprocess
 from ast import get_source_segment as gs
 from collections import defaultdict, Counter
 from functools import lru_cache
@@ -25,6 +25,7 @@ from fastcore.xdg import xdg_data_home
 from tqdm import tqdm
 from json import loads as jl
 from litesearch import *
+from litesearch.utils import FastEncode, bge_model
 
 # %% ../nbs/00_core.ipynb #563987a46284072b
 @timed_cache(maxsize=4096)
@@ -101,21 +102,72 @@ def pkg_trans_deps(seeds:list, depth:int=2) -> L:
 	return L(seen)
 
 # %% ../nbs/00_core.ipynb #144f225d425b7d6b
-def env_pkg_versions(pyproject=True, depth:int=1) -> dict:
-	'''Get a dict of installed package versions using importlib.metadata.
-	passing depth traverse multiple layers of dependencies'''
-	pkgs = installed_packages(pyproject=pyproject)
-	if pyproject and depth: pkgs = pkg_trans_deps(pkgs, depth)
-	return {dist(p).metadata['Name']: dist(p).version for p in pkgs}
+_canon = lambda s: re.sub(r'[-_.]+','-',s).lower()
+
+def resolve_python(root='.', python=None) -> Path:
+    "Resolve the interpreter used to inspect the project environment."
+    root = Path(root).resolve()
+    cands = L(python, os.getenv('KOSHA_PYTHON'), root/'.venv/bin/python', root/'.venv/Scripts/python.exe',
+              Path(os.getenv('VIRTUAL_ENV',''))/('Scripts/python.exe' if os.name=='nt' else 'bin/python'), sys.executable)
+    return Path(first(cands,lambda p:p and Path(p).is_file())).absolute()
+
+@lru_cache(maxsize=32)
+def _env_inventory(python:str) -> dict:
+    "Inspect distributions through `python`, without importing them into this process."
+    code = r'''import importlib.metadata as m,json,sys,re
+url=lambda d: next((x.split(',',1)[1].strip() for x in (d.metadata.get_all('Project-URL') or []) if x.lower().startswith(('source code,','repository,','github,'))),d.metadata.get('Home-page',''))
+o={}
+for d in m.distributions():
+ n=d.metadata.get('Name')
+ if n:o[re.sub(r"[-_.]+","-",n).lower()]={"name":n,"version":d.version,"requires":d.requires or [],"summary":d.metadata.get('Summary',''),"url":url(d)}
+print(json.dumps({"python":sys.executable,"prefix":sys.prefix,"packages":o}))'''
+    return json.loads(subprocess.check_output([python,'-c',code], text=True, timeout=30))
+
+def _project_pkgs(root) -> L:
+    "Names in project.dependencies; empty when pyproject.toml is absent."
+    p = Path(root)/'pyproject.toml'
+    if not p.exists(): return L()
+    import tomllib
+    deps = tomllib.loads(p.read_text()).get('project',{}).get('dependencies',[])
+    return L(deps).map(lambda x: _canon(m.group()) if (m:=_req_nm.match(x)) else None).filter()
+
+def env_pkg_versions(pyproject=True, depth:int=1, python=None, root=None) -> dict:
+    "Installed package versions from the selected project interpreter."
+    root = Path(root or repo_root() or '.')
+    py = resolve_python(root,python)
+    inv = _env_inventory(str(py))['packages']
+    if not pyproject: return {d['name']:d['version'] for d in inv.values()}
+    seen = front = set(_project_pkgs(root))
+    for _ in range(depth):
+        nxt = {_canon(m.group()) for p in front if p in inv for r in inv[p]['requires'] if (m:=_req_nm.match(r))}
+        front = nxt-seen; seen |= front
+    return {inv[p]['name']:inv[p]['version'] for p in seen if p in inv}
+
+def _pkg_info(python, pkg) -> dict: return _env_inventory(str(python))['packages'].get(_canon(pkg))
+
+def _pkg_files(python, pkg, exts=code_exts) -> L:
+    "Code files owned by a distribution in the selected interpreter."
+    code = r'''import importlib.metadata as m,json,sys
+p=m.distribution(sys.argv[1]); print(json.dumps([str(p.locate_file(f)) for f in p.files or [] if p.locate_file(f).is_file()]))'''
+    try: fs = json.loads(subprocess.check_output([str(python),'-c',code,pkg], text=True, timeout=30))
+    except Exception: return L()
+    exts = set(exts.split(',')) if isinstance(exts,str) else set(listify(exts))
+    return L(fs).map(Path).filter(lambda p:p.suffix in exts)
+
 
 # %% ../nbs/00_core.ipynb #b18bbd41de289e55
 class Kosha:
 	'Kosha allows you to build a context for code generation based on your repo and environment.'
-	def __init__(self, dir: Path = None, install_skill: bool = False, xdg_dir: Path = None, efn=static_code_embedder):
-		self.root, self.xdg, self.efn = Path(dir or repo_root() or '.'), xdg_dir or xdg_data_home(), efn()
+	def __init__(self, dir: Path = None, install_skill: bool = False, xdg_dir: Path = None, efn=None, python=None):
+		self.root, self.xdg = Path(dir or repo_root() or '.').resolve(), xdg_dir or xdg_data_home()
+		self.python = resolve_python(self.root, python)
+		self.env = _env_inventory(str(self.python))
+		self.efn = efn() if callable(efn) else efn or FastEncode(model_dict=bge_model)
 		self.emb_doc, self.emb_query = doc_encoder(self.efn), query_encoder(self.efn)
 		if install_skill: mv_skill_md(dir=self.root, dry_run=False)
-		self.cp, self.ce = self.root.joinpath('.kosha','code.db'), self.xdg.joinpath('kosha','env.db')
+		eid = hashlib.sha1((str(self.python)+self.env['prefix']).encode()).hexdigest()[:12]
+		mid = 'bge-micro-v2' if efn is None else hashlib.sha1(type(self.efn).__name__.encode()).hexdigest()[:12]
+		self.cp, self.ce = self.root/'.kosha'/f'code-{mid}.db', self.xdg/'kosha'/f'env-{eid}-{mid}.db'
 		for p in (self.cp, self.ce): p.parent.mkdir(parents=True, exist_ok=True)
 		self.codedb, self.envdb, kw = database(self.cp), database(self.ce), dict(hash=True,ann=True)
 		self.code_st,self.env_st = self.codedb.get_store(path=str,**kw),self.envdb.get_store(package=str,**kw)
@@ -137,15 +189,17 @@ def pkg_url(pkg: str) -> str | None:
             urls.get('github') or m.get('Home-page') or next(iter(urls.values()), None))
 
 # %% ../nbs/00_core.ipynb #466153b80488af15
-def pkg_doc(pkg) -> dict:
-	'Build pkg_store content dict: content=summary+readme, metadata=json.'
-	m = meta(pkg)
-	_get, _req_re, fn = lambda k: m.get(k,''), re.compile(r'^[\w-]+'), lambda rm: rm.group(0).lower().replace('-','_')
-	reqs = ' '.join({fn(rm) for r in (m.get_all('Requires-Dist') or []) if (rm:=_req_re.match(r))})
-	summary = _get('Summary')
-	cont = summary+'\n'+(m.get_payload() or _get('Description') or '')[:2000].strip()
-	return dict(content=cont, metadata=dict(name=pkg, version=v(pkg), keywords=_get('Keywords'),
-	                                        requires=reqs, summary=summary, url=pkg_url(pkg)))
+def pkg_doc(pkg, info=None) -> dict:
+    "Build a package-description chunk from local or probed metadata."
+    if info:
+        reqs = ' '.join({_canon(m.group()) for r in info['requires'] if (m:=_req_nm.match(r))})
+        return dict(content=info['summary'], metadata=info | {'requires':reqs})
+    m = meta(pkg); get = lambda k: m.get(k,'')
+    reqs = ' '.join({_canon(rm.group()) for r in (m.get_all('Requires-Dist') or []) if (rm:=_req_nm.match(r))})
+    summary = get('Summary')
+    return dict(content=summary+'\n'+(m.get_payload() or get('Description') or '')[:2000].strip(),
+                metadata=dict(name=pkg,version=v(pkg),keywords=get('Keywords'),requires=reqs,summary=summary,url=pkg_url(pkg)))
+
 
 # %% ../nbs/00_core.ipynb #34b20a9569e7b893
 def has_init(d: Path) -> bool:
@@ -224,125 +278,115 @@ def count_imp(files, own:str='') -> Counter:
 @patch
 @fdelegates(pkg2chunks)
 def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, force=False, imports=False, **kwargs):
-    'Update package metadata in the packages table.'
-    assert (o:= spec(pkg)), f'pkg {pkg} is not in environment'
+    "Index one distribution from the selected project interpreter."
+    assert (info:=_pkg_info(self.python,pkg)), f'pkg {pkg} is not in environment {self.python}'
+    pkg, ver = info['name'], info['version']
     if verbose: print(f'updating pkg: {pkg} ...')
-    ep = self._is_pkg_ingested(pkg)
-    if ep and len(self.env_st(where=f'package={pkg!r}')) > 0:
-        if verbose: print(f'package {ep} already loaded.')
-        if not force: return
-        print(f'forcing an update to pkg {ep}')
-    pkg_par = Path(o.origin).parent.parent if o.origin else Path(o.submodule_search_locations[0])
-    mod_fn = lambda p, n: '.'.join(list(Path(p).relative_to(pkg_par).with_suffix('').parts) + ([n] if n else []))
-    _get = lambda o,k1=None: o.get('metadata').get(k1,'')
-    meta_fn = lambda d: d['metadata'] | dict(mod_name=mod_fn(_get(d,'path'), _get(d,'name') or None), package=pkg, version=v(pkg))
-    fn = lambda d: dict(package=pkg, uploaded_at=_get(d,'uploaded_at'), metadata=meta_fn(d))
-    files = pkg2files(pkg, exts=exts, **kwargs)
-    cnt = [file_parse(f, assigns=True, imports=imports) for f in tqdm(files,f'parse files from {pkg}')]
+    ep = first(self.pkgs(select='name,version',where=f'name={pkg!r} and version={ver!r}'))
+    if ep and len(self.env_st(where=f'package={pkg!r}')) and self.env_pd(where=f'from_pkg={pkg!r}') and not force:return
+    files = _pkg_files(self.python,pkg,exts)
+    get = lambda o,k=None: o.get('metadata',{}).get(k,'')
+    mod_fn = lambda p,n: '.'.join(list(Path(p).relative_to(imp_root(p)).with_suffix('').parts)+([n] if n else []))
+    meta_fn = lambda d: d['metadata'] | dict(mod_name=mod_fn(get(d,'path'),get(d,'name') or None),package=pkg,version=ver)
+    fn = lambda d: d | dict(package=pkg,uploaded_at=get(d,'uploaded_at'),metadata=meta_fn(d))
+    cnt = L(file_parse(f,assigns=True,imports=imports) for f in tqdm(files,f'parse files from {pkg}')).concat().filter()
     if cnt:
-        cnt, doc = enrich_chunks(L(cnt).concat().filter(true).map(lambda d: d | fn(d))), pkg_doc(pkg)
-        res = self.env_st.sync(cnt, key_col='package', emb_fn=self.emb_doc, embed=embed, force=force)
-        if res['changed']:
-            pyf = L(files).filter(lambda f: str(f).endswith('.py'))
-            counts = count_imp(pyf, pkg.replace('-','_').split('.')[0])
-            rows = [dict(from_pkg=pkg, to_pkg=dep, n_modules=n) for dep,n in counts.items() if _spec_cached(dep)]
-            if rows: self.envdb.t.pkg_deps.insert_all(rows, replace=True)
+        cnt = enrich_chunks(cnt.map(fn))
+        res = self.env_st.sync(cnt,key_col='package',emb_fn=self.emb_doc,embed=embed,force=force)
+        active = set(self.env['packages'])
+        counts = count_imp(files.filter(lambda f:f.suffix=='.py'),_canon(pkg).replace('-','_'))
+        rows = [dict(from_pkg=pkg,to_pkg=dep,n_modules=n) for dep,n in counts.items() if _canon(dep) in active]
+        if rows:self.env_pd.insert_all(rows,replace=True)
         if verbose: print(res)
-    return self.pkgs.insert(dict(name=pkg, version=v(pkg), summary=_get(doc,'summary')), ignore=True)
+    return self.pkgs.insert(dict(name=pkg,version=ver,summary=info['summary']),ignore=True)
+
 
 @patch
 def rm_pkg(self:Kosha, pkg:str, ver:str=None):
-    'Remove a package and its code snippets from the database.'
-    je = lambda k: f"json_extract(metadata,'$.{k}')"
-    self.env_st.delete_where(where=f'package={pkg!r}' + (f" AND {je('version')}={ver!r}" if ver else ''))
+    "Remove package chunks, metadata, dependencies, and ANN entries."
+    je = lambda k:f"json_extract(metadata,'$.{k}')"
+    self.env_st.delete_where(where=f'package={pkg!r}'+(f" AND {je('version')}={ver!r}" if ver else ''))
     self.pkg_st.delete_where(where=f"{je('name')}={pkg!r}")
     self.env_pd.delete_where(where=f'from_pkg={pkg!r}')
-    self.pkgs.delete_where(where=f'name={pkg!r}' + (f' AND version={ver!r}' if ver else ''))
-    self.env_st.rebuild_index()  # drop ANN entries orphaned by the deleted rows
+    self.pkgs.delete_where(where=f'name={pkg!r}'+(f' AND version={ver!r}' if ver else ''))
+    self.env_st.rebuild_index()
+
 
 @patch
-def update_pkgs(self:Kosha,
-    pkgs:str|list=None, # packages to sync; None syncs all installed env packages
-    embed=True,         # embed chunks after indexing
-    exts=code_exts,     # file extensions to include
-    verbose=True,       # print progress
-    force=False,        # reindex even if package version already loaded
-    **kwargs            # forwarded to update_pkg
-):
-    'Sync installed packages into the env store; if pkgs is None, syncs all env packages.'
-    if verbose: print(f'loading pkgs {pkgs} ...' if pkgs else 'No packages to load.')
+def update_pkgs(self:Kosha, pkgs:str|list=None, embed=True, exts=code_exts, verbose=True, force=False, **kwargs):
+    "Sync selected distributions into the environment store."
     if not pkgs: return
-    kw = dict(embed=embed, exts=exts, verbose=verbose, force=force, **kwargs)
-    for pkg in tqdm(list(set(pkgs)), desc='Updating packages', unit='pkg'): self.update_pkg(pkg, **kw)
+    kw = dict(embed=embed,exts=exts,verbose=verbose,force=force,**kwargs)
+    for pkg in tqdm(set(listify(pkgs)),desc='Updating packages',unit='pkg'): self.update_pkg(pkg,**kw)
+
 
 # %% ../nbs/00_core.ipynb #a62a554620a32e84
-strict_skip_folder_re = r'^[._]|^(?:tests?|examples?|docs?|build|dist)$'
-strict_skip_file_re = r'^[._]|^(?:setup\.py|conftest\.py)$'
+strict_skip_folder_re = r'^(?:\.git|\.kosha|\.venv|venv|__pycache__|node_modules|build|dist|vendor)$'
+strict_skip_file_re = r'^[.]'
+_skip_dirs = {'.git','.kosha','.venv','venv','__pycache__','node_modules','build','dist','vendor'}
+
+def repo_files(root, exts=code_exts) -> L:
+    "Filesystem source discovery, including untracked tests/examples/docs."
+    root, out = Path(root).absolute(), []
+    exts = set(exts.split(',')) if isinstance(exts,str) else set(listify(exts))
+    for d, ds, fs in os.walk(root):
+        ds[:] = [x for x in ds if x not in _skip_dirs]
+        out += [Path(d)/f for f in fs if not f.startswith('.') and Path(f).suffix in exts]
+    return L(out)
 
 @patch
 @fdelegates(process_content)
 def process_repo(self:Kosha, content=None, reembed=False, **kwargs):
-	'Embed all documents in the code store, or only those without embeddings if reembed=False.'
-	content = content or self.code_st(where=f'embedding is NULL' if not reembed else None)
-	return process_content(self.code_st, content, emb_fn=self.emb_doc, **kwargs)
+    "Embed all documents in the code store, or only those without embeddings if reembed=False."
+    content = content or self.code_st(where=f'embedding is NULL' if not reembed else None)
+    return process_content(self.code_st, content, emb_fn=self.emb_doc, **kwargs)
 
 @patch
 @fdelegates(dir2files)
-def update_repo(self:Kosha,
-                dir:Path=None,    # directory to index; defaults to repo root
-                embed:bool=True,  # embed chunks after parsing
-                exts:str=code_exts,
-                verbose=True,       # verbose
-                force=False,        # reindex all files regardless of mtime
-                **kwargs              # extra args forwarded to dir2files
-                ):
-    'Index or update repo code chunks. Pass files= for incremental update (e.g. from watcher).'
-    dir = Path(dir or self.root)
-    known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path, uploaded_at') if r['path']}
-    all_files = dir2files(str(dir), strict_skip_file_re, strict_skip_folder_re,exts=exts, **kwargs)
-    all_str = set(map(str, all_files))
-    to_remove = L(known.keys()).filter(lambda k: k not in all_str)
-    ch = all_files if force else L(all_files).filter(lambda f: str(f) not in known or known[str(f)] != f.stat().st_mtime)
-    if to_remove:
-        self.code_st.delete_where(where=f'path in ({",".join(to_remove.map(repr))})')
-        self.code_st.rebuild_index()  # drop ANN entries orphaned by deleted files
-    if not ch: return
-    if verbose: print(f'syncing files {ch} .....')
-    mod_fn = lambda p, n: '.'.join(list(Path(p).relative_to(imp_root(p)).with_suffix('').parts)+([n] if n else []))
-    _get = lambda m,k1,k2: m.get(k1,{}).get(k2,'')
-    meta_fn = lambda d: d['metadata'] | dict(mod_name=mod_fn(_get(d,'metadata','path'),_get(d,'metadata','name')))
-    fn = lambda d: dict(path=_get(d,'metadata','path'),uploaded_at=_get(d,'metadata','uploaded_at'),metadata=meta_fn(d))
-    content = L([file_parse(f, assigns=True) for f in tqdm(ch,f'parse files from {dir}')]).concat()
+def update_repo(self:Kosha, dir:Path=None, embed:bool=True, exts:str=code_exts, verbose=True, force=False, **kwargs):
+    "Index repo chunks. `files=` supports watcher-driven incremental updates."
+    dir = Path(dir or self.root).resolve()
+    known = {r['path']:r['uploaded_at'] for r in self.code_st(select='path,uploaded_at') if r['path']}
+    all_files = L(kwargs.pop('files',None)) or repo_files(dir,exts)
+    all_files = all_files.map(lambda p: Path(p).resolve())
+    current = set(map(str,all_files)); rm = set(known)-current
+    changed = all_files if force else all_files.filter(lambda f: str(f) not in known or known[str(f)]!=f.stat().st_mtime)
+    if rm:
+        self.code_st.delete_where(where=f'path in ({",".join(map(repr,rm))})'); self.code_st.rebuild_index()
+    if not changed: return
+    if verbose: print(f'syncing files {changed} .....')
+    mod_fn = lambda p,n: '.'.join(list(Path(p).relative_to(imp_root(p)).with_suffix('').parts)+([n] if n else []))
+    get = lambda m,k1,k2: m.get(k1,{}).get(k2,'')
+    meta = lambda d: d['metadata'] | dict(mod_name=mod_fn(get(d,'metadata','path'),get(d,'metadata','name')))
+    fn = lambda d: dict(path=get(d,'metadata','path'),uploaded_at=get(d,'metadata','uploaded_at'),metadata=meta(d))
+    content = L(file_parse(f,assigns=True) for f in tqdm(changed,f'parse files from {dir}')).concat()
     if not content: return
-    content = enrich_chunks(content.map(lambda d: d | fn(d)))
-    res = self.code_st.sync(content, key_col='path', emb_fn=self.emb_doc, embed=embed, force=force)
-    for f in ch: self.codedb.q(f'update {self.code_st.name} set uploaded_at=? where path=?',[f.stat().st_mtime, str(f)])
-    if verbose: print(res)
-    own = Path(dir).resolve().name
-    rows = [dict(from_module=own, to_pkg=dep, n_files=n) for dep,n in count_imp(ch,own).items() if spec(dep)]
-    if rows: self.code_rd.insert_all(rows, replace=True)
-    if verbose: print('synced repo')
+    res = self.code_st.sync(enrich_chunks(content.map(lambda d:d|fn(d))),key_col='path',emb_fn=self.emb_doc,embed=embed,force=force)
+    for f in changed:self.codedb.q(f'update {self.code_st.name} set uploaded_at=? where path=?',[f.stat().st_mtime,str(f)])
+    if verbose: print(res); print('synced repo')
+
 
 # %% ../nbs/00_core.ipynb #d91bbf7a5f17e3d0
 @patch
 def prune_old_versions(self:Kosha, pkg:str):
-	'Keep only the latest version of a package in the database.'
-	if len(vers := self.pkgs(select='version', where=f'name={pkg!r}')) <= 1: return
-	latest = sorted(L(vers).attrgot('version'), key=lambda v: tuple(map(int, v.split('.'))))[-1]
-	je = lambda k, o='=', v='': f"json_extract(metadata, '$.{k}') {o} {v!r}"
-	self.env_st.delete_where(where=f"{je('name')}={pkg!r} AND {je('version')}<>{latest!r}")
-	self.pkgs.delete_where(where=f'name={pkg!r} AND version<>{latest!r}')
+    "Keep only the latest indexed version of a package."
+    if len(vers:=self.pkgs(select='version',where=f'name={pkg!r}'))<=1:return
+    latest=sorted(L(vers).attrgot('version'),key=lambda v:tuple(map(int,v.split('.'))))[-1]
+    je=lambda k,o='=',v='':f"json_extract(metadata, '$.{k}') {o} {v!r}"
+    self.env_st.delete_where(where=f"{je('name')}={pkg!r} AND {je('version')}<>{latest!r}")
+    self.pkgs.delete_where(where=f'name={pkg!r} AND version<>{latest!r}')
 
 @patch
 def prune_old_pkgs(self:Kosha):
-	'Keep only the latest version of each package in the database.'
-	L(self.pkgs(select='name')).attrgot('name').map(self.prune_old_versions)
+    "Keep only the latest version of each indexed package."
+    L(self.pkgs(select='name')).attrgot('name').map(self.prune_old_versions)
 
 @patch
 def pkgs_in_env(self:Kosha, pyproject=False, depth=1) -> list:
-	'Intersection of the packages table with packages installed in the environment.'
-	st_pkgs, inst_pkgs = L(self.pkgs(select='name, version')), env_pkg_versions(pyproject, depth)
-	return st_pkgs.filter(lambda p: p['name'] in inst_pkgs and inst_pkgs[p['name']] == p['version'])
+    "Indexed distributions present in the selected environment."
+    inst = {_canon(k):v for k,v in env_pkg_versions(pyproject,depth,self.python,self.root).items()}
+    return L(self.pkgs(select='name,version')).filter(lambda p:inst.get(_canon(p['name']))==p['version'])
+
 
 # %% ../nbs/00_core.ipynb #b57c6ce49a9c9fe5
 _filter_keys = frozenset({'file', 'files', 'path', 'paths', 'package', 'packages', 'lang', 'langs', 'type', 'types'})
@@ -402,8 +446,14 @@ def env_context(self:Kosha,
 	fq, emb = pre(raw, wide=wide, extract_kw=False), self.emb_query(emb_q or raw)
 	wh = ' AND '.join(map(lambda p: f'({p})', L(filt2wh(fs, 'env'), where).filter(true)))
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if 'metadata' in r else r
-	kw.pop('sys_wide', None)
-	return L(self.envdb.search(fq, emb.tobytes(), columns.split(','), where=wh, ann=ann, **kw)).map(fn)
+	sys_wide = kw.pop('sys_wide',False)
+	if not sys_wide:
+		active = {_canon(k):v for k,v in env_pkg_versions(False,0,self.python,self.root).items()}
+		pairs = [f"(lower(replace(package,'_','-'))={p!r} AND json_extract(metadata,'$.version')={v!r})" for p,v in active.items()]
+		awh = '('+' OR '.join(pairs)+')' if pairs else '0'
+		wh = ' AND '.join(map(lambda x:f'({x})',L(wh,awh).filter()))
+	# ANN ignores SQL filters; filtered searches use exact vectors.
+	return L(self.envdb.search(fq,emb.tobytes(),columns.split(','),where=wh,ann=ann and not wh,**kw)).map(fn)
 
 @patch
 def pkgs2consider(self: Kosha, sys_wide=True) -> set:
@@ -432,7 +482,7 @@ def repo_context(self:Kosha,
 	if where and wh: wh = f'({where}) AND ({wh})'
 	elif where: wh = where
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if 'metadata' in r else r
-	return L(self.codedb.search(fq, emb.tobytes(), columns.split(','), where=wh, ann=ann, **kw)).map(fn)
+	return L(self.codedb.search(fq, emb.tobytes(), columns.split(','), where=wh, ann=ann and not wh, **kw)).map(fn)
 
 @patch
 async def awatch_repo(self:Kosha, dir:Path=None, **kw):

@@ -14,7 +14,7 @@ from collections import defaultdict
 from litesearch import *
 from fastcore.all import (Path, L, patch, groupby, parallel_async, tuplify, first, fdelegates, globtastic, bind, true, dict2obj,
                           listify, filter_keys, in_, chunked, noop, parallel)
-from .core import arun, Kosha, parse, has_init, imp_root, env_pkg_versions
+from .core import arun, Kosha, parse, has_init, imp_root, env_pkg_versions, repo_files, _pkg_files, _canon
 from pyan.analyzer import CallGraphVisitor
 from pyan.anutils import Scope, ExecuteInInnerScope
 from tqdm import tqdm
@@ -382,17 +382,21 @@ def process_files(self:CodeGraph,
 @fdelegates(globtastic)
 def from_dir(self:CodeGraph, dir: str | Path, **kwargs) -> 'CodeGraph':
 	'Build from .py files under path — pyan reads files directly.'
-	files = dir2files(dir, exts=['.py'], func=os.path.join, **kwargs)
-	return self.process_files(files, Path(dir).parent)
+	files = dir2files(dir,exts=['.py'],func=os.path.join,**kwargs)
+	return self.process_files(files,Path(dir).parent)
 
 @patch
 @fdelegates(globtastic)
-def from_pkg(self: CodeGraph, pkg: str, **kwargs) -> 'CodeGraph':
-    'Build from an installed package. Uses pyan3 on the package source files.'
-    s = spec(pkg)
-    if not s: raise ValueError(f"{pkg!r} not installed")
-    p = Path(s.origin).parent if s.origin else Path(s.submodule_search_locations[0])
-    return self.from_dir(p, **kwargs)
+def from_pkg(self: CodeGraph, pkg: str, files=None, python=None, **kwargs) -> 'CodeGraph':
+    "Build from package files resolved in the selected interpreter."
+    if not python and not files:
+        s = spec(pkg)
+        if not s: raise ValueError(f"{pkg!r} not installed")
+        p = Path(s.origin).parent if s.origin else Path(s.submodule_search_locations[0])
+        return self.from_dir(p,**kwargs)
+    files = L(files) or _pkg_files(python,pkg,['.py'])
+    if not files: raise ValueError(f"{pkg!r} has no Python source")
+    return self.process_files(files)
 
 # %% ../nbs/01_graph.ipynb #511f144aaca872f8
 @patch
@@ -558,7 +562,7 @@ from tqdm import tqdm
 def sync_dir(self: CodeGraph, dir: str | Path, force=False) -> 'CodeGraph':
 	'Incremental sync for a directory: drop missing files, update changed files, add new files.'
 	if not dir: print('no action. dir empty'); return self
-	files = dir2files(dir, exts=['.py'], func=os.path.join)
+	files = repo_files(dir,['.py']).map(str)
 	known=set(L(self.db.t.file_index(select='distinct path', where='root=?', where_args=[str(dir)])).attrgot('path'))
 	for f in known - set(files): self._drop_file(f)
 	fs = files if force else self._stale(files, str(dir))
@@ -567,18 +571,18 @@ def sync_dir(self: CodeGraph, dir: str | Path, force=False) -> 'CodeGraph':
 	return self
 
 @patch
-def sync_pkgs(self: CodeGraph, pkgs: list[str]) -> 'CodeGraph':
+def sync_pkgs(self: CodeGraph, pkgs: list[str], python=None) -> 'CodeGraph':
 	'Incremental sync for packages: drop missing files, update changed files, add new files.'
 	if not pkgs: print('no action. pkgs empty'); return self
-	for pkg in tqdm(pkgs, desc='loading code graph for packages', unit='pkg'): self.from_pkg(pkg)
+	for pkg in tqdm(pkgs,desc='loading code graph for packages',unit='pkg'): self.from_pkg(pkg,python=python)
 	return self
 
 @patch
-def sync(self: CodeGraph, dir=None, pkgs=None, force=False) -> 'CodeGraph':
+def sync(self: CodeGraph, dir=None, pkgs=None, force=False, python=None) -> 'CodeGraph':
 	'Incremental sync: from_dir per dir, from_pkg per pkg; manage file_index. Centrality recomputed once at the end.'
 	if force: self.pa.delete_where()
 	if dir: self.sync_dir(dir, force)
-	if pkgs: self.sync_pkgs(pkgs)
+	if pkgs: self.sync_pkgs(pkgs,python)
 	return self
 
 # %% ../nbs/01_graph.ipynb #27493762895c4be6
@@ -654,12 +658,18 @@ import functools
 # %% ../nbs/01_graph.ipynb #3aaa2197
 @patch
 def status(self: Kosha, pyproject=True, depth=1) -> dict:
-	'Index freshness: file/pkg/node counts and stale file count.'
-	known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path,uploaded_at') if r['path']}
-	stale = sum(1 for p, mt in known.items() if Path(p).exists() and Path(p).stat().st_mtime != mt)
-	pkgs={r['name']: r['version'] for r in self.pkgs_in_env(pyproject, depth)}
-	sp = filter_keys(env_pkg_versions(pyproject,depth),not_(in_(pkgs)))
-	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale, stale_pkgs=sp)
+    "Index freshness, selected environment, and repo change counts."
+    known = {r['path']:r['uploaded_at'] for r in self.code_st(select='path,uploaded_at') if r['path']}
+    current = {str(p):p.stat().st_mtime for p in repo_files(self.root)}
+    added, deleted = set(current)-set(known), set(known)-set(current)
+    modified = {p for p in current.keys()&known.keys() if current[p]!=known[p]}
+    indexed = {_canon(r['name']):r['version'] for r in self.pkgs_in_env(pyproject,depth)}
+    wanted = env_pkg_versions(pyproject,depth,self.python,self.root)
+    stale_pkgs = {k:v for k,v in wanted.items() if indexed.get(_canon(k))!=v}
+    return dict(files=len(known),packages=self.pkgs.count,graph_nodes=self.gn.count,
+                stale_files=len(added|modified|deleted),added_files=len(added),modified_files=len(modified),deleted_files=len(deleted),
+                stale_pkgs=stale_pkgs,python=str(self.python),environment=self.env['prefix'])
+
 
 # %% ../nbs/01_graph.ipynb #rank_helpers_a1
 # ── Ranking layer ─────────────────────────────────────────────────────────────
@@ -819,6 +829,14 @@ def _boost_package(results, scores, soft_pkgs):
     for i, r in enumerate(results):
         if (pk := _rk_pkg(r)) and pk.lower() in sp: scores[i] *= _PACKAGE_BOOST
 
+_REPO_BOOST = 2.5
+
+def _boost_source(results, scores, explicit_pkg=False):
+    "Prefer project code for mixed natural-language queries."
+    if explicit_pkg: return
+    for i,r in enumerate(results):
+        if r.get('_source')=='repo': scores[i] *= _REPO_BOOST
+
 def _file_penalty(fpath:str) -> float:
     'Combined multiplicative penalty for test/compat/example/re-export/.d.ts paths.'
     norm = fpath.replace('\\', '/'); penalty = 1.0
@@ -860,8 +878,9 @@ def rank_results(results, query, soft_pkgs=None, top_k=None, penalise_paths=True
     scores = [_rk_score(r) for r in results]
     if max(scores, default=0.0) == 0.0: scores = [1.0/(i+1) for i in range(len(results))]  # keep incoming order
     _apply_query_boost(results, scores, query)
-    _boost_package(results, scores, soft_pkgs)
-    _boost_multi_chunk(results, scores)
+    _boost_package(results,scores,soft_pkgs)
+    _boost_source(results,scores,bool(soft_pkgs))
+    _boost_multi_chunk(results,scores)
     ranked = _rerank_topk(results, scores, top_k or len(results), penalise_paths)
     return L(results[i] | {'_score': s} for i, s in ranked)
 
@@ -884,7 +903,7 @@ def sync(self: Kosha,
 	pkgs = listify(pkgs) or self.status(pyproject,depth).get('stale_pkgs', {})
 	ts = [bind(self.update_repo, dir, verbose=verbose, force=force, embed=embed),
 		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed),
-		  bind(self.graph.sync, dir=dir, pkgs=pkgs, force=force) if sync_graph else noop]
+		  bind(self.graph.sync,dir=dir,pkgs=pkgs,force=force,python=self.python) if sync_graph else noop]
 	if in_parallel: return parallel(lambda f: f(), ts, threadpool=True, progress=True)
 	else: return L(ts).map(lambda f: f())
 
@@ -898,15 +917,16 @@ def context(self: Kosha,
             boost: bool = True,
 			compact: bool = False, # return slim dicts (mod_name, signature, docstring, lineno) instead of full chunks
             columns:str='content,metadata',
-            sys_wide=True,
+            sys_wide=False,
 			**kw                  # forwarded to env_context / repo_context
 ) -> L:
 	'Fan-out semantic search: parse filters, run repo + env searches, merge with chained RRF, then rerank.'
 	# self.update_repo()
-	def _tag(res, pref): return L(res).map(lambda r: r | dict(_src_id=f'{pref}:{r.get("rowid", id(r))}'))
+	def _tag(res,pref): return L(res).map(lambda r:r|dict(_source=pref,_src_id=f'{pref}:{r.get("rowid",id(r))}'))
 	# Embed the query exactly once and pass via emb_q= so repo/env don't each re-embed.
 	from kosha.core import parseq
 	raw, fs = parseq(q)
+	if fs.get('package!'): repo = False
 	emb_q = raw  # text key the cached embedder can hash on
 	items = []
 	if repo: items.append(('repo', bind(self.repo_context, q, emb_q=emb_q, limit=limit*2, columns=columns, **kw)))

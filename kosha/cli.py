@@ -40,13 +40,14 @@ def _print_results(results):
 def sync(
     dir:str=None,        # directory to sync; defaults to repo root
     pkgs:str=None,       # comma-separated package names; defaults to all pyproject.toml deps
+    python:str=None,     # project interpreter; defaults to <dir>/.venv
     parallel:bool=True, # run repo, env, and graph sync in parallel
     embed:bool=True,     # embed code chunks (set False for fast metadata-only update)
     force:bool=False,    # force re-sync of all files (ignoring freshness)
     sync_graph:bool=False, # sync call graph (ignoring freshness
 ):
     'Sync repo + env packages + call graph into .kosha/ databases.'
-    k = Kosha()
+    k = Kosha(dir=dir,python=python)
     pkg_list = pkgs.split(',') if pkgs else None
     k.sync(dir=dir, pkgs=pkg_list, in_parallel=parallel, embed=embed, force=force, sync_graph=sync_graph)
 
@@ -197,14 +198,14 @@ def top_nodes(
 
 # %% ../nbs/03_cli.ipynb #103087ed
 @call_parse
-def status(as_json:bool=False):
+def status(as_json:bool=False, dir:str=None, python:str=None):
     "Show index freshness: file/pkg/node counts, stale files, and stale packages."
-    s = Kosha().status()
+    s = Kosha(dir=dir,python=python).status()
     if as_json: print(json.dumps(s))
     else:
         stale_f = f" ({s['stale_files']} stale)" if s['stale_files'] else ""
         stale_p = f"  stale pkgs: {s['stale_pkgs']}" if s['stale_pkgs'] else ""
-        print(f"files: {s['files']}{stale_f}  packages: {s['packages']}  graph nodes: {s['graph_nodes']}{stale_p}")
+        print(f"files: {s['files']}{stale_f}  packages: {s['packages']}  graph nodes: {s['graph_nodes']}{stale_p}\npython: {s['python']}")
 
 
 # %% ../nbs/03_cli.ipynb #0c775df3
