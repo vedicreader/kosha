@@ -24,7 +24,6 @@ dependencies = [
     "mcp>=1.2.0"
 ]
 
-
 [project.urls]
 Repository = "https://github.com/vedicreader/kosha"
 Documentation = "https://vedicreader.github.io/kosha/"

@@ -2,6 +2,9 @@
 
 <!-- do not remove -->
 
+## 0.0.29
+skip folder re, skip file re, find stale files, graph sync optionalstale fixes
+
 ## 0.0.28
 mcp server (`kosha-mcp`), mcp as a core dep
 - new `kosha-mcp` console script — exposes the index over MCP (stdio, or `--http` for Streamable HTTP)
@@ -138,5 +141,3 @@ kosha release
 
 ## 0.0.1
 kosha initial initial
-
-

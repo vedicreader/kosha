@@ -13,8 +13,8 @@ from json import loads as jl
 from collections import defaultdict
 from litesearch import *
 from fastcore.all import (Path, L, patch, groupby, parallel_async, tuplify, first, fdelegates, globtastic, bind, true, dict2obj,
-                          listify, filter_keys, in_, chunked, noop, parallel)
-from .core import arun, Kosha, parse, has_init, imp_root, env_pkg_versions
+                          listify, filter_keys, in_, chunked, noop, parallel, not_)
+from .core import arun, Kosha, parse, has_init, imp_root, env_pkg_versions,repo_skip_folder_re,strict_skip_file_re
 from pyan.analyzer import CallGraphVisitor
 from pyan.anutils import Scope, ExecuteInInnerScope
 from tqdm import tqdm
@@ -517,9 +517,7 @@ def node_infos(self: CodeGraph,
         gp = ','.join('?'*len(set(n2g.values())))
         g2n = groupby(self.cd(where=f'group_id IN ({gp})', where_args=list(set(n2g.values()))), lambda r: r['group_id'], lambda r: r['node'])
         co = {n: L(x for x in g2n.get(g, []) if x != n) for n, g in n2g.items()}
-    return {n: (gn.get(n) or {}) | dict(callers=L(callers.get(n, [])), callees=L(callees.get(n, [])),
-                                        co_dispatched=co.get(n, L())) for n in nodes}
-
+    return {n: (gn.get(n) or {}) | dict(callers=L(callers.get(n, [])), callees=L(callees.get(n, [])), co_dispatched=co.get(n, L())) for n in nodes}
 
 # %% ../nbs/01_graph.ipynb #5965c060
 @patch
@@ -657,18 +655,12 @@ def status(self: Kosha, pyproject=True, depth=1) -> dict:
 	'Index freshness: file/pkg/node counts and stale file count.'
 	known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path,uploaded_at') if r['path']}
 	stale = sum(1 for p, mt in known.items() if Path(p).exists() and Path(p).stat().st_mtime != mt)
+	new = sum(1 for p in dir2files(self.root,strict_skip_file_re,repo_skip_folder_re,exts=['.py']) if str(p) not in known)
 	pkgs={r['name']: r['version'] for r in self.pkgs_in_env(pyproject, depth)}
 	sp = filter_keys(env_pkg_versions(pyproject,depth),not_(in_(pkgs)))
-	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale, stale_pkgs=sp)
+	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale, stale_pkgs=sp, new_files=new)
 
 # %% ../nbs/01_graph.ipynb #rank_helpers_a1
-# ── Ranking layer ─────────────────────────────────────────────────────────────
-# Rerank retrieved candidates using query-type text boosts + soft-package boost
-# + file-path penalties. Text boosting/penalty
-# logic is ported from MinishLab/semble (src/semble/ranking); the package and
-# graph stages are kosha additions. Operates on litesearch/context result dicts
-# (content, metadata, path/package, _rrf_score) via a parallel positional score list.
-
 # Symbol-lookup queries: namespace-qualified, leading-underscore, or containing uppercase/underscore.
 _SYMBOL_QUERY_RE = re.compile(
     r"^(?:"
@@ -865,7 +857,6 @@ def rank_results(results, query, soft_pkgs=None, top_k=None, penalise_paths=True
     ranked = _rerank_topk(results, scores, top_k or len(results), penalise_paths)
     return L(results[i] | {'_score': s} for i, s in ranked)
 
-
 # %% ../nbs/01_graph.ipynb #6f57bfb4
 @patch
 def sync(self: Kosha,
@@ -874,12 +865,13 @@ def sync(self: Kosha,
          verbose=True, # print progress messages
          in_parallel=True, # run repo, env, and graph sync in parallel; also fans env packages out across threads
          force=False, # ignore file mtimes and reprocess all files
-         sync_graph=True, # whether to force graph recomputation even if no files changed; ignored if force=True
+         sync_graph=False, # whether to force graph recomputation even if no files changed; ignored if force=True
          pyproject=True, # if True, auto-detect env packages from pyproject.toml; if False, use pkgs argument as-is
          depth=1, # depth for pyproject env package detection; ignored if pyproject=False
          embed=True # whether to embed
  ) -> 'Kosha':
 	'Sync code store, env store, and code graph. Runs in a daemon thread by default.'
+	if verbose: print(f"Syncing code graph for dir={dir or self.root}, pkgs={pkgs or 'all env packages'}, graph sync = {sync_graph}")
 	dir = dir or self.root
 	pkgs = listify(pkgs) or self.status(pyproject,depth).get('stale_pkgs', {})
 	ts = [bind(self.update_repo, dir, verbose=verbose, force=force, embed=embed),
@@ -903,27 +895,21 @@ def context(self: Kosha,
 ) -> L:
 	'Fan-out semantic search: parse filters, run repo + env searches, merge with chained RRF, then rerank.'
 	# self.update_repo()
-	def _tag(res, pref): return L(res).map(lambda r: r | dict(_src_id=f'{pref}:{r.get("rowid", id(r))}'))
+	def _tag(res,pref): return L(res).map(lambda r:r|dict(_source=pref,_src_id=f'{pref}:{r.get("rowid",id(r))}'))
 	# Embed the query exactly once and pass via emb_q= so repo/env don't each re-embed.
 	from kosha.core import parseq
 	raw, fs = parseq(q)
-	emb_q = raw  # text key the cached embedder can hash on
-	items = []
-	if repo: items.append(('repo', bind(self.repo_context, q, emb_q=emb_q, limit=limit*2, columns=columns, **kw)))
-	if env: items.append(('env',  bind(self.env_context,  q, emb_q=emb_q, limit=limit*2, columns=columns, sys_wide=sys_wide, **kw)))
-	# Real threadpool — A1 fix. parallel_async runs sync calls sequentially on one event loop.
-	from concurrent.futures import ThreadPoolExecutor
-	if len(items) > 1:
-		with ThreadPoolExecutor(max_workers=len(items)) as ex:
-			pairs = list(zip([t[0] for t in items], ex.map(lambda f: f(), [t[1] for t in items])))
-	else: pairs = [(items[0][0], items[0][1]())] if items else []
-	results = L(pairs).map(lambda r: _tag(r[1], r[0]))
+	if pkg:= fs.get('package', []): repo = False
+	exec_ls = [lambda: self.repo_context(q, emb_q=raw, limit=limit*2, columns=columns, **kw) if repo else noop(),
+	           lambda: self.env_context(q, emb_q=raw, limit=limit*2, columns=columns, sys_wide=sys_wide, **kw) if env else noop()]
+	fn = lambda f: f()
+	rr, er = parallel(fn, exec_ls, threadpool=True) if parallel else L(exec_ls).map(fn)
+	results = L(_tag(rr,'repo'), _tag(er,'env'))
 	if not results: return L()
 	rrf = bind(rrf_merge, limit=limit*2, id_key='_src_id')
 	res = L(L(results[1:]).reduce(lambda m,rs: rrf(m,rs), results[0]))
 	if not res: return L()
-	pkg, ig_pkg = fs.get('package', []), fs.get('package!', [])
-	soft_pkgs = (set(pkg) | (set(raw.split()) & set(self.pkgs2consider(sys_wide)))) - set(ig_pkg)
+	soft_pkgs = set(pkg) if pkg else set(raw.split()) & set(self.pkgs2consider(sys_wide))
 	ranked = rank_results(res, raw, soft_pkgs=soft_pkgs, top_k=limit) if boost else res
 	if graph:
 		em = self.graph.node_infos([r['metadata']['mod_name'] for r in ranked])
@@ -932,7 +918,6 @@ def context(self: Kosha,
 		meta = lambda r: filter_keys(r['metadata'],in_(['mod_name','docstring','lineno','path']))
 		return ranked.map(lambda r:meta(r)|dict(sig=(r['content'].splitlines()[0])))
 	return dict2obj(ranked)
-
 
 # %% ../nbs/01_graph.ipynb #pkg_deps_task_context_c3d4
 def is_sys_pkg(pkg:str) -> bool:

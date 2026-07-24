@@ -16,11 +16,7 @@ Docs: https://vedicreader.github.io/kosha/mcp.html.md"""
 
 import sys
 from .core import Kosha, env_pkg_versions, pkg_url as _pkg_url
-
-try: from mcp.server.fastmcp import FastMCP
-except ImportError as e:
-    raise ImportError("kosha-mcp needs the `mcp` package (a kosha dependency) — "
-                      "reinstall kosha with `uv add --dev koshas` or `pip install koshas`") from e
+from mcp.server.fastmcp import FastMCP
 
 # %% ../nbs/04_mcp.ipynb #c83b2bc6
 mcp = FastMCP('kosha', instructions=(
