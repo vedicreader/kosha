@@ -4,8 +4,8 @@
 
 # %% auto #0
 __all__ = ['repo_skip_folder_re', 'strict_skip_file_re', 'parse', 'repo_root', 'mv_skill_md', 'arun', 'pkg_trans_deps',
-           'env_pkg_versions', 'Kosha', 'pkg_url', 'pkg_doc', 'has_init', 'imp_root', 'enrich_chunks', 'count_imp',
-           'parseq', 'filt2wh']
+           'env_pkg_versions', 'emb_dtype', 'as_dtype', 'align_ann_dtype', 'Kosha', 'pkg_url', 'pkg_doc', 'has_init',
+           'imp_root', 'enrich_chunks', 'count_imp', 'parseq', 'filt2wh']
 
 # %% ../nbs/00_core.ipynb #d979fe142033f158
 import ast, os, re
@@ -17,6 +17,7 @@ from fastcore.all import (Path, first, patch, timed_cache, L, merge, AttrDict, b
                           listify, true, fdelegates, type2str, parallel_async)
 from fastcore.xdg import xdg_data_home
 from tqdm import tqdm
+import numpy as np
 from json import loads as jl
 from litesearch import *
 
@@ -103,22 +104,57 @@ def env_pkg_versions(pyproject=True, depth:int=1, xtras='dev') -> dict:
 	return {dist(p).metadata['Name']: dist(p).version for p in pkgs}
 
 # %% ../nbs/00_core.ipynb #b18bbd41de289e55
+_dtype_suffix = {np.int8:'i8', np.float16:'f16', np.float32:'f32', np.float64:'f64'}  # litesearch ANN registry codes
+
+def emb_dtype(emb_fn, efn=None):
+	'Scalar type the embedder actually emits. Probed, not assumed: the ANN index must be registered at the dtype of the blobs we store.'
+	try: return np.asarray(emb_fn(['def f(): pass'])).dtype.type
+	except Exception: return np.dtype(getattr(efn, 'dtype', np.float32)).type
+
+def as_dtype(emb_fn, dtype):
+	'Wrap an encoder so every vector it returns is `dtype`; the blobs we store have to match the registered ANN dtype.'
+	def _(txts, **kw): return np.asarray(emb_fn(txts, **kw), dtype=dtype)
+	return _
+
+def align_ann_dtype(st, dtype):
+	'Repoint an already-registered ANN store at `dtype` and rebuild it; no-op when the registry already agrees.'
+	m = st.db._ann_meta(st.name)
+	if not m or m['dtype'] == (want := _dtype_suffix.get(dtype, 'f32')): return False
+	st.db.t.usearch_indices.update(dict(name=st.name, dtype=want, ndim=None))  # ndim was measured at the wrong dtype
+	st.db.ann_indices.pop(st.name, None)
+	if m['path'] and Path(m['path']).exists(): Path(m['path']).unlink()  # sidecar was built at the wrong dtype/ndim
+	st.rebuild_index()
+	return True
+
 class Kosha:
 	'Kosha allows you to build a context for code generation based on your repo and environment.'
 	def __init__(self, dir: Path = None, install_skill: bool = False, xdg_dir: Path = None, efn=static_code_embedder):
 		self.root, self.xdg, self.efn = Path(dir or repo_root() or '.'), xdg_dir or xdg_data_home(), efn()
 		self.emb_doc, self.emb_query = doc_encoder(self.efn), query_encoder(self.efn)
+		self.dtype = emb_dtype(self.emb_doc, self.efn)  # static embedders emit float32; litesearch's ANN default is float16
+		self.emb_doc, self.emb_query = as_dtype(self.emb_doc, self.dtype), as_dtype(self.emb_query, self.dtype)
 		if install_skill: mv_skill_md(dir=self.root, dry_run=False)
 		self.cp, self.ce = self.root.joinpath('.kosha','code.db'), self.xdg.joinpath('kosha','env.db')
 		for p in (self.cp, self.ce): p.parent.mkdir(parents=True, exist_ok=True)
-		self.codedb, self.envdb, kw = database(self.cp), database(self.ce), dict(hash=True,ann=True)
+		self.codedb, self.envdb, kw = database(self.cp), database(self.ce), dict(hash=True,ann=True,dtype=self.dtype)
 		self.code_st,self.env_st = self.codedb.get_store(path=str,**kw),self.envdb.get_store(package=str,**kw)
 		self.pkg_st, self.pkgs = self.envdb.get_store('pkg_store', **kw), self.envdb.t.packages
+		L(self.code_st, self.env_st, self.pkg_st).map(align_ann_dtype, dtype=self.dtype)  # migrate indexes registered at another dtype
 		self.env_pd, self.code_rd = self.envdb.t.pkg_deps, self.codedb.t.repo_deps
 		self.pkgs.create(name=str, version=str, summary=str, uploaded_at=float, pk=['name','version'],
 			 defaults=dict(uploaded_at='CURRENT_TIMESTAMP'), if_not_exists=True)
 		self.env_pd.create(from_pkg=str, to_pkg=str, n_modules=int, if_not_exists=True, pk=['from_pkg','to_pkg'])
 		self.code_rd.create(from_module=str, to_pkg=str, n_files=int, if_not_exists=True, pk=['from_module','to_pkg'])
+
+@patch
+def ann_status(self:Kosha) -> dict:
+	'Per-store ANN health: registered dtype/ndim, live index size vs row count, and whether the registry matches the embedder.'
+	def _one(st):
+		m = st.db._ann_meta(st.name) or {}
+		return dict(dtype=m.get('dtype'), ndim=m.get('ndim'), rows=st.count,
+					indexed=st.db.get_index(st.name).size if m.get('ndim') else 0,
+					ok=m.get('dtype') == _dtype_suffix.get(self.dtype, 'f32'))
+	return {k: _one(st) for k,st in dict(code=self.code_st, env=self.env_st, pkg=self.pkg_st).items()}
 
 # %% ../nbs/00_core.ipynb #6a562e8f73eab276
 def pkg_url(pkg: str) -> str | None:
@@ -395,6 +431,7 @@ def env_context(self:Kosha,
 	wh = ' AND '.join(map(lambda p: f'({p})', L(filt2wh(fs, 'env'), where).filter(true)))
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if 'metadata' in r else r
 	kw.pop('sys_wide', None)
+	kw.setdefault('dtype', self.dtype)
 	return L(self.envdb.search(fq, emb.tobytes(), columns.split(','), where=wh, ann=ann, **kw)).map(fn)
 
 @patch
@@ -424,6 +461,7 @@ def repo_context(self:Kosha,
 	if where and wh: wh = f'({where}) AND ({wh})'
 	elif where: wh = where
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if 'metadata' in r else r
+	kw.setdefault('dtype', self.dtype)
 	return L(self.codedb.search(fq, emb.tobytes(), columns.split(','), where=wh, ann=ann, **kw)).map(fn)
 
 @patch
@@ -447,4 +485,4 @@ def pkg_context(self:Kosha,
 	'FTS5+vector search over package descriptions in pkg_store.'
 	fq, emb = pre(q, extract_kw=False), self.emb_query(q).tobytes()
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if isinstance(r.get('metadata'), str) else r
-	return L(self.envdb.search(fq, emb, ann=True, columns=['content','metadata'], table_name='pkg_store', limit=limit)).map(fn)
+	return L(self.envdb.search(fq, emb, ann=True, columns=['content','metadata'], table_name='pkg_store', limit=limit, dtype=self.dtype)).map(fn)
