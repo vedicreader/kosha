@@ -11,7 +11,7 @@ __all__ = ['CodeGraph', 'dyn_edges', 'static_edges', 'is_symbol_query', 'rank_re
 import ast, re, os, builtins, numpy as np
 from json import loads as jl
 from collections import defaultdict
-from litesearch.core import database, rrf_merge, rerank_hits
+from litesearch.core import database, rrf_all, rerank_hits
 from litesearch.data import *
 from fastcore.all import (Path, L, patch, groupby, parallel_async, tuplify, first, fdelegates, globtastic, bind, true, dict2obj,
                           listify, filter_keys, in_, chunked, noop, parallel, not_)
@@ -266,9 +266,7 @@ def static_edges(sources:dict[str,str]=None, filenames:list[str]=None, root:str=
 		defs |= d
 		calls += [(mod,)+u for u in cs]
 		meta |= {q: {'node':q, 'flavor':f, 'file':file, 'method':q.rsplit('.',1)[-1]} for q, f in d.items()}
-	byname = defaultdict(list)   # module-level defs only: a method is reachable only through an instance
-	for q, f in defs.items():
-		if f != 'method': byname[q.rsplit('.',1)[-1]].append(q)
+	byname = groupby([q for q, f in defs.items() if f != 'method'], lambda q: q.rsplit('.',1)[-1])
 	imap = {m: parse(s)[-1] or {} for m, (s, _) in srcs.items()}
 	seen, edges = set(), []
 	for mod, c, nm, on_self in calls:
@@ -428,9 +426,7 @@ def process_files(self:CodeGraph,
 	'Build call-graph edges for the given source files and recompute centrality.'
 	if not files: return self
 	if root: files_by_root = {Path(root): list(files)}
-	else:
-		files_by_root = {}
-		for f in files: files_by_root.setdefault(imp_root(f), []).append(f)
+	else: files_by_root = groupby(files, imp_root)
 	nodes = set()
 	for r, flist in files_by_root.items():
 		batches = [dict(filenames=list(c), root=str(r)) for c in chunked(flist, sz)]
@@ -901,10 +897,7 @@ import hashlib
 def _source_hash(src): return hashlib.blake2b(src.encode(), digest_size=16).hexdigest()
 def _by_root(files, root=None):
 	'{root: [files]} — one group when `root` is given, else grouped by import root.'
-	if root: return {Path(root): list(files)}
-	out = {}
-	for f in files: out.setdefault(imp_root(f), []).append(f)
-	return out
+	return {Path(root): list(files)} if root else groupby(files, imp_root)
 
 @patch
 def _drop_file(self: CodeGraph, path: str, incoming=True):
@@ -1072,11 +1065,8 @@ def context(self: Kosha,
 	exec_ls = [lambda: self.repo_context(q, emb_q=raw, limit=limit*2, columns=columns, **kw) if repo else noop(),
 	           lambda: self.env_context(q, emb_q=raw, limit=limit*2, columns=columns, sys_wide=sys_wide, **kw) if env else noop()]
 	fn = lambda f: f()
-	rr, er = parallel(fn, exec_ls, threadpool=True) if parallel else L(exec_ls).map(fn)
-	results = L(_tag(rr,'repo'), _tag(er,'env'))
-	if not results: return L()
-	rrf = bind(rrf_merge, limit=limit*2, id_key='_src_id')
-	res = L(L(results[1:]).reduce(lambda m,rs: rrf(m,rs), results[0]))
+	rr, er = parallel(fn, exec_ls, threadpool=True)
+	res = L(rrf_all(L(_tag(rr,'repo'), _tag(er,'env')), limit=limit*2, id_key='_src_id'))
 	if not res: return L()
 	soft_pkgs = set(pkg) if pkg else set(raw.split()) & set(self.pkgs2consider(sys_wide))
 	ranked = rank_results(res, raw, soft_pkgs=soft_pkgs, top_k=limit) if boost else res

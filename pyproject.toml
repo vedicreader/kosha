@@ -21,7 +21,7 @@ dependencies = [
     "pyskills>=0.0.4",
     "watchfiles>=1.1.1",
     "mcp>=1.2.0",
-    "litesearch>=0.1.1",
+    "litesearch>=0.1.35",
 ]
 
 [project.urls]
