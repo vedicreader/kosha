@@ -124,12 +124,16 @@ def dyn_edges(src:str, module:str) -> list[dict]:
 	"All dynamic dispatch edges: decorator, connect_body, registration, co_dispatch."
 	tree, imp, top, all_fns, *_ = parse(src)
 	if tree is None: return []
-	fns = L(ast.walk(tree)).filter(lambda n: isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)))
+	fns, reg = [], []
+	for n in ast.walk(tree):                          # one walk feeds both fns and registration
+		if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)): fns.append(n)
+		reg += _reg_edges(n, module, imp, all_fns)
+	fns = L(fns)
 	return (sum(fns.map(lambda n: _dec_edges(n, module, imp)), []) +
 	        sum(fns.map(lambda n: _conn_edges(n, module)), []) +
 			sum(fns.map(lambda n: _patch_edges(n, module)), []) +
 			sum(fns.map(lambda n: _delegates_edges(n, module)), []) +
-	        sum(L(ast.walk(tree)).map(lambda n: _reg_edges(n, module, imp, all_fns)), []) +
+	        reg +
 	        sum(L(tree.body).filter(lambda n: isinstance(n,ast.Assign))
 	            .map(lambda n: _co_edges(n, module, top)), []))
 
