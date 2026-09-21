@@ -3,9 +3,15 @@
 <!-- do not remove -->
 
 ## 0.1.8
-`kosha.refactor`: `move_plan`, `replace_plan`, `extract`, `inline`, `top_symbols`, `module_of`, on top of the index that already knows where a symbol lives.
-`dyn_edges` walks the AST once. The code, env and package stores are stamped with the encoder, so another embedder cannot be mixed in on reopen.
-`mv_skill_md` honours `dir=` for the `.claude` copy. `rrf_all` fuses the two legs; `update_pkg` drops the `parallel=` that reached nothing. Needs litesearch 0.1.35.
+- `kosha.refactor`: `move_plan`, `replace_plan`, `extract`, `inline`, `top_symbols`, `module_of`, built on the index
+- `from kosha import *` exports `refactor`
+- `extract` binds comprehension targets before the element; a loop variable is no longer lifted as a parameter
+- `dyn_edges` walks the AST once
+- Code, env and package stores are stamped with the encoder; another embedder cannot be mixed in on reopen
+- `mv_skill_md` honours `dir=` for the `.claude` copy
+- `rrf_all` fuses the two legs
+- `update_pkg` drops the `parallel=` that reached nothing
+- Needs litesearch 0.1.35
 
 ## 0.1.7
 kosha code rows
