@@ -158,10 +158,13 @@ def _reads(text):
 # %% ../nbs/02_refactor.ipynb #a82d5674
 #: Where a statement reads before it binds. `ast.walk` is breadth-first, so it would see the target
 #: of `total = total + 1` before the value and call the name already bound.
+#: A comprehension binds its target before `elt` reads it, and `elt` is the earlier field.
 _EVAL_ORDER = {ast.Assign: ('value', 'targets'), ast.AugAssign: ('value', 'target'),
                ast.AnnAssign: ('value', 'target'), ast.For: ('iter', 'target'),
                ast.AsyncFor: ('iter', 'target'), ast.comprehension: ('iter', 'target'),
-               ast.withitem: ('context_expr', 'optional_vars')}
+               ast.withitem: ('context_expr', 'optional_vars'),
+               ast.ListComp: ('generators', 'elt'), ast.SetComp: ('generators', 'elt'),
+               ast.GeneratorExp: ('generators', 'elt'), ast.DictComp: ('generators', 'key', 'value')}
 
 def _children(value):
     if isinstance(value, list): return [x for x in value if isinstance(x, ast.AST)]
