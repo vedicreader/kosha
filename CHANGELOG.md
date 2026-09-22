@@ -2,6 +2,9 @@
 
 <!-- do not remove -->
 
+## 0.1.9
+- `rows` hands `code_row` the hit, not the leg name; the federated repo and env legs work again.
+
 ## 0.1.8
 - `kosha.refactor`: `move_plan`, `replace_plan`, `extract`, `inline`, `top_symbols`, `module_of`, built on the index
 - `from kosha import *` exports `refactor`
