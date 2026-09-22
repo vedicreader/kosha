@@ -516,8 +516,8 @@ def rows(self:Kosha,
 ) -> L:
     'Code hits in one flat shape, ready to fuse with hits from anywhere else.'
     out = L()
-    if repo: out += L(self.repo_context(q, limit=limit, **kw)).map(code_row, 'repo')
-    if env:  out += L(self.env_context(q, limit=limit, **kw)).map(code_row, 'env')
+    if repo: out += L(self.repo_context(q, limit=limit, **kw)).map(code_row, leg='repo')
+    if env:  out += L(self.env_context(q, limit=limit, **kw)).map(code_row, leg='env')
     return out
 
 # %% ../nbs/00_core.ipynb #7841e51bd75c0c1e
