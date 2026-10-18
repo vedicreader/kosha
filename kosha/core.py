@@ -295,7 +295,7 @@ def update_pkgs(self:Kosha,
     kw = dict(embed=embed, exts=exts, verbose=verbose, force=force, chunk=chunk, **kwargs)
     pkgs = L(pkgs).map(_pkg_name).unique()
     if parallel:
-        pkw = dict(threadpool=True, progress=True)
+        pkw = dict(threadpool=True, progress=verbose)
         if n_workers: pkw['n_workers'] = n_workers
         return fcp(lambda p: self.update_pkg(p, **kw), pkgs, **pkw)
     for pkg in tqdm(pkgs, desc='Updating packages', unit='pkg'): self.update_pkg(pkg, **kw)

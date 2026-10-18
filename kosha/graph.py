@@ -1037,7 +1037,7 @@ def sync(self: Kosha,
 		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed, parallel=pkg_parallel, chunk=chunk)
 		      if pkgs else (lambda: None),
 		  bind(self.graph.sync, dir=dir if repo else None, pkgs=pkgs, force=force, mode=graph_mode, metrics=graph_metrics) if graph else (lambda: None)]
-	if in_parallel: return parallel(lambda f: f(), ts, threadpool=True, progress=True)
+	if in_parallel: return parallel(lambda f: f(), ts, threadpool=True, progress=verbose)
 	else: return L(ts).map(lambda f: f())
 
 @patch
