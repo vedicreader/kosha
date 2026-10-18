@@ -2,6 +2,10 @@
 
 <!-- do not remove -->
 
+## 0.1.10
+- `sync(verbose=False)` and `update_pkgs(parallel=True, verbose=False)` show no progress bar. They used to write one to stdout whatever `verbose` said, which corrupted the output of a caller that prints JSON on stdout.
+- Locks litesearch 0.1.40, as `pyproject.toml` already required.
+
 ## 0.1.9
 - `rows` hands `code_row` the hit, not the leg name; the federated repo and env legs work again.
 
