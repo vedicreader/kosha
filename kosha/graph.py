@@ -388,6 +388,10 @@ def _static_batch(kw:dict) -> tuple:
 	meta |= _lambda_nodes(**kw)
 	return meta, s_edges, _attr_call_hints(**kw, meta=meta)
 
+def _static_batches(batches:list) -> list:
+	'`_static_batch` over `batches`, in a process pool only when there is more than one.'
+	return parallel(_static_batch, batches, threadpool=False, progress=True, n_workers=None if len(batches)>1 else 0)
+
 @patch
 def _add_static(self:CodeGraph, sources:dict[str,str]=None, filenames:list[str]=None, root:str=None):
 	"Static edges, lambda nodes and attr-call hints for one batch."
@@ -408,7 +412,7 @@ def _write_batch(self:CodeGraph, res) -> set:
 def from_sources(self:CodeGraph, sources:dict[str,str], chunk_size=50):
 	'Build the graph from a dict of {module name: source text}.'
 	batches = [dict(sources=dict(c)) for c in chunked(list(sources.items()), chunk_size)]
-	nodes = self._write_batch(parallel(_static_batch, batches, threadpool=False, progress=True))
+	nodes = self._write_batch(_static_batches(batches))
 	nodes |= self._add_dyn(sources)
 	self._centrality(nodes)
 	return self.resolve_attr_calls()
@@ -428,7 +432,7 @@ def process_files(self:CodeGraph,
 	nodes = set()
 	for r, flist in files_by_root.items():
 		batches = [dict(filenames=list(c), root=str(r)) for c in chunked(flist, sz)]
-		nodes |= self._write_batch(parallel(_static_batch, batches, threadpool=False, progress=True))
+		nodes |= self._write_batch(_static_batches(batches))
 	fn = lambda p: '.'.join(Path(p).relative_to(root or imp_root(p)).with_suffix('').parts)
 	nodes |= self._add_dyn({fn(p): Path(p) for p in files})
 	self._centrality(nodes)

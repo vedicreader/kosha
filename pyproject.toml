@@ -51,11 +51,13 @@ include = ["/kosha", "/pyproject.toml", "/README.md"]
 lib_name = "kosha"
 lib_path = "kosha"
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
     "mcp>=1.2.0",
-    "nbdev>=3.0.15",
+    "nbdev>=3.3.25",
     "notebook>=7.5.5",
     "slopometer>=0.0.1",
-    "litesearch[full]"
 ]
+
+[dependency-groups]
+dev = ["koshas[dev]"]

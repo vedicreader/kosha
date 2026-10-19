@@ -1,4 +1,4 @@
-"""Search your repo and every installed package by meaning, then follow the call graph between them. Use it before you grep, open a source file, or write code a dependency already provides. Keyword search, vector search and a static call graph over local SQLite, with no LLM calls and no network.
+r"""Search your repo and every installed package by meaning, then follow the call graph between them. Use it before you grep, open a source file, or write code a dependency already provides. Keyword search, vector search and a static call graph over local SQLite, with no LLM calls and no network.
 
 ## Start here
 
@@ -45,7 +45,7 @@ for r in k.env_context('atomic file write preserving permissions', limit=8):
 | Where should new code go? | `k.where_to_add('desc', limit=5)` |
 | Search READMEs and other prose, not code | `k.docs_context('desc')` |
 
-`pkg_context` searches package descriptions, but nothing in kosha fills that table yet, so it returns no hits. `doc(Kosha)` lists every method with its signature; the table is a map, not the full reference. Indexing (`update_repo`, `update_pkgs`, `process_env`) and deleting (`nuke`, `rm_pkg`, `prune_old_pkgs`) are methods of the same class, but `sync` is the only one you normally need.
+`pkg_context` searches package descriptions, one per indexed package, to find a package by what it does. `doc(Kosha)` lists every method with its signature; the table is a map, not the full reference. Indexing (`update_repo`, `update_pkgs`, `process_env`) and deleting (`nuke`, `rm_pkg`, `prune_old_pkgs`) are methods of the same class, but `sync` is the only one you normally need.
 
 ## Filters
 

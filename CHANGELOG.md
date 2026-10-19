@@ -2,6 +2,14 @@
 
 <!-- do not remove -->
 
+## 0.1.11
+- `update_repo(files=...)` indexes only the listed paths and drops the ones that are gone; `watch_repo` and `kosha watch` no longer crash on the first change.
+- `update_pkg` stores each package's description in `pkg_store` through the new `put_pkg_doc`, so `pkg_context` returns hits.
+- `prune_old_versions` drops old chunks by their `package` column, and old descriptions too.
+- `env_context` and `repo_context` drop the unused `wide` parameter; the keyword leg already ORs the query terms.
+- The call graph parses a single batch in-process, so the docs build no longer breaks on Linux, where a spawned pool cannot load a notebook-defined function.
+- `dev` is an extra, as nbdev's CI installs it, with the uv group pointing at it; needs nbdev 3.3.25.
+
 ## 0.1.10
 - `sync(verbose=False)` and `update_pkgs(parallel=True, verbose=False)` show no progress bar. They used to write one to stdout whatever `verbose` said, which corrupted the output of a caller that prints JSON on stdout.
 - Locks litesearch 0.1.40, as `pyproject.toml` already required.

@@ -27,7 +27,7 @@ from tqdm import tqdm
 from json import loads as jl
 from litesearch.data import *
 from litesearch.utils import static_code_embedder, doc_encoder, query_encoder, encoder_id
-from litesearch.core import database, process_content, rerank_hits, RERANK_FANOUT
+from litesearch.core import database, process_content, content_id, rerank_hits, RERANK_FANOUT
 from litesearch.api import DTYPE, Index
 
 # %% ../nbs/00_core.ipynb #563987a46284072b
@@ -232,6 +232,14 @@ def count_imp(files, own:str='') -> Counter:
 
 # %% ../nbs/00_core.ipynb #a3ef441f7ecb6c4c
 @patch
+def put_pkg_doc(self:Kosha, pkg:str, embed=True) -> dict:
+    'Store the `pkg_doc` record of `pkg` in pkg_store, replacing older ones, and return it.'
+    d = pkg_doc(pkg); d['id'] = content_id(d['content'])
+    self.pkg_st.delete_where(where=f"json_extract(metadata,'$.name')={pkg!r} AND id<>{d['id']!r}")
+    self.pkg_st.sync([d], key_col='id', emb_fn=self.emb_doc, embed=embed)
+    return d
+
+@patch
 @fdelegates(pkg2chunks)
 def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, force=False, imports=False,
                chunk=5_000, **kwargs):
@@ -239,6 +247,7 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, fo
     pkg = _pkg_name(pkg)
     assert (o:= spec(pkg)), f'pkg {pkg} is not in environment'
     if verbose: print(f'updating pkg: {pkg} ...')
+    doc = self.put_pkg_doc(pkg, embed=embed)
     ep = self._is_pkg_ingested(pkg)
     if ep and len(self.env_st(where=f'package={pkg!r}')) > 0:
         if verbose: print(f'package {ep} already loaded.')
@@ -252,7 +261,7 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, fo
     files = pkg2files(pkg, exts=exts, **kwargs)
     cnt = [file_parse(f, assigns=True, imports=imports) for f in tqdm(files,f'parse files from {pkg}')]
     if cnt:
-        cnt, doc = enrich_chunks(L(cnt).concat().filter(true).map(lambda d: d | fn(d))), pkg_doc(pkg)
+        cnt = enrich_chunks(L(cnt).concat().filter(true).map(lambda d: d | fn(d)))
         res = self.env_st.sync(cnt, key_col='package', emb_fn=self.emb_doc, embed=embed, force=force,
                                chunk=chunk)
         if res['changed']:
@@ -317,14 +326,17 @@ def update_repo(self:Kosha,
                 exts:str=code_exts, # file extensions to index
                 verbose=True,       # print progress
                 force=False,        # re-index every file, changed or not
+                files:list=None,    # only these paths, as from a watch event; listed paths that are gone are dropped
                 **kwargs              # extra args forwarded to dir2files
                 ):
     'Index new and changed repo files under `dir` and drop the chunks of deleted ones.'
     dir = Path(dir or self.root)
     known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path, uploaded_at') if r['path']}
-    all_files = dir2files(str(dir), strict_skip_file_re, repo_skip_folder_re,exts=exts, **kwargs)
+    fs = None if files is None else {str(Path(f).resolve()) for f in files}
+    inf = lambda f: fs is None or str(Path(f).resolve()) in fs
+    all_files = L(dir2files(str(dir), strict_skip_file_re, repo_skip_folder_re,exts=exts, **kwargs)).filter(inf)
     all_str = set(map(str, all_files))
-    rm = L(known.keys()).filter(lambda k: k not in all_str)
+    rm = L(known.keys()).filter(lambda k: k not in all_str and inf(k))
     ch = all_files if force else L(all_files).filter(lambda f: str(f) not in known or known[str(f)] != f.stat().st_mtime)
     if rm:
         self.code_st.delete_where(where=f'path in ({",".join(rm.map(repr))})')
@@ -352,8 +364,10 @@ def prune_old_versions(self:Kosha, pkg:str):
 	'Keep only the highest indexed version of `pkg`.'
 	if len(vers := self.pkgs(select='version', where=f'name={pkg!r}')) <= 1: return
 	latest = sorted(L(vers).attrgot('version'), key=lambda v: tuple(map(int, v.split('.'))))[-1]
-	je = lambda k, o='=', v='': f"json_extract(metadata, '$.{k}') {o} {v!r}"
-	self.env_st.delete_where(where=f"{je('name')}={pkg!r} AND {je('version')}<>{latest!r}")
+	old = f"json_extract(metadata, '$.version')<>{latest!r}"
+	self.env_st.delete_where(where=f"package={pkg!r} AND {old}")
+	self.pkg_st.delete_where(where=f"json_extract(metadata, '$.name')={pkg!r} AND {old}")
+	self.env_st.rebuild_index()
 	self.pkgs.delete_where(where=f'name={pkg!r} AND version<>{latest!r}')
 
 @patch
@@ -422,7 +436,6 @@ def fanout(kw, limit, rerank):
 def env_context(self:Kosha,
 				q:str,               	# query to search (supports key:value filters)
 				emb_q:str=None,     	# query to embed; defaults to bare query after filter parsing
-				wide:bool=False,    	# accepted but not used
                 columns:str='content,metadata,package',			# comma separated columns string to return from search
                 where:str=None,			# additional where clause to filter search results
                 ann=True,               # HNSW Approximate Nearest Neighbors (ann) search; defaults to True
@@ -454,7 +467,6 @@ def pkgs2consider(self: Kosha, sys_wide=True) -> set:
 def repo_context(self:Kosha,
                 q:str,                          # query to search (supports key:value filters)
                 emb_q:str=None,                 # query to embed; defaults to bare query after filter parsing
-                wide:bool=False,                # accepted but not used
                 columns:str='content,path,metadata', # columns to return
                 where:str=None,                 # extra SQL filter
                 ann=True,               # HNSW Approximate Nearest Neighbors (ann) search; defaults to True

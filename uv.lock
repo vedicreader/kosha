@@ -1073,11 +1073,11 @@ wheels = [
 
 [[package]]
 name = "fastcore"
-version = "2.2.16"
+version = "2.2.33"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/fe/d9/2df5ca5328adcd6957076300528e0c26817c81b14e322f349c3a7f815fe5/fastcore-2.2.16.tar.gz", hash = "sha256:59ac9ef9b94a33c890f191d44247562dca42e4db9ae523d06d870fb5af307cf2", size = 144241, upload-time = "2026-08-26T08:25:28.948Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/10/f4/a03f290cb0d1aedcf837c51b2be193a28dcc437697f5a57441f16d2c6a27/fastcore-2.2.33.tar.gz", hash = "sha256:919cc6d182e633a206238bfaacb39f37b7da985974568121347eedf0bec602c0", size = 145347, upload-time = "2026-10-05T06:56:55.208Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5a/ee/ff5b0456cee872322ea9793044d5def1e01f86dc701c78629e6e2ed8249d/fastcore-2.2.16-py3-none-any.whl", hash = "sha256:dbde36ff5e7931b9ae8fbbc6cfd071a5a3f13a00e6066f9c2294c76bff339590", size = 150762, upload-time = "2026-08-26T08:25:27.203Z" },
+    { url = "https://files.pythonhosted.org/packages/93/77/687142707e4ff6b11c63f10dba0562e1be08eb214eaca9b46eab2f77a1fe/fastcore-2.2.33-py3-none-any.whl", hash = "sha256:2c29d35263d88d21d6c3c5ddef92fe3547161e4af0d3efcd324a6277de1a4fba", size = 152034, upload-time = "2026-10-05T06:56:53.423Z" },
 ]
 
 [[package]]
@@ -1788,13 +1788,17 @@ dependencies = [
     { name = "watchfiles" },
 ]
 
-[package.dev-dependencies]
+[package.optional-dependencies]
 dev = [
-    { name = "litesearch" },
     { name = "mcp" },
     { name = "nbdev" },
     { name = "notebook" },
     { name = "slopometer" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "koshas", extra = ["dev"] },
 ]
 
 [package.metadata]
@@ -1803,18 +1807,17 @@ requires-dist = [
     { name = "fastprogress", specifier = ">=1.1.6" },
     { name = "litesearch", specifier = ">=0.1.35" },
     { name = "mcp", specifier = ">=1.2.0" },
+    { name = "mcp", marker = "extra == 'dev'", specifier = ">=1.2.0" },
+    { name = "nbdev", marker = "extra == 'dev'", specifier = ">=3.3.25" },
+    { name = "notebook", marker = "extra == 'dev'", specifier = ">=7.5.5" },
     { name = "pyskills", specifier = ">=0.0.4" },
+    { name = "slopometer", marker = "extra == 'dev'", specifier = ">=0.0.1" },
     { name = "watchfiles", specifier = ">=1.1.1" },
 ]
+provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "litesearch", extras = ["full"] },
-    { name = "mcp", specifier = ">=1.2.0" },
-    { name = "nbdev", specifier = ">=3.0.15" },
-    { name = "notebook", specifier = ">=7.5.5" },
-    { name = "slopometer", specifier = ">=0.0.1" },
-]
+dev = [{ name = "koshas", extras = ["dev"] }]
 
 [[package]]
 name = "lark"
@@ -2184,7 +2187,7 @@ wheels = [
 
 [[package]]
 name = "nbdev"
-version = "3.3.13"
+version = "3.3.25"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asttokens" },
@@ -2199,9 +2202,9 @@ dependencies = [
     { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "watchdog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ea/af/e7c627d02a919372c82be11a8581744377f1d03206f3ef1293669a420800/nbdev-3.3.13.tar.gz", hash = "sha256:ff3c0865e701384d9ba0511abe01aceec326aa3bf0313b6fdf27c78deed948d5", size = 87533, upload-time = "2026-08-25T01:24:23.657Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3c/fa/d80fb6b061023677bb88a8d59ac1ebefb74ad9add37d7c1211a01d56dbba/nbdev-3.3.25.tar.gz", hash = "sha256:cd48c235d18e5d53128f82c676cdb9a3f66f084ef05e48e8d4b9f56b3832d80d", size = 91478, upload-time = "2026-10-05T08:31:15.544Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/e4/385e2761c63087dd9d250fe9ebdf566df84dc4d77a393931a0bf8475e5a5/nbdev-3.3.13-py3-none-any.whl", hash = "sha256:69ead01e783b2eaaba1630432b114ec2fa57fe82b536ff833b1c40b68a783f9c", size = 92441, upload-time = "2026-08-25T01:24:21.944Z" },
+    { url = "https://files.pythonhosted.org/packages/ab/ce/d0cfdd1bc8338285ae26db62771450b4c2b05f5befe81819f77789d8dc06/nbdev-3.3.25-py3-none-any.whl", hash = "sha256:9912cba878b0919aa40b0fd8e4f1ddcfabf186ea877b52f77b6dd75677312288", size = 95596, upload-time = "2026-10-05T08:31:13.906Z" },
 ]
 
 [[package]]
