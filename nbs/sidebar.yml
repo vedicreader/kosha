@@ -5,3 +5,6 @@ website:
       - 00_core.ipynb
       - 01_graph.ipynb
       - 02_refactor.ipynb
+      - 03_cli.ipynb
+      - 04_mcp.ipynb
+      - 05_skill.ipynb

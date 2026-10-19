@@ -1,8 +1,8 @@
-"""Kosha is a tool for building a context for code generation based on your repo and environment.
-It uses a vector database to store code snippets and their embeddings, allowing you to search for relevant code based
-on natural language queries.
-The core functionality includes managing the database, updating package metadata, embedding code snippets,
-and performing context-aware searches.
+"""Index your repository and its installed packages, then search them by meaning or by keyword.
+
+Before you write a helper, it pays to know whether your code or one of your dependencies already has one. This module builds the index that answers that question. It splits source files into chunks, one per function, class or method, and stores each chunk with its metadata and an embedding: a vector of numbers computed from the code, so that chunks with similar meaning have similar vectors. A search then combines two methods. Keyword search (SQLite's FTS5) finds chunks that contain the words of the query, and vector search finds chunks whose embedding is close to the query's. No language model is involved, and everything runs locally.
+
+There are two indexes. The repo index covers your own code and lives in `.kosha/code.db` inside the repository. The package index covers installed packages and lives in your user data directory (`~/.local/share/kosha/env.db` on most systems), so every project on the machine shares it and a package version is indexed once. The `Kosha` class owns both. The call graph that sits on top of them is in the `graph` module.
 
 Docs: https://vedicreader.github.io/kosha/core.html.md"""
 
@@ -33,7 +33,7 @@ from litesearch.api import DTYPE, Index
 # %% ../nbs/00_core.ipynb #563987a46284072b
 @timed_cache(maxsize=4096)
 def parse(code=None, p=None):
-    "Parse source, tag parents, return (tree, imp, top_fns, all_fns, imp2mod). Cached — called freely."
+    "Parse `code` or the file `p` and return (tree, imports, top-level defs, defs plus call-assigned names, import paths)."
     if not code and not p: return None, {}, set(), set(), {}
     try: tree = ast.parse(Path(p).read_text(errors='replace') if not code else code)
     except SyntaxError: return None, {}, set(), set(), {}
@@ -61,7 +61,7 @@ def parse(code=None, p=None):
 
 # %% ../nbs/00_core.ipynb #3a870afc7b06d9b4
 def mv_skill_md(dry_run=True, dir=None) -> None:
-	'Copy bundled SKILL.md to skill directories.'
+	'Copy the bundled SKILL.md into `.agents/skills/kosha/` and `.claude/skills/kosha/`; `dry_run` only prints the targets.'
 	base = Path(__file__).parent if '__file__' in globals() else Path.cwd()
 	if not (src := base.joinpath('SKILL.md')).exists(): return
 	root = dir or repo_root() or '.'
@@ -73,7 +73,7 @@ def mv_skill_md(dry_run=True, dir=None) -> None:
 
 # %% ../nbs/00_core.ipynb #ccf6b2c040f76c9a
 def arun(coro) -> any:
-	'Run an async coroutine from sync code, even if already inside an event loop'
+	'Run `coro` to completion from synchronous code, even inside a running event loop, and return its result in an `L`.'
 	import asyncio
 	try: asyncio.get_running_loop()
 	except RuntimeError: return L(asyncio.run(coro))
@@ -86,7 +86,7 @@ _pkg_name = lambda pkg: _req_nm.match(pkg.strip()).group(0)
 _spec_cached = lru_cache(maxsize=None)(spec)
 
 def pkg_trans_deps(seeds:list, depth:int=2) -> L:
-	'BFS over importlib.metadata requires: return seeds + all transitive deps up to depth levels (installed only, no optional extras).'
+	'The `seeds` plus the installed packages they require, `depth` levels down, ignoring optional extras.'
 	seen, frontier = set(seeds), set(seeds)
 	for _ in range(depth):
 		nxt = set()
@@ -103,8 +103,7 @@ def pkg_trans_deps(seeds:list, depth:int=2) -> L:
 
 # %% ../nbs/00_core.ipynb #97b484ed681d266d
 def env_pkg_versions(pyproject=True, depth:int=1, xtras=None) -> dict:
-	'''Get a dict of installed package versions using importlib.metadata.
-	passing depth traverse multiple layers of dependencies'''
+	'{name: version} of the packages to index: pyproject dependencies expanded `depth` levels, or all installed packages.'
 	if pyproject and repo_root() is None: return {}
 	pkgs = installed_packages(pyproject=pyproject,xtras=xtras)
 	if pyproject and depth: pkgs = pkg_trans_deps(pkgs, depth)
@@ -112,13 +111,13 @@ def env_pkg_versions(pyproject=True, depth:int=1, xtras=None) -> dict:
 
 # %% ../nbs/00_core.ipynb #b18bbd41de289e55
 def cast_emb(f, dtype=DTYPE):
-	'Wrap an encoder so its vectors carry the dtype the store is read back with.'
+	'Wrap encoder `f` so the vectors it returns have the dtype the store reads back.'
 	return lambda txts, **kw: np.asarray(f(txts, **kw), dtype=dtype)
 
 class Kosha:
-	'Kosha allows you to build a context for code generation based on your repo and environment.'
+	'Search index over a repository and its installed packages.'
 	def __init__(self, dir: Path = None, install_skill: bool = False, xdg_dir: Path = None, efn=static_code_embedder,
-			 busy_timeout: int = None):  # ms to wait on a locked db; set this for parallel ingestion, else apsw's default
+			 busy_timeout: int = None):  # ms to wait for a locked database; set it for parallel indexing
 		self.root, self.xdg, self.efn = Path(dir or repo_root() or '.'), xdg_dir or xdg_data_home(), efn()
 		self.emb_doc, self.emb_query = cast_emb(doc_encoder(self.efn)), cast_emb(query_encoder(self.efn))
 		if install_skill: mv_skill_md(dir=self.root, dry_run=False)
@@ -138,7 +137,7 @@ class Kosha:
 
 # %% ../nbs/00_core.ipynb #6a562e8f73eab276
 def pkg_url(pkg: str) -> str | None:
-    'Return best web URL for pkg from importlib.metadata: Source Code > Repository > Home-page > first Project-URL.'
+    'The best web address for installed package `pkg`: source code, then repository, then home page, then any project URL.'
     m, urls = meta(pkg), {}
     for e in (m.get_all('Project-URL') or []):
         label, _, u = e.partition(',')
@@ -148,7 +147,7 @@ def pkg_url(pkg: str) -> str | None:
 
 # %% ../nbs/00_core.ipynb #466153b80488af15
 def pkg_doc(pkg) -> dict:
-	'Build pkg_store content dict: content=summary+readme, metadata=json.'
+	'A description record of `pkg`: summary and the start of its README as content, package details as metadata.'
 	m = meta(pkg)
 	_get, _req_re, fn = lambda k: m.get(k,''), re.compile(r'^[\w-]+'), lambda rm: rm.group(0).lower().replace('-','_')
 	reqs = ' '.join({fn(rm) for r in (m.get_all('Requires-Dist') or []) if (rm:=_req_re.match(r))})
@@ -159,11 +158,11 @@ def pkg_doc(pkg) -> dict:
 
 # %% ../nbs/00_core.ipynb #34b20a9569e7b893
 def has_init(d: Path) -> bool:
-	'True if dir is a Python package root: has __init__.py or a C-extension __init__*.so.'
+	'True if `d` is a Python package directory: it holds `__init__.py` or a compiled `__init__*.so`.'
 	return (d / '__init__.py').exists() or bool(list(d.glob('__init__*.so')))
 
 def imp_root(p: Path) -> Path:
-	'Import root of p: the nearest ancestor directory without __init__.py.'
+	'The directory imports of `p` start from: its nearest ancestor that is not a package.'
 	r = Path(p).parent
 	while has_init(r): r = r.parent
 	return r
@@ -171,7 +170,7 @@ def imp_root(p: Path) -> Path:
 
 # %% ../nbs/00_core.ipynb #96ec0897c5cba140
 def enrich_chunks(content: L) -> L:
-	'Set public_api+docstring flags on non-assign chunks and explode ClassDefs into method sub-chunks.'
+	'Mark chunks as public or private, record their docstrings, add one chunk per class method, and drop assignment chunks.'
 	_m, _c = lambda d, k: d.get('metadata',{}).get(k,''), lambda d: d.get('content','')
 	assigns, non_assigns = content.partition(lambda d: d['metadata'].get('type','') in ('Assign','AnnAssign'))
 	chk = lambda e: isinstance(e, ast.Constant) and isinstance(e.value, str)
@@ -207,25 +206,25 @@ def enrich_chunks(content: L) -> L:
 os.environ['TOKENIZERS_PARALLELISM']='false'  # to suppress warnings from tokenizers
 @patch
 def nuke(self:Kosha, env=False):
-	'Reset the databases by dropping all tables.'
+	'Delete the repo index and call graph, and with `env=True` the shared package and docs indexes too.'
 	self.cp.parent.delete()
 	if env: self.ce.parent.delete()
 
 @patch
 def _is_pkg_ingested(self:Kosha, pkg:str) -> bool:
-	'Check if a package is already ingested and up-to-date.'
+	'The packages row for `pkg` if it is indexed at its installed version.'
 	pkg = _pkg_name(pkg)
 	return first(self.pkgs(select='name, version', where=f'name={pkg!r} and version={v(pkg)!r}'))
 
 @patch
 @fdelegates(process_content)
 def process_env(self:Kosha, content=None, reembed=False, **kwargs):
-	'Embed all documents in the env store, or only those without embeddings if reembed=False.'
+	'Embed package chunks that have no embedding yet, or all of them with `reembed=True`.'
 	content = content or self.env_st(where=f'embedding is NULL' if not reembed else None)
 	return process_content(self.env_st, content, emb_fn=self.emb_doc, **kwargs)
 
 def count_imp(files, own:str='') -> Counter:
-	'External top-level imports from a source-string iterable. Reuses cached _parse.'
+	'For a list of files, the number of files importing each top-level package other than `own`.'
 	c, fn = Counter(), lambda p: p and p!=own and p[0]!='_'
 	def do(f): c.update(set(L(parse(p=f)[1].values()).filter(fn)))
 	L(files).map(do)
@@ -236,7 +235,7 @@ def count_imp(files, own:str='') -> Counter:
 @fdelegates(pkg2chunks)
 def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, force=False, imports=False,
                chunk=5_000, **kwargs):
-    'Update package metadata in the packages table.'
+    'Index installed package `pkg`: parse, store and embed its chunks, and record its imports and version.'
     pkg = _pkg_name(pkg)
     assert (o:= spec(pkg)), f'pkg {pkg} is not in environment'
     if verbose: print(f'updating pkg: {pkg} ...')
@@ -266,7 +265,7 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, fo
 
 @patch
 def rm_pkg(self:Kosha, pkg:str, ver:str=None):
-    'Remove a package and its code snippets from the database.'
+    'Remove package `pkg`, or only version `ver`, and its chunks from the index.'
     je = lambda k: f"json_extract(metadata,'$.{k}')"
     self.env_st.delete_where(where=f'package={pkg!r}' + (f" AND {je('version')}={ver!r}" if ver else ''))
     self.pkg_st.delete_where(where=f"{je('name')}={pkg!r}")
@@ -276,7 +275,7 @@ def rm_pkg(self:Kosha, pkg:str, ver:str=None):
 
 @patch
 def update_pkgs(self:Kosha,
-    pkgs:str|list=None, # packages to sync; None syncs all installed env packages
+    pkgs:str|list=None, # package name or list of names to index; nothing happens if empty
     embed=True,         # embed chunks after indexing
     exts=code_exts,     # file extensions to include
     verbose=True,       # print progress
@@ -286,7 +285,7 @@ def update_pkgs(self:Kosha,
     chunk=5_000,        # rows per write transaction when parallel=True
     **kwargs            # forwarded to update_pkg
 ):
-    'Sync installed packages into the env store; if pkgs is None, syncs all env packages.'
+    'Index each package in `pkgs`, in turn or in parallel threads.'
     if verbose: print(f'loading pkgs {pkgs} ...' if pkgs else 'No packages to load.')
     if not pkgs: return
     if parallel and not self.busy_timeout: raise ValueError(
@@ -306,7 +305,7 @@ strict_skip_file_re = r'^[._]|^(?:setup\.py|conftest\.py)$'
 @patch
 @fdelegates(process_content)
 def process_repo(self:Kosha, content=None, reembed=False, **kwargs):
-	'Embed all documents in the code store, or only those without embeddings if reembed=False.'
+	'Embed repo chunks that have no embedding yet, or all of them with `reembed=True`.'
 	content = content or self.code_st(where=f'embedding is NULL' if not reembed else None)
 	return process_content(self.code_st, content, emb_fn=self.emb_doc, **kwargs)
 
@@ -315,12 +314,12 @@ def process_repo(self:Kosha, content=None, reembed=False, **kwargs):
 def update_repo(self:Kosha,
                 dir:Path=None,    # directory to index; defaults to repo root
                 embed:bool=True,  # embed chunks after parsing
-                exts:str=code_exts,
-                verbose=True,       # verbose
-                force=False,        # reindex all files regardless of mtime
+                exts:str=code_exts, # file extensions to index
+                verbose=True,       # print progress
+                force=False,        # re-index every file, changed or not
                 **kwargs              # extra args forwarded to dir2files
                 ):
-    'Index or update repo code chunks. Pass files= for incremental update (e.g. from watcher).'
+    'Index new and changed repo files under `dir` and drop the chunks of deleted ones.'
     dir = Path(dir or self.root)
     known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path, uploaded_at') if r['path']}
     all_files = dir2files(str(dir), strict_skip_file_re, repo_skip_folder_re,exts=exts, **kwargs)
@@ -350,7 +349,7 @@ def update_repo(self:Kosha,
 # %% ../nbs/00_core.ipynb #d91bbf7a5f17e3d0
 @patch
 def prune_old_versions(self:Kosha, pkg:str):
-	'Keep only the latest version of a package in the database.'
+	'Keep only the highest indexed version of `pkg`.'
 	if len(vers := self.pkgs(select='version', where=f'name={pkg!r}')) <= 1: return
 	latest = sorted(L(vers).attrgot('version'), key=lambda v: tuple(map(int, v.split('.'))))[-1]
 	je = lambda k, o='=', v='': f"json_extract(metadata, '$.{k}') {o} {v!r}"
@@ -359,12 +358,12 @@ def prune_old_versions(self:Kosha, pkg:str):
 
 @patch
 def prune_old_pkgs(self:Kosha):
-	'Keep only the latest version of each package in the database.'
+	'Keep only the highest indexed version of every package.'
 	L(self.pkgs(select='name')).attrgot('name').map(self.prune_old_versions)
 
 @patch
 def pkgs_in_env(self:Kosha, pyproject=False, depth=1) -> list:
-	'Intersection of the packages table with packages installed in the environment.'
+	'Indexed packages whose indexed version is the one installed.'
 	st_pkgs, inst_pkgs = L(self.pkgs(select='name, version')), env_pkg_versions(pyproject, depth)
 	return st_pkgs.filter(lambda p: p['name'] in inst_pkgs and inst_pkgs[p['name']] == p['version'])
 
@@ -377,14 +376,7 @@ _filter_pat = re.compile(r'\b(' + '|'.join(sorted(_filter_keys, key=len, reverse
 _keyish_pat = re.compile(r'\b([a-zA-Z][a-zA-Z_-]{1,14})!?:(?![/\\])\S+')
 
 def parseq(q: str) -> tuple:
-    '''Parse key:value filter tokens from a query. Returns (bare_query, filters).
-
-    Keys are file/path/package/lang/type, plus plurals and the short forms people reach for first
-    (`pkg`, `dir`, `ext`, ...); a trailing `!` is accepted and means the same thing, since every
-    filter is already a hard SQL predicate. A filter-shaped token whose key is none of these lands
-    under `_unknown` rather than vanishing into the query text: `pkg:x` used to leave the whole
-    index unfiltered *and* search for the literal string, which reads as a plausible answer to a
-    question that was never asked.'''
+    'Split query `q` into its plain text and a dict of `key:value` filters, with unknown keys under `_unknown`.'
     filters = defaultdict(list)
     for m in _filter_pat.finditer(q):
         filters[_filter_norm.get(m.group(1), m.group(1))].extend(m.group(2).split(','))
@@ -407,7 +399,7 @@ _ext = {'py': '.py', 'js': '.js', 'ts': '.ts', 'jsx': '.jsx', 'tsx': '.tsx', 'rb
         'javascript':'.js','typescript':'.ts','ruby':'.rb','rust':'.rs','golang':'.go'}
 
 def filt2wh(filters: dict, store: str = 'code') -> str | None:
-	'Convert a filter dict (from parse_query) to a SQL WHERE clause for the given store (code or env).'
+	'An SQL WHERE clause for `filters` (from `parseq`) on the `code` or `env` store, or None if nothing applies.'
 	_get, je = lambda k: filters.get(k,[]), lambda k, o='=', v='': f"json_extract(metadata, '$.{k}') {o} {v!r}"
 	list_or = lambda it: ['(%s)'%' OR '.join(ls)] if (ls:=listify(it)) else []
 	c, files, paths, langs = [], _get('file'), _get('path'), _get('lang')
@@ -422,7 +414,7 @@ def filt2wh(filters: dict, store: str = 'code') -> str | None:
 
 # %% ../nbs/00_core.ipynb #854f0f95b0b3cddd
 def fanout(kw, limit, rerank):
-	'Widen the retrieval limit when reranking, so the cross-encoder has candidates to reorder.'
+	'Set the retrieval limit in `kw`, widened to at least RERANK_FANOUT when reranking.'
 	kw['limit'] = max(limit, RERANK_FANOUT) if rerank else limit
 	return kw
 
@@ -430,7 +422,7 @@ def fanout(kw, limit, rerank):
 def env_context(self:Kosha,
 				q:str,               	# query to search (supports key:value filters)
 				emb_q:str=None,     	# query to embed; defaults to bare query after filter parsing
-				wide:bool=False,    	# whether to use wide search
+				wide:bool=False,    	# accepted but not used
                 columns:str='content,metadata,package',			# comma separated columns string to return from search
                 where:str=None,			# additional where clause to filter search results
                 ann=True,               # HNSW Approximate Nearest Neighbors (ann) search; defaults to True
@@ -438,7 +430,7 @@ def env_context(self:Kosha,
                 rerank_model:str=None,  # flashrank model name (None -> fast default)
 				**kw					# additional args to pass to db.search
 				) -> L:
-	'Code search over the env store, with optional key:value filters (e.g. package:fasthtml).'
+	'Keyword and vector search over the package index, with optional `key:value` filters.'
 	raw, fs = parseq(q)
 	fq, emb = raw, self.emb_query(emb_q or raw)
 	wh = ' AND '.join(map(lambda p: f'({p})', L(filt2wh(fs, 'env'), where).filter(true)))
@@ -451,7 +443,7 @@ def env_context(self:Kosha,
 
 @patch
 def pkgs2consider(self: Kosha, sys_wide=True) -> set:
-	'Determine which packages to consider for search intersecting packages table and the environment.'
+	'Names of indexed packages, or with `sys_wide=False` only those indexed at the installed version.'
 	ex_pkgs = {d['name']: d['version'] for d in self.pkgs(select='name, version')}
 	if sys_wide: return ex_pkgs.keys()
 	env_pkgs = env_pkg_versions()
@@ -462,7 +454,7 @@ def pkgs2consider(self: Kosha, sys_wide=True) -> set:
 def repo_context(self:Kosha,
                 q:str,                          # query to search (supports key:value filters)
                 emb_q:str=None,                 # query to embed; defaults to bare query after filter parsing
-                wide:bool=False,                # use wide (OR) FTS search
+                wide:bool=False,                # accepted but not used
                 columns:str='content,path,metadata', # columns to return
                 where:str=None,                 # extra SQL filter
                 ann=True,               # HNSW Approximate Nearest Neighbors (ann) search; defaults to True
@@ -470,7 +462,7 @@ def repo_context(self:Kosha,
                 rerank_model:str=None,  # flashrank model name (None -> fast default)
                 **kw                            # additional args to pass to db.search
 ) -> L:
-	'Semantic + keyword search through indexed repo code.'
+	'Keyword and vector search over the repo index, with optional `key:value` filters.'
 	raw, fs = parseq(q)
 	fq, emb = raw, self.emb_query(emb_q or raw)
 	wh = filt2wh(fs, 'code')
@@ -484,21 +476,21 @@ def repo_context(self:Kosha,
 
 @patch
 async def awatch_repo(self:Kosha, dir:Path=None, **kw):
-	'Async watcher: re-indexes changed files on every watchfiles event.'
+	'Watch `dir` asynchronously and re-index the files in each change event.'
 	from watchfiles import awatch
 	dir = Path(dir or self.root)
 	async for changes in awatch(str(dir)): self.update_repo(dir, files=L({c[1] for c in changes}), **kw)
 
 @patch
 def watch_repo(self:Kosha, dir:Path=None, **kw):
-	'Block and watch repo for changes, re-indexing incrementally. Ctrl-C to stop.'
+	'Watch the repo and re-index files as they change, until you press Ctrl-C.'
 	arun(self.awatch_repo(dir, **kw))
 
 # %% ../nbs/00_core.ipynb #4a29335aeeff
 def code_row(r:dict,          # a hit from `repo_context` or `env_context`
              leg:str='repo'   # which index it came from
 ) -> AttrDict:
-    'One hit in the flat shape: `source, ref, title, where, text, open`.'
+    'Hit `r` as an AttrDict with the keys source, ref, title, where, text and open.'
     m = dict(r.get('metadata') or {})
     mod, path, ln = m.get('mod_name', ''), m.get('path', ''), m.get('lineno')
     return AttrDict(source=leg, ref=mod or path, title=mod or (Path(path).name if path else ''),
@@ -514,7 +506,7 @@ def rows(self:Kosha,
          env:bool=False,    # the installed-package index
          **kw               # forwarded to repo_context / env_context
 ) -> L:
-    'Code hits in one flat shape, ready to fuse with hits from anywhere else.'
+    'Search hits for `q` from the repo and, with `env=True`, the package index, each as a `code_row`.'
     out = L()
     if repo: out += L(self.repo_context(q, limit=limit, **kw)).map(code_row, leg='repo')
     if env:  out += L(self.env_context(q, limit=limit, **kw)).map(code_row, leg='env')
@@ -524,11 +516,11 @@ def rows(self:Kosha,
 @patch
 def pkg_context(self:Kosha,
                 q:str, # the search query
-                limit:int=10, # limits
+                limit:int=10, # number of hits to return
                 rerank:bool=False,      # reorder the merged hits with a flashrank cross-encoder
                 rerank_model:str=None,  # flashrank model name (None -> fast default)
 ) -> L:
-	'FTS5+vector search over package descriptions in pkg_store.'
+	'Keyword and vector search over the package descriptions in pkg_store.'
 	fq, emb = q, self.emb_query(q).tobytes()
 	fn = lambda r: r | dict(metadata=jl(r['metadata'])) if isinstance(r.get('metadata'), str) else r
 	hits = self.envdb.search(fq, emb, ann=True, columns=['content','metadata'], table_name='pkg_store',
@@ -539,7 +531,7 @@ def pkg_context(self:Kosha,
 # %% ../nbs/00_core.ipynb #5da499af
 @patch(as_prop=True)
 def docs(self:Kosha) -> Index:
-	'Lazy tree-aware `Index` over long-form docs — READMEs and `docs/` trees, not AST chunks.'
+	'The docs index, a litesearch `Index` over READMEs and other prose, opened on first use.'
 	if self._docs is None: self._docs = Index(self.dp, encoder=self.efn, name='docs')
 	return self._docs
 
@@ -548,12 +540,12 @@ def add_docs(self:Kosha,
              src,             # a docs directory, a file, or {title: text}
              **kw             # forwarded to Index.add
              ) -> int:
-	'Ingest long-form docs. Returns the number of chunks gained.'
+	'Add documents to the docs index and return the number of chunks added.'
 	return self.docs.add(src, **kw)
 
 @patch
 def add_pkg_docs(self:Kosha, pkg:str) -> int:
-	'Ingest a package README in full — pkg_store keeps only a 2k-char blurb.'
+	'Add the full README of installed package `pkg` to the docs index.'
 	m = meta(_pkg_name(pkg))
 	txt = m.get_payload() or m.get('Description') or ''
 	return self.add_docs({f'{pkg} readme': txt}) if txt.strip() else 0
@@ -565,5 +557,5 @@ def docs_context(self:Kosha,
                  sections:bool=True,  # ranked sections (with `read` handles) vs raw chunks
                  **kw                 # forwarded to Index.sections / Index.search
                  ) -> L:
-	'Search the docs index; sections reassemble whole passages instead of fragments.'
+	'Search the docs index, returning whole sections by default or raw chunks with `sections=False`.'
 	return L(self.docs.sections(q, limit=limit, **kw) if sections else self.docs.search(q, limit=limit, **kw))

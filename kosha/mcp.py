@@ -1,4 +1,4 @@
-"""MCP server for kosha, repo + package context search and call-graph queries as MCP tools, so Claude, Codex, and any other MCP client can drive the full index.
+"""An MCP server that gives Claude, Codex and other MCP clients the kosha index as a set of tools.
 
 Docs: https://vedicreader.github.io/kosha/mcp.html.md"""
 
@@ -9,7 +9,7 @@ __all__ = ['mcp', 'status', 'sync', 'context', 'repo_context', 'env_context', 'w
            'short_path', 'public_api', 'top_nodes', 'api_paths', 'dep_stack', 'pkg_url', 'main']
 
 # %% ../nbs/04_mcp.ipynb #0ec0ff9f
-"""MCP server for kosha — repo + package context search and call-graph tools over stdio.
+"""MCP server for kosha: repo and package search and call-graph tools over stdio.
 Run `kosha-mcp` from the target repo's root in its venv (e.g. `uv run kosha-mcp`).
 
 Docs: https://vedicreader.github.io/kosha/mcp.html.md"""
@@ -31,17 +31,17 @@ mcp = MCPServer('kosha', instructions=(
     'a dependency already does it; context/repo_context find existing patterns (pagerank = blast radius); '
     'node_info/short_path/api_paths answer call-graph questions; where_to_add gives file:line insertion '
     'points. Queries mix natural language with filters: package:name path:sub lang:py type:FunctionDef; '
-    'package!:name hard-filters to one package.'))
+    'every filter excludes non-matching code, and a package filter skips the repo.'))
 
 _k = None
 def _kosha():
-    'Lazy Kosha singleton — the embedder cold-start (~3-5s) happens once per server, not per call.'
+    'The one Kosha this server uses, created on first call so the embedding model loads once.'
     global _k
     if _k is None: _k = Kosha()
     return _k
 
 def _jsonable(o):
-    'Recursively convert kosha result objects (L, sets, ...) to JSON-serializable types.'
+    'Convert kosha results (L, sets, dicts and so on) to plain JSON types, recursively.'
     if isinstance(o, (set, frozenset)): return sorted(o)
     if isinstance(o, dict): return {str(k): _jsonable(v) for k, v in o.items()}
     if isinstance(o, (str, int, float, bool)) or o is None: return o
@@ -51,14 +51,14 @@ def _jsonable(o):
 # %% ../nbs/04_mcp.ipynb #f1bbab07
 @mcp.tool()
 def status() -> dict:
-    "Index freshness: {files, packages, graph_nodes, stale_files, stale_pkgs}. Call this first; if anything is stale, sync before querying (stale looks like missing)."
+    "How fresh the index is: {files, packages, graph_nodes, stale_files, stale_pkgs, new_files}; call it first and sync if anything is stale."
     return _jsonable(_kosha().status())
 
 @mcp.tool()
 def sync(dir:str|None=None, pkgs:list|None=None, embed:bool=True, force:bool=False,
          repo:bool=True, env:bool=True, graph:bool=True, graph_mode:str='fast',
          graph_metrics:bool=True) -> dict:
-    "Sync repo, env packages, and the call graph. `graph=False` skips the graph. `graph_mode='full'` uses worker processes. `graph_metrics=False` defers PageRank and degree updates until `recompute_metrics()`. Returns post-sync status."
+    "Update the repo index, the package index and the call graph, then return the status; graph=False skips the graph."
     k = _kosha()
     k.sync(dir=dir, pkgs=pkgs, embed=embed, force=force, repo=repo, env=env, graph=graph,
            graph_mode=graph_mode, graph_metrics=graph_metrics)
@@ -67,66 +67,66 @@ def sync(dir:str|None=None, pkgs:list|None=None, embed:bool=True, force:bool=Fal
 # %% ../nbs/04_mcp.ipynb #1c8111fc
 @mcp.tool()
 def context(query:str, limit:int=10, repo:bool=True, env:bool=True, graph:bool=True, compact:bool=False) -> list:
-    "Fan-out semantic + keyword search over repo and installed packages, graph-enriched (callers/callees/pagerank). The right default once a task touches more than one module. compact=True returns slim dicts (mod_name, signature, docstring, lineno) for triage."
+    "Search the repo and installed packages together, with callers, callees and PageRank on each hit; compact=True returns mod_name, sig, docstring, lineno and path only."
     return _jsonable(_kosha().context(query, limit=limit, repo=repo, env=env, graph=graph, compact=compact))
 
 @mcp.tool()
 def repo_context(query:str, limit:int=10) -> list:
-    "Semantic + keyword search over indexed repo code only."
+    "Keyword and vector search over the repo index only."
     return _jsonable(_kosha().repo_context(query, limit=limit))
 
 @mcp.tool()
 def env_context(query:str, limit:int=10) -> list:
-    "Semantic search over installed packages only — check whether a dependency already does something before implementing it. Bare package names in the query auto-detect as soft filters."
+    "Keyword and vector search over installed packages only, to check whether a dependency already does something before you write it."
     return _jsonable(_kosha().env_context(query, limit=limit))
 
 @mcp.tool()
 def where_to_add(description:str, limit:int=5) -> list:
-    "Likely file:line insertion points for new code matching a description, with co_dispatched peers to pattern-match."
+    "Files and lines where code matching `description` would best be added, with the peers it would join."
     return _jsonable(_kosha().where_to_add(description, limit=limit))
 
 # %% ../nbs/04_mcp.ipynb #5d2ebcbc
 @mcp.tool()
 def node_info(mod_name:str) -> dict:
-    "Callers, callees, co_dispatched peers, and pagerank for a fully-qualified node, e.g. fastcore.basics.merge. pagerank = blast radius: high means load-bearing, touch carefully."
+    "Callers, callees, co-dispatched peers and PageRank of a node such as fastcore.basics.merge; high PageRank means much code depends on it."
     return _jsonable(_kosha().ni(mod_name))
 
 @mcp.tool()
 def neighbors(node:str, depth:int=1) -> list:
-    "Callers + callees of a fully-qualified node up to depth hops."
+    "Every node within `depth` edges of `node`, callers and callees alike."
     return _jsonable(_kosha().neighbors(node, depth=depth))
 
 @mcp.tool()
 def short_path(src:str, tgt:str) -> list:
-    "Shortest call-graph path between two fully-qualified nodes (how do these connect?)."
+    "The shortest chain of calls from node `src` to node `tgt`."
     return _jsonable(_kosha().short_path(src, tgt))
 
 @mcp.tool()
 def public_api(pkg:str, limit:int=200) -> list:
-    "A package's real public API — __all__ entries plus @patch-derived methods — with docstrings. Works for a package ('fastcore') or submodule ('fastcore.basics')."
+    "Public names and docstrings of a package or module, including functions that @patch adds to its classes."
     return _jsonable(_kosha().public_api(pkg, limit=limit))
 
 @mcp.tool()
 def top_nodes(pkg:str, k:int=5) -> list:
-    "Top-k public API nodes for a package ranked by PageRank in the call graph."
+    "The `k` public names of a package with the highest PageRank."
     return _jsonable(_kosha().top_nodes(pkg, k=k))
 
 @mcp.tool()
 def api_paths(from_pkg:str, to_pkg:str, k:int=15) -> dict:
-    "Shortest call-graph paths from one package's public API to another's — how two packages actually connect."
+    "Shortest call paths from the top public functions of `from_pkg` to those of `to_pkg`."
     return _jsonable(_kosha().api_call_paths(from_pkg, to_pkg, k=k))
 
 @mcp.tool()
 def dep_stack(seeds:list|None=None, depth:int=1) -> list:
-    "BFS dependency layers from seed packages (default: pyproject deps), ordered by coupling strength."
+    "Layers of packages imported by the seed packages (default: the pyproject dependencies), breadth first."
     return _jsonable(_kosha().dep_stack(seeds=seeds or list(env_pkg_versions().keys()), depth=depth))
 
 @mcp.tool()
 def pkg_url(pkg:str) -> str:
-    "Best repo/docs URL for an installed package — feed it to a web-fetch tool for docs, changelogs, or migration guides."
+    "The repository or home page address of an installed package, for looking up its docs or changelog."
     return _pkg_url(pkg) or "not found"
 
 # %% ../nbs/04_mcp.ipynb #04d1a1a6
 def main():
-    "Entry point for the `kosha-mcp` console script. stdio by default; pass --http for Streamable HTTP."
+    "Run the server for the `kosha-mcp` command, over stdio, or Streamable HTTP with --http."
     mcp.run(transport='streamable-http' if '--http' in sys.argv[1:] else 'stdio')

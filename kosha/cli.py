@@ -1,5 +1,8 @@
-"""Single `kosha` entry point with subcommands for shell-based harnesses.
-Default output is readable markdown; pass `--as-json` for JSON (piping/harnesses).
+"""The `kosha` shell command: every index and graph query as a subcommand.
+
+Agents that work through a shell, and people at a terminal, need kosha without writing Python. This module provides one `kosha` command with a subcommand for each query: `sync`, `status`, `context`, `repo-context`, `env-context`, `ni`, `public-api`, `api-paths`, `dep-stack`, `top-nodes`, `where-to-add`, `watch`, `daemon`, `install` and `nuke`. Subcommand names use hyphens where the Python methods use underscores, and so do flags, as in `--as-json` and `--busy-timeout`. A flag that is on by default is turned off with `--no-` in front, as in `kosha sync --no-graph`.
+
+Output is readable markdown. `--as-json` prints JSON instead, for piping into `jq` or another program. `kosha <subcommand> --help` lists a subcommand's flags.
 
 Docs: https://vedicreader.github.io/kosha/cli.html.md"""
 
@@ -54,22 +57,18 @@ def sync(
     dir:str=None,        # directory to sync; defaults to repo root
     pkgs:str=None,       # comma-separated package names; defaults to all pyproject.toml deps
     repo:bool=True,      # index the repo
-    env:bool=True,       # index env packages; --no-env is "this repo only", and skips the staleness scan
+    env:bool=True,       # index installed packages; --no-env indexes the repo only
     graph:bool=True,     # build the call graph
-    graph_mode:str='fast', # use 'full' to extract graph batches in worker processes
-    graph_metrics:bool=True, # update PageRank and degrees; False defers them
+    graph_mode:str='fast', # 'full' re-extracts changed files in worker processes
+    graph_metrics:bool=True, # recompute PageRank after the graph update
     parallel:bool=True,  # run repo, env, and graph sync in parallel
-    embed:bool=True,     # embed code chunks (set False for fast metadata-only update)
+    embed:bool=True,     # compute embeddings; --no-embed stores chunks for keyword search only
     force:bool=False,    # re-sync everything, graph included, rather than what changed
     busy_timeout:int=None, # ms to wait on a locked db; set (e.g. 30000) when syncing in parallel
-    pkg_parallel:bool=False, # ingest env packages concurrently; requires --busy_timeout
+    pkg_parallel:bool=False, # index packages in parallel threads; needs --busy-timeout
     as_json:bool=False,  # output the post-sync status as JSON
 ):
-    '''Sync repo + env packages + call graph into .kosha/ databases.
-
-    The flags are `context`'s flags, and they mean the same thing here. They used to be one
-    `--sync_graph` that defaulted to off, so this command promised a call graph in its own help text
-    and never built one — `kosha ni` then found nothing and there was no way to tell why.'''
+    'Index the repo, the installed packages and the call graph, then print the index status.'
     k = Kosha(busy_timeout=busy_timeout)
     pkg_list = _split_pkgs(pkgs) if pkgs else None
     k.sync(dir=dir, pkgs=pkg_list, repo=repo, env=env, graph=graph, in_parallel=parallel, embed=embed,
@@ -89,7 +88,7 @@ def context(
     rerank:bool=False,   # reorder the top-k with a flashrank cross-encoder
     as_json:bool=False,  # output JSON instead of markdown
 ):
-    'Fan-out semantic search over repo and env, optionally graph-enriched.'
+    'Search the repo and installed packages together and print the hits with their call-graph details.'
     _warn_filters(query)
     k = Kosha()
     results = k.context(query, limit=limit, repo=repo, env=env, graph=graph, rerank=rerank)
@@ -103,7 +102,7 @@ def repo_context(
     limit:int=10,       # max results
     as_json:bool=False, # output JSON
 ):
-    'Semantic + keyword search over indexed repo code only.'
+    'Search the repo index only and print the hits.'
     _warn_filters(query)
     k = Kosha()
     results = k.repo_context(query, limit=limit)
@@ -113,11 +112,11 @@ def repo_context(
 # %% ../nbs/03_cli.ipynb #cell-env-context
 @call_parse
 def env_context(
-    query:str,          # search query (package names auto-detected as filters)
+    query:str,          # search query (supports key:value filters e.g. package:fastcore)
     limit:int=10,       # max results
     as_json:bool=False, # output JSON
 ):
-    'Semantic search over indexed env packages only.'
+    'Search the installed-package index only and print the hits.'
     _warn_filters(query)
     k = Kosha()
     results = k.env_context(query, limit=limit)
@@ -127,10 +126,10 @@ def env_context(
 # %% ../nbs/03_cli.ipynb #cell-ni
 @call_parse
 def ni(
-    mod_name:str,       # fully-qualified module node name e.g. fastcore.basics.merge
+    mod_name:str,       # full dotted node name, e.g. fastcore.basics.merge
     as_json:bool=False, # output JSON
 ):
-    'Node info: callers, callees, co_dispatched, pagerank for a single graph node.'
+    'Print the PageRank, callers, callees and co-dispatched peers of one graph node.'
     k = Kosha()
     result = k.ni(mod_name)
     if as_json: print(json.dumps(_to_json(result)))
@@ -149,7 +148,7 @@ def ni(
 def watch(
     dir:str=None,  # directory to watch; defaults to repo root
 ):
-    "Live incremental re-index on file changes. Blocking \u2014 Ctrl-C to stop."
+    "Watch the repo and re-index files as they change, until Ctrl-C."
     from pathlib import Path as _Path
     k = Kosha()
     k.watch_repo(dir=_Path(dir) if dir else None)
@@ -161,7 +160,7 @@ def public_api(
     module:str=None,    # restrict to a submodule (overrides pkg for scoping)
     as_json:bool=False, # output JSON
 ):
-    "List public API entries for a package (respects __all__ + @patch methods)."
+    "Print the public names of a package or module, including functions `@patch` adds to its classes."
     k = Kosha()
     target = module or pkg
     results = k.public_api(target)
@@ -182,7 +181,7 @@ def api_paths(
     k:int=15,           # top-k API nodes per package to consider
     as_json:bool=False, # output JSON
 ):
-    "Shortest call-graph paths from from_pkg public API to to_pkg public API."
+    "Print the shortest call paths from the top public functions of `from_pkg` to those of `to_pkg`."
     ko = Kosha()
     paths = ko.api_call_paths(from_pkg, to_pkg, k=k)
     if as_json: print(json.dumps(_to_json(paths)))
@@ -198,10 +197,10 @@ def api_paths(
 @call_parse
 def dep_stack(
     seeds:str=None,     # comma-separated seed package names; defaults to pyproject.toml deps
-    depth:int=1,        # BFS depth
+    depth:int=1,        # number of layers below the seeds
     as_json:bool=False, # output JSON
 ):
-    "BFS dependency layers from seed packages, ordered by coupling strength."
+    "Print the layers of packages imported by the seed packages, breadth first."
     k = Kosha()
     seed_list = seeds.split(',') if seeds else list(env_pkg_versions().keys())
     layers = k.dep_stack(seeds=seed_list, depth=depth)
@@ -219,7 +218,7 @@ def top_nodes(
     k:int=5,            # number of top nodes to return
     as_json:bool=False, # output JSON
 ):
-    "Top-k public API nodes for a package ranked by PageRank in the call graph."
+    "Print the `k` public names of a package with the highest PageRank."
     ko = Kosha()
     nodes = ko.top_nodes(pkg, k=k)
     if as_json: print(json.dumps(_to_json(nodes)))
@@ -230,7 +229,7 @@ def top_nodes(
 # %% ../nbs/03_cli.ipynb #103087ed
 @call_parse
 def status(as_json:bool=False):
-    "Show index freshness: file/pkg/node counts, stale files, and stale packages."
+    "Print how fresh the index is: file, package and node counts, stale files and stale packages."
     s = Kosha().status()
     if as_json: print(json.dumps(s))
     else:
@@ -246,7 +245,7 @@ def where_to_add(
     limit:int=5,        # max results
     as_json:bool=False, # output JSON
 ):
-    "Find likely insertion points for new code matching description."
+    "Print the files and lines where code matching `description` would best be added."
     results = Kosha().where_to_add(description, limit=limit)
     if as_json: print(json.dumps(_to_json(results)))
     else:
@@ -258,9 +257,9 @@ def where_to_add(
 
 # %% ../nbs/03_cli.ipynb #3c1799aaece78c40
 @call_parse
-def nuke(env=False # delete env cache
+def nuke(env=False # also delete the shared package and docs indexes
 ):
-    'Delete all kosha data and caches.'
+    'Delete the repo index and call graph, and with --env the shared indexes too.'
     if env: print("Deleting env cache...")
     Kosha().nuke(env=env)
     print("deleted kosha cache.")
@@ -285,7 +284,7 @@ _DISPATCH = {
 
 @call_parse
 def daemon():
-    "Persistent kosha kernel. Reads newline-delimited JSON from stdin, writes results to stdout."
+    "Answer JSON requests from stdin, one per line, with one JSON line each on stdout, keeping kosha loaded."
     k = Kosha()
     print(json.dumps({"ok": True, "status": "ready"}), flush=True)
     for line in sys.stdin:
@@ -301,7 +300,7 @@ def daemon():
 # %% ../nbs/03_cli.ipynb #cli-install-a1b2
 @call_parse
 def install():
-    "Install kosha SKILL.md to .agents/skills/kosha/ and .claude/skills/kosha/."
+    "Copy the bundled SKILL.md into .agents/skills/kosha/ and .claude/skills/kosha/ in the repo."
     from .core import mv_skill_md, repo_root
     mv_skill_md(dry_run=False, dir=repo_root())
 

@@ -1,25 +1,25 @@
-"""Search your repo and every installed package by meaning, then walk the call graph that connects them — reach for this before you grep, open a source file, or write code a dependency already provides. FTS5 keyword search, vector search and a static call graph over local SQLite: no LLM calls, no network, answers in milliseconds.
+"""Search your repo and every installed package by meaning, then follow the call graph between them. Use it before you grep, open a source file, or write code a dependency already provides. Keyword search, vector search and a static call graph over local SQLite, with no LLM calls and no network.
 
 ## Start here
 
-`Kosha()` opens two SQLite stores — the repo index (`.kosha/code.db`) and the env index of installed packages (XDG `kosha/env.db`) — plus the call graph over both. Check freshness before you trust an answer, because a stale index is indistinguishable from a missing result:
+`Kosha()` opens two indexes, the repo index (`.kosha/code.db`) and the index of installed packages (`kosha/env.db` in the user data directory), plus the call graph over both. Check that they are current before trusting an answer, because code missing from a stale index looks the same as code that does not exist:
 
 ```python
 from kosha import Kosha
 k = Kosha()
 k.status()
-# {'files': 4, 'packages': 355, 'graph_nodes': 10630, 'stale_files': 0, 'stale_pkgs': 5, 'new_files': 0}
+# {'files': 4, 'packages': 355, 'graph_nodes': 10630, 'stale_files': 0, 'stale_pkgs': {'httpx': '0.28.1'}, 'new_files': 0}
 ```
 
-Sync only when something you actually need is stale — a full sync embeds every changed chunk and is the one slow operation here:
+Sync only when something you need is stale. Computing embeddings for changed code is the one slow step:
 
 ```python
-k.sync(in_parallel=True)          # repo + stale packages + graph
-k.sync(embed=False)               # rebuild the graph without re-embedding
+k.sync()                            # repo, stale packages and call graph
+k.sync(embed=False)                 # store new chunks without embeddings: keyword search only, much faster
 k.sync(pkgs=['httpx'], repo=False)  # one package
 ```
 
-Then query. `context` is the default and searches both stores; `env_context` and `repo_context` are the one-sided, faster versions:
+Then search. `context` is the default and searches both indexes; `env_context` and `repo_context` search one each and are faster:
 
 ```python
 for r in k.env_context('atomic file write preserving permissions', limit=8):
@@ -30,45 +30,44 @@ for r in k.env_context('atomic file write preserving permissions', limit=8):
 
 | Question | Call |
 |---|---|
-| Is the index fresh? | `k.status()` |
+| Is the index current? | `k.status()` |
 | Does a dependency already do this? | `k.env_context('desc', limit=8)` |
 | What pattern does this codebase use? | `k.context('desc', graph=True, limit=15)` |
 | Repo only, no packages | `k.repo_context('desc')` |
-| Triage many hits without full code bodies | `k.context('desc', compact=True)` |
+| Look over many hits without their source | `k.context('desc', compact=True)` |
 | Who calls this, what does it call, what are its peers? | `k.ni('fastcore.basics.merge')` |
 | How do two nodes connect? | `k.short_path('a.fn', 'b.fn')` |
-| What's within n hops? | `k.neighbors('kosha.core.Kosha', depth=2)` |
-| What does a package actually export? | `k.public_api('fastcore')` |
-| What is load-bearing in a package? | `k.top_nodes('fastcore', k=5)` |
+| What is within n calls of a node? | `k.neighbors('kosha.core.Kosha', depth=2)` |
+| What does a package export? | `k.public_api('fastcore')` |
+| Which functions of a package does the most code depend on? | `k.top_nodes('fastcore', k=5)` |
 | How does package A reach package B? | `k.api_call_paths('kosha', 'litesearch')` |
-| What does this project depend on, by coupling? | `k.dep_stack(depth=2)` |
+| Which packages does a package import, layer by layer? | `k.dep_stack(['fastcore'], depth=2)` |
 | Where should new code go? | `k.where_to_add('desc', limit=5)` |
-| Which package is for this job? | `k.pkg_context('desc')` |
-| Search long-form docs, not code | `k.docs_context('desc')` |
+| Search READMEs and other prose, not code | `k.docs_context('desc')` |
 
-`doc(Kosha)` lists every method with its signature — the table above is the map, not the API reference. Ingestion (`update_repo`, `update_pkgs`, `process_env`) and destructive calls (`nuke`, `rm_pkg`, `prune_old_pkgs`) are on the same class; `sync` is the only one worth calling directly.
+`pkg_context` searches package descriptions, but nothing in kosha fills that table yet, so it returns no hits. `doc(Kosha)` lists every method with its signature; the table is a map, not the full reference. Indexing (`update_repo`, `update_pkgs`, `process_env`) and deleting (`nuke`, `rm_pkg`, `prune_old_pkgs`) are methods of the same class, but `sync` is the only one you normally need.
 
 ## Filters
 
-Filters live inside the query string, mixed with natural language, and apply to `context`, `env_context` and `repo_context`. Bare package names are auto-detected as `package:`, so `k.context('fastcore atomic save')` already scopes itself.
+Filters go inside the query string, next to the plain words, and work with `context`, `env_context` and `repo_context`.
 
 | Token | Aliases | Example | Effect |
 |---|---|---|---|
 | `package:` | `pkg:`, `packages:`, `pkgs:` | `package:fastcore` | one package |
-| `path:` | `dir:`, `folder:`, `paths:` | `path:xtras` | path substring |
-| `file:` | `filename:`, `files:` | `file:xtras*` | filename glob |
-| `lang:` | `ext:`, `extension:`, `langs:` | `lang:py` | language by extension |
-| `type:` | `types:` | `type:FunctionDef` | AST node type |
+| `path:` | `dir:`, `folder:`, `paths:` | `path:xtras` | path contains the text |
+| `file:` | `filename:`, `files:` | `file:xtras*` | path matches the glob |
+| `lang:` | `ext:`, `extension:`, `langs:` | `lang:py` | language, by file extension |
+| `type:` | `types:` | `type:FunctionDef` | kind of definition |
 
-Values are comma-separated for OR (`package:httpx,requests`), and a trailing `!` (`package!:x`) parses to the same thing — every filter is already a hard SQL predicate. A `package:` filter turns repo search off, since the two can't both be what you meant.
+Separate several values with commas to accept any of them (`package:httpx,requests`). Every filter excludes code that does not match, and a trailing `!` (`package!:x`) means the same as without it. In `context`, a `package:` filter also skips the repo search. A package name written as a plain word, as in `k.context('fastcore atomic save')`, is not a filter: it ranks that package's hits higher, and other packages still appear.
 
-A filter-shaped token with any other key is reported under `parseq(q)[1]['_unknown']`, and the CLI warns on stderr. This matters more than it looks: an unrecognised key isn't dropped, it's searched *as text* against every package, which returns a confident-looking page of results for a question nobody asked.
+A filter-shaped token with an unknown key is reported in `parseq(q)[1]['_unknown']`, and the command line prints a warning. The token is searched as plain text, so a typo such as `libr:litesearch` would otherwise return a full page of results that ignore the filter you meant.
 
 ## Reading a result
 
 ```python
 {'content':  'def merge(*ds):\n    "Merge all dicts"\n    ...',
- 'metadata': {'mod_name': 'fastcore.basics.merge',   # the handle for ni() / short_path()
+ 'metadata': {'mod_name': 'fastcore.basics.merge',   # the name to pass to ni() and short_path()
               'path': '.../fastcore/basics.py', 'lineno': 655,
               'type': 'FunctionDef', 'package': 'fastcore',
               'public_api': True, 'docstring': 'Merge all dicts'},
@@ -76,55 +75,55 @@ A filter-shaped token with any other key is reported under `parseq(q)[1]['_unkno
  'callers': [...], 'callees': [...], 'co_dispatched': []}
 ```
 
-`pagerank` is blast radius: a high-pagerank node is load-bearing, so changing it ripples. `callers` tells you where to hook in upstream, `callees` what you can reuse below.
+`pagerank` measures how much code depends on a node. Changing a node with a high score affects more code, so look at its callers first. `callers` shows where the code is used, and `callees` shows what it uses that you might reuse.
 
-`co_dispatched` is the least obvious and often the most useful: functions assigned together in one list, dict or tuple at module level — route tables, handler maps, plugin registries. When you need to add another handler, this names its peers and where the registration lives, without reading the glue code.
+`co_dispatched` is the least obvious field and often the most useful. It lists the functions assigned together with this one in a module-level list, dict or tuple: route tables, handler maps, plugin registries. When you add another handler, it names the existing ones and so shows where they are registered, without reading the glue code.
 
-The graph fields only appear when `graph=True` (the default for `context`); the search-only methods return `content` and `metadata` alone.
+The graph fields appear only when `graph=True`, the default for `context`. `env_context` and `repo_context` return `content` and `metadata` only.
 
 ## The call graph
 
-`k.graph` is the graph engine itself, built by ast-grep static analysis plus Python AST rules for dynamic edges. It also exposes `k.graph.ranked(k=10, module='fastcore')`, `k.graph.callers`, `k.graph.file2nodes`, and `k.graph.co_dispatched`. `doc(k.graph)` lists the complete API.
+`k.graph` is the graph itself, a `CodeGraph` built from ast-grep static analysis plus Python AST rules for decorators, registrations and `@patch`. Besides the methods above it has `k.graph.ranked(k=10, module='fastcore')`, `k.graph.callers`, `k.graph.file2nodes` and `k.graph.co_dispatched`; `doc(k.graph)` lists them all.
 
-Node names are the fully-qualified `mod_name` from a result's metadata. A name that isn't in the graph returns empty rather than raising, so an empty `short_path` means "no path found *or* node not indexed" — check `k.ni(name)` before concluding the code doesn't connect.
+Node names are the dotted `mod_name` from a hit's metadata. A name that is not in the graph gives an empty result, not an error, so an empty `short_path` means either that there is no path or that a node is not indexed. Check `k.ni(name)` before concluding that two pieces of code do not connect.
 
 ## Long-form docs
 
-The code stores hold AST chunks, which is the wrong shape for prose. `k.docs` is a tree-aware `litesearch.api.Index` over READMEs and docs directories, created lazily on first access:
+Code chunks suit code, not prose. `k.docs` is a separate index for READMEs and documentation folders, a litesearch `Index` that splits documents by heading. It is created the first time you use it:
 
 ```python
-k.add_pkg_docs('fastcore')          # the full README, not the 2k-char blurb in pkg_context
-k.add_docs('path/to/docs')          # a directory, a file, or {title: text}
-k.docs_context('how do I install')  # ranked sections, each with a read handle
-k.docs.read(node_id)['text']        # one whole section, reassembled
+k.add_pkg_docs('fastcore')          # a package's full README
+k.add_docs('path/to/docs')          # a folder, a file, or {title: text}
+k.docs_context('how do I install')  # ranked sections, each with a node_id
+k.docs.read(node_id)['text']        # one whole section
 ```
 
-`docs_context(q, sections=False)` returns raw chunks instead. The docs index has no staleness tracking: re-ingesting upserts by content hash but won't evict a stale version.
+`docs_context(q, sections=False)` returns raw chunks instead. The docs index does not track staleness: adding a changed document again stores the new text but does not remove the old version.
 
 ## Reranking
 
-`context`, `env_context`, `repo_context` and `pkg_context` take `rerank=True`, which reorders the results with a flashrank cross-encoder (the first call downloads a ~3MB model). It reorders what was retrieved and never adds to it, costing roughly 15-35ms.
+`context`, `env_context`, `repo_context` and `pkg_context` take `rerank=True`, which reorders the hits with a flashrank cross-encoder, a small model that scores each hit against the query. The first call downloads the model. Reranking reorders what was retrieved and never adds to it.
 
-It is off by default on purpose. On queries whose wording matches the target's docstring the gain is large; on paraphrased queries most of the loss is retrieval, not ordering, and the cross-encoder can't recover it. Widening the candidate pool first measures *worse* while costing linearly more, so `context` reranks only its existing top-k.
+It is off by default. It helps most when the query uses the same words as the target's docstring. When a query is phrased differently, the right code is usually missing from the candidates in the first place, and reordering cannot bring it back. `context` reranks only its final top hits; `env_context` and `repo_context` first retrieve a wider pool for the reranker to choose from.
 
 ## Outside Python
 
-The same index is reachable three other ways, which matters when the caller isn't a Python process:
+The same index can be reached in three other ways, for callers that are not Python processes:
 
-- **CLI** — `kosha sync`, `kosha context 'query' --limit 10 --rerank`, `kosha ni <mod_name>`, `kosha public-api <pkg>`, `--as_json` on any of them.
-- **Daemon** — `kosha daemon &` holds one warm embedding model and takes `{"cmd": ..., "args": {...}}` as JSON on stdin, which removes the few-second cold start from every call.
-- **MCP** — `kosha-mcp` exposes the same operations as MCP tools over stdio. If the host already has it configured, call those instead of importing anything.
+- Command line: `kosha sync`, `kosha context 'query' --limit 10 --rerank`, `kosha ni <mod_name>`, `kosha public-api <pkg>`, and `--as-json` on any of them for JSON output.
+- Daemon: `kosha daemon` keeps one embedding model loaded and reads `{"cmd": ..., "args": {...}}` requests as JSON lines on standard input, which saves the few seconds of loading on every call.
+- MCP: `kosha-mcp` offers the same operations as MCP tools over stdio. If the host already has it configured, call those tools instead of importing anything.
 
-## The stores are litesearch databases
+## The indexes are litesearch databases
 
-`k.codedb` and `k.envdb` are plain `litesearch.Database` objects, so the whole litesearch API works on them — extra tables, raw SQL, custom stores:
+`k.codedb` and `k.envdb` are litesearch databases, so the whole litesearch API works on them: extra tables, raw SQL, custom stores.
 
 ```python
 list(k.envdb.q("select content from store where json_extract(metadata,'$.mod_name') = ?", ['fastcore.basics.merge']))
-summaries = k.envdb.get_store(name='summaries')   # e.g. an agent-written layer over undocumented code
+summaries = k.envdb.get_store(name='summaries')   # for example, notes an agent writes about undocumented code
 ```
 
-Embeddings are stored and read back as `float16`; `kosha.core.cast_emb` is what pins that, so a custom `efn` can't silently write a wider dtype.
+Embeddings are stored and read back as 16-bit floats. `kosha.core.cast_emb` enforces that, so a custom embedding function cannot write a wider type by mistake.
 
 Docs: https://vedicreader.github.io/kosha/skill.html.md"""
 

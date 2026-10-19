@@ -7,32 +7,38 @@
 
 > Find the code you need before you write it.
 
-Kosha keeps a searchable memory of your repository and installed packages. Start with semantic search; add call-graph context when you need to understand the impact of a change. It works locally, uses no LLM, and returns code you can inspect.
+kosha (कोश, “treasury”) keeps a searchable index of your repository and of the Python packages it depends on. Ask it in plain words, such as “atomic write to a temp file”, and it returns the functions and classes that do that, from your code and from your dependencies, with their file, line and source. Ask it about a function and it tells you what calls it, what it calls, and how much code depends on it, so you can judge what a change will touch.
+
+It is built for coding agents as much as for people. An agent that searches before it writes reuses the helper your project already has instead of adding a second one. kosha runs locally, uses no language model, and returns real code you can read.
+
+Three ideas recur on this page. A chunk is one function, class or method cut out of a source file and stored with its metadata. The index finds chunks in two ways at once: keyword search, which matches the words of the query, and vector search, which compares embeddings, lists of numbers computed from text so that code with similar meaning gets similar numbers. The call graph records which function uses which, across your code and your packages.
 
 ## Install
 
-kosha is a dev dependency. It indexes at development time so AI coding assistants can search it.
+kosha is a development tool, so add it as a dev dependency. The package is published as `koshas`; the module you import and the command you run are both `kosha`.
 
 ``` sh
-uv add --dev kosha
+uv add --dev koshas
 ```
 
-One-time project setup, which installs `SKILL.md` so every agent picks up the skill automatically:
+kosha ships a skill file, `SKILL.md`, that tells coding agents how to use it. Install it once per project:
 
 ``` python
-Kosha(install_skill=True)   # writes .agents/skills/kosha/ and .claude/skills/kosha/
+Kosha(install_skill=True)   # writes .agents/skills/kosha/SKILL.md and .claude/skills/kosha/SKILL.md
 ```
 
-## Start a session
+Commit `.agents/skills/kosha/SKILL.md` so that every contributor’s agent picks it up.
 
-Create one index for the repository and the packages it uses. Later syncs compare source fingerprints and skip unchanged files.
+## Build the index
+
+`Kosha()` opens the index for the repository you are in. `sync()` brings it up to date: it indexes your repo files, the packages listed in `pyproject.toml` with their direct dependencies, and the call graph between them. The first sync takes a while. Later syncs re-read only files and package versions that changed.
 
 ``` python
 k = Kosha()
 k.sync()
 ```
 
-`k.sync(graph=False)` skips the call graph. `graph_mode='full'` extracts graph batches in worker processes. `graph_metrics=False` defers PageRank and degree updates; call `k.graph.recompute_metrics()` after the graph updates finish.
+`k.sync(graph=False)` skips the call graph when you only need search. `graph_mode='full'` re-extracts the graph in worker processes. `graph_metrics=False` skips recomputing PageRank (explained below); call `k.graph.recompute_metrics()` once you are done updating. The example below syncs only two packages.
 
 ``` python
 k = Kosha()
@@ -101,13 +107,13 @@ k.status()
      'stale_pkgs': {},
      'new_files': 1}
 
-Re-run `k.sync()` after `uv add`, version bumps, or significant code changes. If `stale_files > 0` or `stale_pkgs` is non-empty, sync before querying.
+`status` tells you whether the index is current. `stale_files` counts repo files changed since they were indexed, `new_files` counts Python files not indexed yet, and `stale_pkgs` lists installed packages not yet indexed at their installed version. Run `k.sync()` again after `uv add`, an upgrade, or a large edit, or whenever these are not zero.
 
-Use `k.sync(embed=False)` to rebuild the call graph on an existing DB without re-embedding, useful after a kosha update that changes graph logic.
+`k.sync(embed=False)` is a faster sync that stores new chunks without embeddings. Keyword search finds them straight away, and `k.process_repo()` and `k.process_env()` add the embeddings later.
 
 ## Search before you write
 
-Search installed packages first. It often finds an existing function or pattern before you add another one.
+`env_context` searches the installed packages. Searching them first often turns up a function that already does what you were about to write. Here a search for an atomic file write finds `fsspec.utils.atomic_write` and a Jupyter helper among others. Each hit is a dict with the chunk’s `content` and its `metadata`, which includes the dotted name (`mod_name`), the file path and the line number.
 
 ``` python
 results = k.env_context('atomic write temp file permissions', limit=5)
@@ -132,14 +138,16 @@ for r in results:
     fsspec.utils.atomic_write
       def atomic_write(path: str, mode: str = "wb"):
 
-Package names in the query (`package:fastcore`, or a bare package word) are **soft-boosted**, matching results rank higher but other packages still appear. Use `package!:fastcore` to hard-filter to a single package. `path:`, `lang:`, `type:` tokens are hard filters that narrow further:
+Filters narrow a search. Write them in the query as `key:value`: `package:` for an installed package, `path:` and `file:` for a path glob, `lang:` for a language, and `type:` for the kind of definition, such as `FunctionDef`. Each filter excludes everything that does not match. A trailing `!`, as in `package!:fastcore`, means the same as without it.
+
+A package name written as a plain word behaves differently in `context`, the combined search below. It only raises that package’s hits, and other packages still appear.
 
 ``` python
-k.env_context('package:fastcore path:xtras atomic save', limit=8)   # boost fastcore, keep others
-k.context('atomic save package!:fastcore', limit=8)                 # fastcore only
+k.env_context('package:fastcore path:xtras atomic save', limit=8)   # only fastcore, only paths containing xtras
+k.context('fastcore atomic save', limit=8)                          # fastcore ranked higher, others still listed
 ```
 
-**Need more info on a package?** Call `pkg_url` to get its repo/docs URL, then use websearch for changelogs, API docs, or migration guides:
+When a hit comes from a package you do not know, `pkg_url` gives the address of its repository or home page, which you can hand to a web search for its documentation or changelog:
 
 ``` python
 from kosha.core import pkg_url
@@ -148,9 +156,9 @@ pkg_url('litesearch')
 
     'https://github.com/Karthik777/litesearch'
 
-## Find a local pattern
+## Search the repo and the packages together
 
-Use repository and package search together when the task changes existing behaviour.
+`context` is the search to reach for first. It searches your repo and the packages at once, merges the two lists, and reorders the hits with rules made for code: a query that names a symbol favours the chunk that defines it, and test files and re-exports rank lower. With `graph=True` each hit also carries its place in the call graph: `pagerank`, `callers`, `callees` and `co_dispatched`.
 
 ``` python
 results = k.context('search code embeddings', limit=6, graph=True)
@@ -167,11 +175,11 @@ for r in results:
     transformers.models.squeezebert.modeling_squeezebert.SqueezeBertModel.set_input_embeddings  L434  pr=0.0000  callers=[]
     chonkie.handshakes.elastic.ElasticHandshake.search  L152  pr=0.0000  callers=[]
 
-`pagerank` = blast radius, higher means more things depend on it, touch carefully.
+PageRank, the algorithm Google first used to rank web pages, scores how much of the graph depends on a node. A function with a high score is called from many places, or from places that are themselves called a lot, so a change to it reaches further. Treat it as a warning to look before you edit. Most nodes score close to zero, as here.
 
-## Inspect the impact
+## Inspect what a change will touch
 
-Node information shows callers, callees, peers, and PageRank before you change a symbol.
+`ni` (node info) takes a full dotted name and returns the node’s graph record: its PageRank, the functions that call it, the functions it calls, and its co-dispatched peers. Call it before you change a function. In this example [`fastcore.basics.merge`](https://fastcore.fast.ai/basics.html#merge) is called from two places in `fastcore.script`.
 
 ``` python
 info = k.ni('fastcore.basics.merge')
@@ -186,9 +194,11 @@ print('co_dispatched:', list(info.get('co_dispatched', []))[:5])
     callees:  []
     co_dispatched: []
 
-`co_dispatched` lists sibling functions registered together (route groups, handler tables, plugin lists), the pattern to follow when adding a new one.
+`co_dispatched` lists the node’s peers: functions registered together, in a route list, a handler table or a list of plugins. When you add a new member to such a group, the peers show the pattern to copy.
 
 ## Choose where to make the change
+
+`where_to_add` takes a description of new code and suggests where it should go. For each suggestion it gives the file, the line to insert after, and the node it would sit next to. When that node belongs to a co-dispatch group, the line is the end of the group’s last member in the file, so the new code lands beside its peers.
 
 ``` python
 pts = k.where_to_add('add dynamic ast parsing for patched functions', limit=3)
@@ -201,9 +211,9 @@ for p in pts:
     /Users/71293/code/personal/orgs/kosha/kosha/graph.py:154  (kosha.graph.dyn_edges)
     /Users/71293/code/personal/orgs/kosha/kosha/core.py:56  (kosha.core.parse)
 
-## Triage, scan many results quickly
+## Scan many results quickly
 
-`compact=True` strips full code bodies and returns slim dicts for fast scanning.
+`compact=True` drops the source code from each hit and returns a slim dict with `mod_name`, `path`, `lineno`, `docstring` and `sig`, the first line of the definition. It is the cheap way to look over many results before reading a few in full. `repo=False` limits the search to packages.
 
 ``` python
 hits = k.context('database search filter package:litesearch', limit=2,repo=False, compact=True)
@@ -222,7 +232,9 @@ for r in hits:
       def database(pth_or_uri:str=':memory:',     # the database name or URL
       # Set up a database connection and load usearch extensions.
 
-## Public API surface
+## List a package’s public API
+
+`public_api` lists the public names of a package or of one module in it. A name is public when the module lists it in `__all__`, or, for modules without `__all__`, when it has no leading underscore. Functions that fastcore’s `@patch` attaches to a class count too. Top-level names come before methods.
 
 ``` python
 api = k.public_api('fastcore', limit=12)
@@ -247,7 +259,7 @@ for e in api:
 
 ## Trace a call path
 
-Use these graph queries after you have a symbol or package in hand. They show a shortest call chain, public API paths, dependency layers, and the most connected nodes.
+Once you have a symbol or a package in hand, these queries walk the call graph. `k.graphdb` is the graph’s SQLite database, so you can query the `graph_edges` table directly, as the first cell does. `short_path` returns the shortest chain of calls from one node to another. `api_call_paths` finds call chains from the most used public functions of one package to those of another. `dep_stack` lists the packages a package imports, layer by layer. `graph.ranked` returns the nodes with the highest PageRank under a module prefix.
 
 ``` python
 from fastcore.foundation import L
@@ -280,7 +292,7 @@ k.short_path('kosha.core.env_context', 'litesearch.core.search')
     ['kosha.core.env_context', 'litesearch.core.search']
 
 ``` python
-# Public-API → public-API call paths between two packages
+# Call paths from the top public functions of one package to those of another
 paths = k.api_call_paths('kosha', 'litesearch', k=10)
 for tgt, path in sorted(paths.items(), key=lambda x: len(x[1]))[:3]:
     print(f'{tgt}: {len(path)} hops')
@@ -288,7 +300,7 @@ for tgt, path in sorted(paths.items(), key=lambda x: len(x[1]))[:3]:
 ```
 
 ``` python
-# BFS dependency layers from a seed package, ordered by coupling strength
+# Layers of imported packages, breadth first from a seed package
 k.dep_stack(seeds=['kosha'], depth=2)
 ```
 
@@ -301,83 +313,73 @@ k.graph.ranked(k=5, module='fastcore')
 
     [{'node': 'fastcore.all.L', 'pagerank': 0.00975}, {'node': 'fastcore.all.Path', 'pagerank': 0.00526}, {'node': 'fastcore.all.first', 'pagerank': 0.00254}, {'node': 'fastcore.all.ifnone', 'pagerank': 0.0013}, {'node': 'fastcore.all.patch', 'pagerank': 0.00129}]
 
-## Daemon mode, warm kernel for sessions
+## Daemon mode
 
-The first kosha call in a process pays a 3–5s embedder cold-start. `kosha daemon` keeps a warm process running and routes JSON requests over stdin/stdout, so subsequent calls are immediate.
+Each new Python process pays three to five seconds to load the embedding model before its first search. `kosha daemon` loads it once and then answers requests read from standard input, one JSON object per line, writing one JSON line per answer. It prints `{"ok": true, "status": "ready"}` when it is ready.
 
 ``` bash
-kosha daemon &     # start once per session
+kosha daemon
 ```
 
-Then send newline-delimited JSON requests:
+Each request names a command and its arguments:
 
-    → {"cmd":"context","args":{"q":"embed a query","limit":10}}
-    ← {"ok":true,"result":[…]}
+    {"cmd": "context", "args": {"q": "embed a query", "limit": 10}}
+    {"ok": true, "result": [...]}
 
-    → {"cmd":"short_path","args":{"src":"kosha.core.Kosha.sync","tgt":"litesearch.core.search"}}
-    ← {"ok":true,"result":[…]}
+    {"cmd": "short_path", "args": {"src": "kosha.core.Kosha.sync", "tgt": "litesearch.core.search"}}
+    {"ok": true, "result": [...]}
 
-Available commands: `sync`, `status`, `context`, `repo_context`, `env_context`, `ni`, `neighbors`, `short_path`, `top_nodes`, `public_api`, `api_call_paths`, `dep_stack`, `where_to_add`.
+A failed request returns `{"ok": false, "error": "..."}`. The commands are `sync`, `status`, `context`, `repo_context`, `env_context`, `ni`, `neighbors`, `short_path`, `top_nodes`, `public_api`, `api_call_paths`, `dep_stack`, `where_to_add` and `nuke`, with the same arguments as the `Kosha` methods of those names. `ni` takes `mod_name`.
 
-## Live watch mode
+## Watch mode
 
-Re-index the repo incrementally on every file change (blocking, Ctrl-C to stop):
+`kosha watch` watches the repository and re-indexes files as they change. It blocks until you press Ctrl-C. From Python, `k.watch_repo()` does the same.
 
 ``` bash
 kosha watch
 ```
 
-or programmatically:
+## Command line
 
-``` python
-k.watch_repo()
-```
-
-## CLI
-
-Shell access to everything. Markdown by default; `--as_json` pipes into `jq`.
+Every query above is also a shell command. Output is markdown, and `--as-json` gives JSON for tools such as `jq`. Commands and flags use hyphens where the Python names use underscores, and `kosha <command> --help` lists a command’s flags.
 
 ``` bash
-kosha install                         # install SKILL.md to .agents/ and .claude/
-kosha sync  # index repo + env + call graph
-kosha status # check index freshness
-kosha context "embed a query" --as_json | jq '.[].metadata.mod_name'
-kosha ni "fastcore.basics.merge" # node info
+kosha install                          # install SKILL.md into .agents/ and .claude/
+kosha sync                             # index the repo, the packages and the call graph
+kosha status                           # check whether the index is current
+kosha context "embed a query" --as-json | jq '.[].metadata.mod_name'
+kosha ni "fastcore.basics.merge"       # node info
 kosha where-to-add "new route handler"
 kosha public-api fastcore
 kosha api-paths kosha litesearch
-kosha daemon # persistent kernel, warm for all session calls
+kosha daemon                           # long-running process for repeated queries
 ```
 
-## Harness install
+## Agent skill
 
-``` python
-Kosha(install_skill=True)   # installs to .agents/ and .claude/
-```
-
-Commit `.agents/skills/kosha/SKILL.md` so every contributor picks up the skill automatically.
+`Kosha(install_skill=True)`, or `kosha install` from the shell, copies `SKILL.md` into `.agents/skills/kosha/` and `.claude/skills/kosha/`. Commit `.agents/skills/kosha/SKILL.md` so every contributor’s agent picks it up.
 
 ## pyskills
 
-kosha registers as a [pyskill](https://github.com/AnswerDotAI/pyskills) (`kosha.skill`) for Python-native LLM hosts.
+kosha also registers itself as a [pyskill](https://github.com/AnswerDotAI/pyskills), `kosha.skill`, for agent hosts that load skills as Python modules.
 
 ## MCP server
 
-`kosha-mcp` exposes the index over the Model Context Protocol, so Claude Code, Claude Desktop, Codex, and any other MCP client can query it directly, `status`/`sync`, `context`/`repo_context`/`env_context`, `node_info`/`short_path`/`api_paths`, `where_to_add`, and more.
+`kosha-mcp` serves the index over the Model Context Protocol (MCP), so Claude Code, Claude Desktop, Codex and other MCP clients can call it as a set of tools: `status`, `sync`, `context`, `repo_context`, `env_context`, `where_to_add`, `node_info`, `neighbors`, `short_path`, `public_api`, `top_nodes`, `api_paths`, `dep_stack` and `pkg_url`.
 
-The MCP server ships with kosha (no extra needed). kosha indexes the current repo and its venv, so the server must launch from the project root with the project’s environment, `uv run` does both:
+The server comes with the package. It indexes the repository it starts in and that repository’s environment, so it must start at the project root inside the project’s environment, and `uv run` takes care of both:
 
 ``` sh
 uv add --dev koshas
 ```
 
-**Claude Code** (run inside the project)
+For Claude Code, run this inside the project:
 
 ``` sh
 claude mcp add kosha -- uv run kosha-mcp
 ```
 
-**Codex** (`~/.codex/config.toml`; Codex launches servers from your session’s working directory, so start it at the project root)
+For Codex, add this to `~/.codex/config.toml`. Codex starts servers in your session’s working directory, so start Codex at the project root.
 
 ``` toml
 [mcp_servers.kosha]
@@ -385,10 +387,10 @@ command = "uv"
 args = ["run", "kosha-mcp"]
 ```
 
-**Claude Desktop** (`claude_desktop_config.json`, pin the project explicitly)
+Claude Desktop does not start in your project, so name the project in `claude_desktop_config.json`:
 
 ``` json
 {"mcpServers": {"kosha": {"command": "uv", "args": ["run", "--project", "/path/to/your/repo", "kosha-mcp"]}}}
 ```
 
-The server speaks stdio by default (`kosha-mcp --http` for Streamable HTTP). See the [mcp docs](https://vedicreader.github.io/kosha/mcp.html) for the full tool list.
+The server talks over standard input and output by default; `kosha-mcp --http` serves Streamable HTTP instead. The [MCP page](https://vedicreader.github.io/kosha/mcp.html) describes each tool.

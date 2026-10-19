@@ -2,9 +2,9 @@
 
 Modules:
 
-- `kosha.cli`: Single `kosha` entry point with subcommands for shell-based harnesses. Default output is readable markdown; pass `--as-json` for JSON (piping/harnesses).
-- `kosha.core`: Kosha is a tool for building a context for code generation based on your repo and environment. It uses a vector database to store code snippets and their embeddings, allowing you to search for relevant code based on natural language queries. The core functionality includes managing the database, updating package metadata, embedding code snippets, and performing context-aware searches.
-- `kosha.skill`: Search your repo and every installed package by meaning, then walk the call graph that connects them — reach for this before you grep, open a source file, or write code a dependency already provides. FTS5 keyword search, vector search and a static call graph over local SQLite: no LLM calls, no network, answers in milliseconds."""
+- `kosha.cli`: The `kosha` shell command: every index and graph query as a subcommand.
+- `kosha.core`: Index your repository and its installed packages, then search them by meaning or by keyword.
+- `kosha.skill`: Search your repo and every installed package by meaning, then follow the call graph between them. Use it before you grep, open a source file, or write code a dependency already provides. Keyword search, vector search and a static call graph over local SQLite, with no LLM calls and no network."""
 
 __version__ = "0.1.10"
 from .core import *

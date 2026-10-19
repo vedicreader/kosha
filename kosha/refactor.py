@@ -1,4 +1,4 @@
-"""Move a top-level definition to another file and repoint every import that named it, on top of the index that already knows where the symbol lives.
+"""Plan safe edits to Python files: find and replace, extract, inline, and moving a definition to another file.
 
 Docs: https://vedicreader.github.io/kosha/refactor.html.md"""
 
@@ -42,7 +42,7 @@ def _pattern(query, regex=False, case=False, word=False):
     except re.error as e: raise ValueError(f'invalid regular expression: {e}') from e
 
 def replace_plan(paths, query, replacement, regex=False, case=False, word=False, read=_read):
-    "Changed files for one literal or regular-expression replacement, and the paths left unread."
+    "Plan one find-and-replace across `paths`: the changed files as `FileEdit`s, and the paths skipped."
     pat = _pattern(str(query), bool(regex), bool(case), bool(word))
     repl = str(replacement) if regex else str(replacement).replace('\\', '\\\\')
     rows, skipped = [], []
@@ -213,7 +213,7 @@ def _offset_after(source, node):
 
 # %% ../nbs/02_refactor.ipynb #0551774f
 def extract(path, source, start, end, kind, name):
-    "One safe single-file extraction; unsupported selections fail rather than guess."
+    "Plan lifting the selection `start:end` of `source` into a new function, method, variable or constant called `name`."
     start, end, name = int(start), int(end), _name(name)
     if not 0 <= start < end <= len(source): raise ValueError('select code before extracting')
     text, indent = source[start:end], _indent(source, start)
@@ -430,10 +430,7 @@ def _gained(path, before, after):
 
 # %% ../nbs/02_refactor.ipynb #5b32a11d
 def move_plan(src, names, dest, others=(), shim=True, read=_read):
-    """Move `names` from `src` into `dest` and repoint every file in `others` that imported them.
-
-    `read` returns a file's text, or None when it does not exist. A destination that did not exist
-    comes back with `before` None, which is what makes undo delete it again."""
+    "Plan moving top-level definitions `names` from `src` into `dest` and repointing the imports in `others`."
     src, dest, names, notes = str(src), str(dest), list(names), []
     if not names: raise ValueError('choose a function or class to move')
     if Path(src).resolve() == Path(dest).resolve(): raise ValueError('choose a different file to move into')
