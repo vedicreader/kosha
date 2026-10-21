@@ -2,6 +2,14 @@
 
 <!-- do not remove -->
 
+## 0.1.12
+- The code, package and package-description stores have an index on `json_extract(metadata,'$.name')`, created when a store is opened. A lookup by name no longer scans the store: 25 ms instead of 1.2 to 2.8 s on a 239,000-row package store.
+- A repo chunk moved by an edit keeps its new `lineno`, through litesearch 0.1.52. An index written before this release is re-parsed once when it is opened, with `PRAGMA user_version` recording `CODE_FORMAT` 1. Embeddings are reused.
+- `update_repo` skips a file that fails to parse and indexes the rest. Before, one empty notebook stopped every sync of the repo.
+- `update_repo` drops the rows of a changed file that no longer yields chunks, such as a module cut down to imports and `__all__`.
+- `update_repo` reads each file's mtime before parsing it, so an edit made during the parse is picked up by the next sync.
+- Needs litesearch 0.1.52.
+
 ## 0.1.11
 - `update_repo(files=...)` indexes only the listed paths and drops the ones that are gone; `watch_repo` and `kosha watch` no longer crash on the first change.
 - `update_pkg` stores each package's description in `pkg_store` through the new `put_pkg_doc`, so `pkg_context` returns hits.
