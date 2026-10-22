@@ -692,7 +692,7 @@ def status(self: Kosha, pyproject=True, depth=1) -> dict:
 	stale = sum(1 for p, mt in known.items() if Path(p).exists() and Path(p).stat().st_mtime != mt)
 	new = sum(1 for p in dir2files(self.root,strict_skip_file_re,repo_skip_folder_re,exts=['.py']) if str(p) not in known)
 	pkgs={r['name']: r['version'] for r in self.pkgs_in_env(pyproject, depth)}
-	sp = filter_keys(env_pkg_versions(pyproject,depth,path=self.env_path),not_(in_(pkgs)))
+	sp = filter_keys(env_pkg_versions(pyproject,depth,path=self.env_path,root=self.root),not_(in_(pkgs)))
 	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale, stale_pkgs=sp, new_files=new)
 
 # %% ../nbs/01_graph.ipynb #rank_helpers_a1
@@ -1023,7 +1023,7 @@ def sync(self: Kosha,
          env=True, # index installed packages; False indexes the repo only, even if `pkgs` is given
          graph=True, # update the call graph
          sync_graph=None, # deprecated: the old name for `graph`
-         pyproject=True, # if True, auto-detect env packages from pyproject.toml; if False, use pkgs argument as-is
+         pyproject=True, # if True, auto-detect env packages from the pyproject.toml in `Kosha.root` (not `dir`); if False, use pkgs argument as-is
          depth=1, # depth for pyproject env package detection; ignored if pyproject=False
          embed=True, # compute vectors for new chunks; False stores them for keyword search only
          pkg_parallel=False, # ingest env packages concurrently; requires Kosha(busy_timeout=...)

@@ -2,6 +2,9 @@
 
 <!-- do not remove -->
 
+## 0.1.14
+- The package set comes from the pyproject of `Kosha.root`, read by the new `pyproject_deps(root)`. Before, `status`, `sync` and `env_pkg_versions` found the pyproject from the current folder, so `Kosha(dir=other)` run from elsewhere, as Leela's server does, indexed another project's packages or none.
+
 ## 0.1.13
 - Installed packages are looked up in the project's own environment: the repo's `.venv`, else a `$VIRTUAL_ENV` inside the repo, plus folders its `.pth` files name. `env_path(root)` finds it and `Kosha.env_path` keeps it. Before, kosha used the interpreter it ran in, so `kosha sync` from the uv tool, or Leela's sync, failed on a project dependency with `pkg fastai is not in environment`. With no project environment, behaviour is as before.
 - A symlink loop, dangling link or unreadable folder in the repo no longer stops `sync` or `status`, through litesearch 0.1.53.

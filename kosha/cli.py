@@ -202,7 +202,7 @@ def dep_stack(
 ):
     "Print the layers of packages imported by the seed packages, breadth first."
     k = Kosha()
-    seed_list = seeds.split(',') if seeds else list(env_pkg_versions(path=k.env_path).keys())
+    seed_list = seeds.split(',') if seeds else list(env_pkg_versions(path=k.env_path, root=k.root).keys())
     layers = k.dep_stack(seeds=seed_list, depth=depth)
     if as_json: print(json.dumps(_to_json(layers)))
     else:

@@ -10,11 +10,11 @@ Docs: https://vedicreader.github.io/kosha/core.html.md"""
 
 # %% auto #0
 __all__ = ['CODE_FORMAT', 'repo_skip_folder_re', 'strict_skip_file_re', 'parse', 'mv_skill_md', 'arun', 'env_path',
-           'pkg_trans_deps', 'env_pkg_versions', 'cast_emb', 'Kosha', 'pkg_url', 'pkg_doc', 'has_init', 'imp_root',
-           'enrich_chunks', 'count_imp', 'parseq', 'filt2wh', 'fanout', 'code_row']
+           'pkg_trans_deps', 'pyproject_deps', 'env_pkg_versions', 'cast_emb', 'Kosha', 'pkg_url', 'pkg_doc',
+           'has_init', 'imp_root', 'enrich_chunks', 'count_imp', 'parseq', 'filt2wh', 'fanout', 'code_row']
 
 # %% ../nbs/00_core.ipynb #d979fe142033f158
-import ast, os, re
+import ast, os, re, tomllib
 import numpy as np
 from ast import get_source_segment as gs
 from collections import defaultdict, Counter
@@ -121,11 +121,21 @@ def pkg_trans_deps(seeds:list, depth:int=2, path:list=None) -> L:
 		seen |= nxt; frontier = nxt
 	return L(seen)
 
+# %% ../nbs/00_core.ipynb #eeea2f57
+def pyproject_deps(root=None, xtras:str=None) -> list:
+	'Names of the dependencies in `root`/pyproject.toml, plus the comma-separated `xtras` groups; None when `root` (default: the git repository of the current folder) has no such file.'
+	if not (root := root or repo_root()) or not (p := Path(root)/'pyproject.toml').exists(): return None
+	toml = tomllib.loads(p.read_text())
+	dg = toml.get('dependency-groups', {})
+	deps = toml.get('project', {}).get('dependencies', []) + [e for g in (xtras or '').split(',') if g for e in dg.get(g, []) if isinstance(e, str)]
+	return [_pkg_name(d) for d in deps]
+
 # %% ../nbs/00_core.ipynb #97b484ed681d266d
-def env_pkg_versions(pyproject=True, depth:int=1, xtras=None, path:list=None) -> dict:
-	'{name: version} of the packages to index: pyproject dependencies expanded `depth` levels, or all installed packages.'
-	if pyproject and repo_root() is None: return {}
-	pkgs = installed_packages(pyproject=pyproject, xtras=xtras, path=path)
+def env_pkg_versions(pyproject=True, depth:int=1, xtras=None, path:list=None, root=None) -> dict:
+	'{name: version} of the packages to index: the dependencies of the pyproject.toml in `root` expanded `depth` levels, or all installed packages.'
+	deps = pyproject_deps(root, xtras) if pyproject else None
+	if pyproject and deps is None: return {}
+	pkgs = installed_packages(deps, path=path)
 	if pyproject and depth: pkgs = pkg_trans_deps(pkgs, depth, path)
 	return {(d := _dist(p, path)).metadata['Name']: d.version for p in pkgs}
 
@@ -422,7 +432,7 @@ def prune_old_pkgs(self:Kosha):
 @patch
 def pkgs_in_env(self:Kosha, pyproject=False, depth=1) -> list:
 	'Indexed packages whose indexed version is the one installed.'
-	st_pkgs, inst_pkgs = L(self.pkgs(select='name, version')), env_pkg_versions(pyproject, depth, path=self.env_path)
+	st_pkgs, inst_pkgs = L(self.pkgs(select='name, version')), env_pkg_versions(pyproject, depth, path=self.env_path, root=self.root)
 	return st_pkgs.filter(lambda p: p['name'] in inst_pkgs and inst_pkgs[p['name']] == p['version'])
 
 # %% ../nbs/00_core.ipynb #b57c6ce49a9c9fe5
@@ -503,7 +513,7 @@ def pkgs2consider(self: Kosha, sys_wide=True) -> set:
 	'Names of indexed packages, or with `sys_wide=False` only those indexed at the installed version.'
 	ex_pkgs = {d['name']: d['version'] for d in self.pkgs(select='name, version')}
 	if sys_wide: return ex_pkgs.keys()
-	env_pkgs = env_pkg_versions(path=self.env_path)
+	env_pkgs = env_pkg_versions(path=self.env_path, root=self.root)
 	return {p for p in env_pkgs if p in ex_pkgs and env_pkgs[p] == ex_pkgs[p]}
 
 # %% ../nbs/00_core.ipynb #d395d7d7c6bd2fae

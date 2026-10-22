@@ -119,7 +119,7 @@ def api_paths(from_pkg:str, to_pkg:str, k:int=15) -> dict:
 @mcp.tool()
 def dep_stack(seeds:list|None=None, depth:int=1) -> list:
     "Layers of packages imported by the seed packages (default: the pyproject dependencies), breadth first."
-    return _jsonable(_kosha().dep_stack(seeds=seeds or list(env_pkg_versions(path=_kosha().env_path).keys()), depth=depth))
+    return _jsonable(_kosha().dep_stack(seeds=seeds or list(env_pkg_versions(path=_kosha().env_path, root=_kosha().root).keys()), depth=depth))
 
 @mcp.tool()
 def pkg_url(pkg:str) -> str:
