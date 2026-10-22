@@ -2,6 +2,11 @@
 
 <!-- do not remove -->
 
+## 0.1.13
+- Installed packages are looked up in the project's own environment: the repo's `.venv`, else a `$VIRTUAL_ENV` inside the repo, plus folders its `.pth` files name. `env_path(root)` finds it and `Kosha.env_path` keeps it. Before, kosha used the interpreter it ran in, so `kosha sync` from the uv tool, or Leela's sync, failed on a project dependency with `pkg fastai is not in environment`. With no project environment, behaviour is as before.
+- A symlink loop, dangling link or unreadable folder in the repo no longer stops `sync` or `status`, through litesearch 0.1.53.
+- Needs litesearch 0.1.53.
+
 ## 0.1.12
 - The code, package and package-description stores have an index on `json_extract(metadata,'$.name')`, created when a store is opened. A lookup by name no longer scans the store: 25 ms instead of 1.2 to 2.8 s on a 239,000-row package store.
 - A repo chunk moved by an edit keeps its new `lineno`, through litesearch 0.1.52. An index written before this release is re-parsed once when it is opened, with `PRAGMA user_version` recording `CODE_FORMAT` 1. Embeddings are reused.

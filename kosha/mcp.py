@@ -119,12 +119,12 @@ def api_paths(from_pkg:str, to_pkg:str, k:int=15) -> dict:
 @mcp.tool()
 def dep_stack(seeds:list|None=None, depth:int=1) -> list:
     "Layers of packages imported by the seed packages (default: the pyproject dependencies), breadth first."
-    return _jsonable(_kosha().dep_stack(seeds=seeds or list(env_pkg_versions().keys()), depth=depth))
+    return _jsonable(_kosha().dep_stack(seeds=seeds or list(env_pkg_versions(path=_kosha().env_path).keys()), depth=depth))
 
 @mcp.tool()
 def pkg_url(pkg:str) -> str:
     "The repository or home page address of an installed package, for looking up its docs or changelog."
-    return _pkg_url(pkg) or "not found"
+    return _pkg_url(pkg, _kosha().env_path) or "not found"
 
 # %% ../nbs/04_mcp.ipynb #04d1a1a6
 def main():

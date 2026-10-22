@@ -447,9 +447,9 @@ def from_dir(self:CodeGraph, dir: str | Path, **kwargs) -> 'CodeGraph':
 
 @patch
 @fdelegates(globtastic)
-def from_pkg(self: CodeGraph, pkg: str, **kwargs) -> 'CodeGraph':
+def from_pkg(self: CodeGraph, pkg: str, path: list = None, **kwargs) -> 'CodeGraph':
     'Build from the source of an installed package.'
-    s = spec(pkg)
+    s = spec(pkg, path)
     if not s: raise ValueError(f"{pkg!r} not installed")
     p = Path(s.origin).parent if s.origin else Path(s.submodule_search_locations[0])
     return self.from_dir(p, **kwargs)
@@ -664,7 +664,7 @@ def public_api(self: Kosha,
     get = lambda r, k: r.get('metadata', {}).get(k)
     decode = lambda r: r | dict(metadata=jl(r['metadata'])) if isinstance(r.get('metadata'), str) else r
     root, prefix = pkg.split('.')[0], f'{pkg}.%'
-    pkg_ = Path(s.origin).parent.name if (s := spec(root)) else root.replace('-', '_')
+    pkg_ = Path(s.origin).parent.name if (s := spec(root, self.env_path)) else root.replace('-', '_')
     patches = L(self.ge(select='callee',where="kind='patch' AND caller LIKE ?", where_args=[prefix])).attrgot('callee')
     wh = "(json_extract(metadata, '$.public_api') = 1 AND json_extract(metadata, '$.mod_name') LIKE ?)"
     args = [prefix]
@@ -692,7 +692,7 @@ def status(self: Kosha, pyproject=True, depth=1) -> dict:
 	stale = sum(1 for p, mt in known.items() if Path(p).exists() and Path(p).stat().st_mtime != mt)
 	new = sum(1 for p in dir2files(self.root,strict_skip_file_re,repo_skip_folder_re,exts=['.py']) if str(p) not in known)
 	pkgs={r['name']: r['version'] for r in self.pkgs_in_env(pyproject, depth)}
-	sp = filter_keys(env_pkg_versions(pyproject,depth),not_(in_(pkgs)))
+	sp = filter_keys(env_pkg_versions(pyproject,depth,path=self.env_path),not_(in_(pkgs)))
 	return dict(files=len(known), packages=self.pkgs.count, graph_nodes=self.gn.count, stale_files=stale, stale_pkgs=sp, new_files=new)
 
 # %% ../nbs/01_graph.ipynb #rank_helpers_a1
@@ -968,22 +968,22 @@ def sync_dir(self: CodeGraph, dir: str | Path, force=False, mode='fast', root=No
     return self
 
 @patch
-def sync_pkgs(self: CodeGraph, pkgs: list[str], force=False, mode='fast') -> 'CodeGraph':
+def sync_pkgs(self: CodeGraph, pkgs: list[str], force=False, mode='fast', path: list = None) -> 'CodeGraph':
     'Update the graph for installed packages, skipping files whose content hash is unchanged.'
     for pkg in tqdm(pkgs or [], desc='loading code graph for packages', unit='pkg'):
-        s = spec(pkg)
+        s = spec(pkg, path)
         if not s: continue
         p = Path(s.origin).parent if s.origin else Path(s.submodule_search_locations[0])
         self.sync_dir(p, force=force, mode=mode, root=p.parent)
     return self
 
 @patch
-def sync(self: CodeGraph, dir=None, pkgs=None, force=False, mode='fast', metrics=True) -> 'CodeGraph':
+def sync(self: CodeGraph, dir=None, pkgs=None, force=False, mode='fast', metrics=True, path: list = None) -> 'CodeGraph':
     'Update the graph for a directory and a list of packages, then refresh PageRank if anything changed.'
     self._graph_changed = force
     if force: self.pa.delete_where()
     if dir: self.sync_dir(dir, force=force, mode=mode)
-    if pkgs: self.sync_pkgs(pkgs, force=force, mode=mode)
+    if pkgs: self.sync_pkgs(pkgs, force=force, mode=mode, path=path)
     if metrics and self._graph_changed: self._centrality()
     return self
 
@@ -1038,7 +1038,7 @@ def sync(self: Kosha,
 	ts = [bind(self.update_repo, dir, verbose=verbose, force=force, embed=embed) if repo else (lambda: None),
 		  bind(self.update_pkgs, pkgs, verbose=verbose, force=force, embed=embed, parallel=pkg_parallel, chunk=chunk)
 		      if pkgs else (lambda: None),
-		  bind(self.graph.sync, dir=dir if repo else None, pkgs=pkgs, force=force, mode=graph_mode, metrics=graph_metrics) if graph else (lambda: None)]
+		  bind(self.graph.sync, dir=dir if repo else None, pkgs=pkgs, force=force, mode=graph_mode, metrics=graph_metrics, path=self.env_path) if graph else (lambda: None)]
 	if in_parallel: return parallel(lambda f: f(), ts, threadpool=True, progress=verbose)
 	else: return L(ts).map(lambda f: f())
 
@@ -1082,17 +1082,15 @@ def context(self: Kosha,
 	return dict2obj(ranked)
 
 # %% ../nbs/01_graph.ipynb #pkg_deps_task_context_c3d4
-def is_sys_pkg(pkg:str) -> bool:
-	'True if `pkg` is the name of an installed distribution.'
-	from importlib.metadata import distribution as dist, PackageNotFoundError
-	try: return bool(dist(pkg))
-	except PackageNotFoundError: return False
+def is_sys_pkg(pkg:str, path:list=None) -> bool:
+	'True if `pkg` is the name of an installed distribution in `path`, or in the running interpreter when `path` is empty.'
+	return bool(pkg_dist(pkg, path))
 
 @patch
 def dep_stack(self:Kosha, seeds:list=None, depth:int=1, no_sys_pkg=True, allow:list=None) -> list:
 	'Layers of package imports from the pkg_deps table, breadth first from `seeds`.'
 	seen, frontier, layers = set(seeds), set(seeds), [list(seeds)]
-	fn=lambda p: p['tgt'] not in seen and (not no_sys_pkg or is_sys_pkg(p['tgt'])) and (not allow or p['tgt'] in allow)
+	fn=lambda p: p['tgt'] not in seen and (not no_sys_pkg or is_sys_pkg(p['tgt'], self.env_path)) and (not allow or p['tgt'] in allow)
 	for _ in range(depth):
 		if not frontier: break
 		_pl = ','.join('?'*len(frontier))
