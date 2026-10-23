@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.19">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Search your repo and every installed package by meaning, then follow the call graph between them. Use it before you grep, open a source file, or write code a dependency already provides. Keyword search, vector search and a static call graph over local SQLite, with no LLM calls and no network.">
+
+<title>skill – koshas</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-f2788e636de456f6409e966386820849.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="styles.css">
+<meta property="og:title" content="skill – koshas">
+<meta property="og:description" content="Search your repo and every installed package by meaning, then follow the call graph between them. Use it before you grep, open a source file, or write code a dependency already provides. Keyword search, vector search and a static call graph over local SQLite, with no LLM calls and no network.">
+<meta property="og:site_name" content="koshas">
+<meta name="twitter:title" content="skill – koshas">
+<meta name="twitter:description" content="Search your repo and every installed package by meaning, then follow the call graph between them. Use it before you grep, open a source file, or write code a dependency already provides. Keyword search, vector search and a static call graph over local SQLite, with no LLM calls and no network.">
+<meta name="twitter:card" content="summary">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">koshas</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./skill.html">skill</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">kosha</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./core.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">core</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./graph.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">graph</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./refactor.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">refactor</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./cli.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">cli</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./mcp.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">mcp</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./skill.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">skill</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#start-here" id="toc-start-here" class="nav-link active" data-scroll-target="#start-here">Start here</a></li>
+  <li><a href="#which-call-answers-which-question" id="toc-which-call-answers-which-question" class="nav-link" data-scroll-target="#which-call-answers-which-question">Which call answers which question</a></li>
+  <li><a href="#filters" id="toc-filters" class="nav-link" data-scroll-target="#filters">Filters</a></li>
+  <li><a href="#reading-a-result" id="toc-reading-a-result" class="nav-link" data-scroll-target="#reading-a-result">Reading a result</a></li>
+  <li><a href="#the-call-graph" id="toc-the-call-graph" class="nav-link" data-scroll-target="#the-call-graph">The call graph</a></li>
+  <li><a href="#long-form-docs" id="toc-long-form-docs" class="nav-link" data-scroll-target="#long-form-docs">Long-form docs</a></li>
+  <li><a href="#reranking" id="toc-reranking" class="nav-link" data-scroll-target="#reranking">Reranking</a></li>
+  <li><a href="#outside-python" id="toc-outside-python" class="nav-link" data-scroll-target="#outside-python">Outside Python</a></li>
+  <li><a href="#the-indexes-are-litesearch-databases" id="toc-the-indexes-are-litesearch-databases" class="nav-link" data-scroll-target="#the-indexes-are-litesearch-databases">The indexes are litesearch databases</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/vedicreader/kosha/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div><div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="skill.html.md"><i class="bi bi-file-code"></i>Markdown</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">skill</h1>
+</div>
+
+<div>
+  <div class="description">
+    Search your repo and every installed package by meaning, then follow the call graph between them. Use it before you grep, open a source file, or write code a dependency already provides. Keyword search, vector search and a static call graph over local SQLite, with no LLM calls and no network.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<section id="start-here" class="level2">
+<h2 class="anchored" data-anchor-id="start-here">Start here</h2>
+<p><code>Kosha()</code> opens two indexes, the repo index (<code>.kosha/code.db</code>) and the index of installed packages (<code>kosha/env.db</code> in the user data directory), plus the call graph over both. Check that they are current before trusting an answer, because code missing from a stale index looks the same as code that does not exist:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> kosha <span class="im">import</span> Kosha</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>k <span class="op">=</span> Kosha()</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>k.status()</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># {'files': 4, 'packages': 355, 'graph_nodes': 10630, 'stale_files': 0, 'stale_pkgs': {'httpx': '0.28.1'}, 'new_files': 0}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Sync only when something you need is stale. Computing embeddings for changed code is the one slow step:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>k.sync()                            <span class="co"># repo, stale packages and call graph</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>k.sync(embed<span class="op">=</span><span class="va">False</span>)                 <span class="co"># store new chunks without embeddings: keyword search only, much faster</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>k.sync(pkgs<span class="op">=</span>[<span class="st">'httpx'</span>], repo<span class="op">=</span><span class="va">False</span>)  <span class="co"># one package</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Then search. <code>context</code> is the default and searches both indexes; <code>env_context</code> and <code>repo_context</code> search one each and are faster:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> r <span class="kw">in</span> k.env_context(<span class="st">'atomic file write preserving permissions'</span>, limit<span class="op">=</span><span class="dv">8</span>):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(r[<span class="st">'metadata'</span>][<span class="st">'mod_name'</span>], r[<span class="st">'metadata'</span>].get(<span class="st">'lineno'</span>), r[<span class="st">'content'</span>][:<span class="dv">120</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="which-call-answers-which-question" class="level2">
+<h2 class="anchored" data-anchor-id="which-call-answers-which-question">Which call answers which question</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Question</th>
+<th>Call</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Is the index current?</td>
+<td><code>k.status()</code></td>
+</tr>
+<tr class="even">
+<td>Does a dependency already do this?</td>
+<td><code>k.env_context('desc', limit=8)</code></td>
+</tr>
+<tr class="odd">
+<td>What pattern does this codebase use?</td>
+<td><code>k.context('desc', graph=True, limit=15)</code></td>
+</tr>
+<tr class="even">
+<td>Repo only, no packages</td>
+<td><code>k.repo_context('desc')</code></td>
+</tr>
+<tr class="odd">
+<td>Look over many hits without their source</td>
+<td><code>k.context('desc', compact=True)</code></td>
+</tr>
+<tr class="even">
+<td>Who calls this, what does it call, what are its peers?</td>
+<td><code>k.ni('fastcore.basics.merge')</code></td>
+</tr>
+<tr class="odd">
+<td>How do two nodes connect?</td>
+<td><code>k.short_path('a.fn', 'b.fn')</code></td>
+</tr>
+<tr class="even">
+<td>What is within n calls of a node?</td>
+<td><code>k.neighbors('kosha.core.Kosha', depth=2)</code></td>
+</tr>
+<tr class="odd">
+<td>What does a package export?</td>
+<td><code>k.public_api('fastcore')</code></td>
+</tr>
+<tr class="even">
+<td>Which functions of a package does the most code depend on?</td>
+<td><code>k.top_nodes('fastcore', k=5)</code></td>
+</tr>
+<tr class="odd">
+<td>How does package A reach package B?</td>
+<td><code>k.api_call_paths('kosha', 'litesearch')</code></td>
+</tr>
+<tr class="even">
+<td>Which packages does a package import, layer by layer?</td>
+<td><code>k.dep_stack(['fastcore'], depth=2)</code></td>
+</tr>
+<tr class="odd">
+<td>Where should new code go?</td>
+<td><code>k.where_to_add('desc', limit=5)</code></td>
+</tr>
+<tr class="even">
+<td>Search READMEs and other prose, not code</td>
+<td><code>k.docs_context('desc')</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>pkg_context</code> searches package descriptions, one per indexed package, to find a package by what it does. <code>doc(Kosha)</code> lists every method with its signature; the table is a map, not the full reference. Indexing (<code>update_repo</code>, <code>update_pkgs</code>, <code>process_env</code>) and deleting (<code>nuke</code>, <code>rm_pkg</code>, <code>prune_old_pkgs</code>) are methods of the same class, but <code>sync</code> is the only one you normally need.</p>
+</section>
+<section id="filters" class="level2">
+<h2 class="anchored" data-anchor-id="filters">Filters</h2>
+<p>Filters go inside the query string, next to the plain words, and work with <code>context</code>, <code>env_context</code> and <code>repo_context</code>.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Token</th>
+<th>Aliases</th>
+<th>Example</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>package:</code></td>
+<td><code>pkg:</code>, <code>packages:</code>, <code>pkgs:</code></td>
+<td><code>package:fastcore</code></td>
+<td>one package</td>
+</tr>
+<tr class="even">
+<td><code>path:</code></td>
+<td><code>dir:</code>, <code>folder:</code>, <code>paths:</code></td>
+<td><code>path:xtras</code></td>
+<td>path contains the text</td>
+</tr>
+<tr class="odd">
+<td><code>file:</code></td>
+<td><code>filename:</code>, <code>files:</code></td>
+<td><code>file:xtras*</code></td>
+<td>path matches the glob</td>
+</tr>
+<tr class="even">
+<td><code>lang:</code></td>
+<td><code>ext:</code>, <code>extension:</code>, <code>langs:</code></td>
+<td><code>lang:py</code></td>
+<td>language, by file extension</td>
+</tr>
+<tr class="odd">
+<td><code>type:</code></td>
+<td><code>types:</code></td>
+<td><code>type:FunctionDef</code></td>
+<td>kind of definition</td>
+</tr>
+</tbody>
+</table>
+<p>Separate several values with commas to accept any of them (<code>package:httpx,requests</code>). Every filter excludes code that does not match, and a trailing <code>!</code> (<code>package!:x</code>) means the same as without it. In <code>context</code>, a <code>package:</code> filter also skips the repo search. A package name written as a plain word, as in <code>k.context('fastcore atomic save')</code>, is not a filter: it ranks that package’s hits higher, and other packages still appear.</p>
+<p>A filter-shaped token with an unknown key is reported in <code>parseq(q)[1]['_unknown']</code>, and the command line prints a warning. The token is searched as plain text, so a typo such as <code>libr:litesearch</code> would otherwise return a full page of results that ignore the filter you meant.</p>
+</section>
+<section id="reading-a-result" class="level2">
+<h2 class="anchored" data-anchor-id="reading-a-result">Reading a result</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>{<span class="st">'content'</span>:  <span class="st">'def merge(*ds):</span><span class="ch">\n</span><span class="st">    "Merge all dicts"</span><span class="ch">\n</span><span class="st">    ...'</span>,</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a> <span class="st">'metadata'</span>: {<span class="st">'mod_name'</span>: <span class="st">'fastcore.basics.merge'</span>,   <span class="co"># the name to pass to ni() and short_path()</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>              <span class="st">'path'</span>: <span class="st">'.../fastcore/basics.py'</span>, <span class="st">'lineno'</span>: <span class="dv">655</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>              <span class="st">'type'</span>: <span class="st">'FunctionDef'</span>, <span class="st">'package'</span>: <span class="st">'fastcore'</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>              <span class="st">'public_api'</span>: <span class="va">True</span>, <span class="st">'docstring'</span>: <span class="st">'Merge all dicts'</span>},</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a> <span class="st">'pagerank'</span>: <span class="fl">0.00027</span>, <span class="st">'in_degree'</span>: <span class="dv">8</span>, <span class="st">'out_degree'</span>: <span class="dv">12</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a> <span class="st">'callers'</span>: [...], <span class="st">'callees'</span>: [...], <span class="st">'co_dispatched'</span>: []}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>pagerank</code> measures how much code depends on a node. Changing a node with a high score affects more code, so look at its callers first. <code>callers</code> shows where the code is used, and <code>callees</code> shows what it uses that you might reuse.</p>
+<p><code>co_dispatched</code> is the least obvious field and often the most useful. It lists the functions assigned together with this one in a module-level list, dict or tuple: route tables, handler maps, plugin registries. When you add another handler, it names the existing ones and so shows where they are registered, without reading the glue code.</p>
+<p>The graph fields appear only when <code>graph=True</code>, the default for <code>context</code>. <code>env_context</code> and <code>repo_context</code> return <code>content</code> and <code>metadata</code> only.</p>
+</section>
+<section id="the-call-graph" class="level2">
+<h2 class="anchored" data-anchor-id="the-call-graph">The call graph</h2>
+<p><code>k.graph</code> is the graph itself, a <code>CodeGraph</code> built from ast-grep static analysis plus Python AST rules for decorators, registrations and <code>@patch</code>. Besides the methods above it has <code>k.graph.ranked(k=10, module='fastcore')</code>, <code>k.graph.callers</code>, <code>k.graph.file2nodes</code> and <code>k.graph.co_dispatched</code>; <code>doc(k.graph)</code> lists them all.</p>
+<p>Node names are the dotted <code>mod_name</code> from a hit’s metadata. A name that is not in the graph gives an empty result, not an error, so an empty <code>short_path</code> means either that there is no path or that a node is not indexed. Check <code>k.ni(name)</code> before concluding that two pieces of code do not connect.</p>
+</section>
+<section id="long-form-docs" class="level2">
+<h2 class="anchored" data-anchor-id="long-form-docs">Long-form docs</h2>
+<p>Code chunks suit code, not prose. <code>k.docs</code> is a separate index for READMEs and documentation folders, a litesearch <code>Index</code> that splits documents by heading. It is created the first time you use it:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>k.add_pkg_docs(<span class="st">'fastcore'</span>)          <span class="co"># a package's full README</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>k.add_docs(<span class="st">'path/to/docs'</span>)          <span class="co"># a folder, a file, or {title: text}</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>k.docs_context(<span class="st">'how do I install'</span>)  <span class="co"># ranked sections, each with a node_id</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>k.docs.read(node_id)[<span class="st">'text'</span>]        <span class="co"># one whole section</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>docs_context(q, sections=False)</code> returns raw chunks instead. The docs index does not track staleness: adding a changed document again stores the new text but does not remove the old version.</p>
+</section>
+<section id="reranking" class="level2">
+<h2 class="anchored" data-anchor-id="reranking">Reranking</h2>
+<p><code>context</code>, <code>env_context</code>, <code>repo_context</code> and <code>pkg_context</code> take <code>rerank=True</code>, which reorders the hits with a flashrank cross-encoder, a small model that scores each hit against the query. The first call downloads the model. Reranking reorders what was retrieved and never adds to it.</p>
+<p>It is off by default. It helps most when the query uses the same words as the target’s docstring. When a query is phrased differently, the right code is usually missing from the candidates in the first place, and reordering cannot bring it back. <code>context</code> reranks only its final top hits; <code>env_context</code> and <code>repo_context</code> first retrieve a wider pool for the reranker to choose from.</p>
+</section>
+<section id="outside-python" class="level2">
+<h2 class="anchored" data-anchor-id="outside-python">Outside Python</h2>
+<p>The same index can be reached in three other ways, for callers that are not Python processes:</p>
+<ul>
+<li>Command line: <code>kosha sync</code>, <code>kosha context 'query' --limit 10 --rerank</code>, <code>kosha ni &lt;mod_name&gt;</code>, <code>kosha public-api &lt;pkg&gt;</code>, and <code>--as-json</code> on any of them for JSON output.</li>
+<li>Daemon: <code>kosha daemon</code> keeps one embedding model loaded and reads <code>{"cmd": ..., "args": {...}}</code> requests as JSON lines on standard input, which saves the few seconds of loading on every call.</li>
+<li>MCP: <code>kosha-mcp</code> offers the same operations as MCP tools over stdio. If the host already has it configured, call those tools instead of importing anything.</li>
+</ul>
+</section>
+<section id="the-indexes-are-litesearch-databases" class="level2">
+<h2 class="anchored" data-anchor-id="the-indexes-are-litesearch-databases">The indexes are litesearch databases</h2>
+<p><code>k.codedb</code> and <code>k.envdb</code> are litesearch databases, so the whole litesearch API works on them: extra tables, raw SQL, custom stores.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">list</span>(k.envdb.q(<span class="st">"select content from store where json_extract(metadata,'$.mod_name') = ?"</span>, [<span class="st">'fastcore.basics.merge'</span>]))</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>summaries <span class="op">=</span> k.envdb.get_store(name<span class="op">=</span><span class="st">'summaries'</span>)   <span class="co"># for example, notes an agent writes about undocumented code</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Embeddings are stored and read back as 16-bit floats. <a href="https://vedicreader.github.io/kosha/core.html#cast_emb"><code>kosha.core.cast_emb</code></a> enforces that, so a custom embedding function cannot write a wider type by mistake.</p>
+<div id="91b721c0" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-10-23T01:22:02.963092+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-10-23T01:22:03.023215+00:00&quot;,&quot;total&quot;:0.060127182999963225}}" data-execution_count="3">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyskills <span class="im">import</span> doc, xdir, list_pyskills</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> kosha.skill</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># the entry point resolves, and its blurb is the first paragraph of the module docstring</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="st">'kosha.skill'</span> <span class="kw">in</span> list_pyskills(), list_pyskills().keys()</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">set</span>(xdir(kosha.skill)) <span class="op">&gt;=</span> {<span class="st">'Kosha'</span>, <span class="st">'CodeGraph'</span>, <span class="st">'pkg_url'</span>}  <span class="co"># plus the sibling submodules pyskills adds</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(list_pyskills()[<span class="st">'kosha.skill'</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Search your repo and every installed package by meaning, then follow the call graph between them. Use it before you grep, open a source file, or write code a dependency already provides. Keyword search, vector search and a static call graph over local SQLite, with no LLM calls and no network.</code></pre>
+</div>
+</div>
+<div id="22e1d1f7" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># every method the docstring points at exists, so a harness following it can't hit an AttributeError</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>named <span class="op">=</span> [<span class="st">'status'</span>,<span class="st">'sync'</span>,<span class="st">'context'</span>,<span class="st">'env_context'</span>,<span class="st">'repo_context'</span>,<span class="st">'pkg_context'</span>,<span class="st">'docs_context'</span>,<span class="st">'public_api'</span>,</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>         <span class="st">'top_nodes'</span>,<span class="st">'api_call_paths'</span>,<span class="st">'dep_stack'</span>,<span class="st">'where_to_add'</span>,<span class="st">'ni'</span>,<span class="st">'neighbors'</span>,<span class="st">'short_path'</span>,<span class="st">'add_docs'</span>,<span class="st">'add_pkg_docs'</span>]</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>missing <span class="op">=</span> [m <span class="cf">for</span> m <span class="kw">in</span> named <span class="cf">if</span> <span class="kw">not</span> <span class="bu">hasattr</span>(Kosha, m)]</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="kw">not</span> missing, <span class="ss">f'skill docstring names methods Kosha does not have: </span><span class="sc">{</span>missing<span class="sc">}</span><span class="ss">'</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>gmissing <span class="op">=</span> [m <span class="cf">for</span> m <span class="kw">in</span> [<span class="st">'ranked'</span>,<span class="st">'callers'</span>,<span class="st">'callees'</span>,<span class="st">'co_dispatched'</span>,<span class="st">'file2nodes'</span>,<span class="st">'node_info'</span>] <span class="cf">if</span> <span class="kw">not</span> <span class="bu">hasattr</span>(CodeGraph, m)]</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="kw">not</span> gmissing, gmissing</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>doc(kosha.skill)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vedicreader\.github\.io\/kosha");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/vedicreader/kosha/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>
