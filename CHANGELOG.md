@@ -2,6 +2,12 @@
 
 <!-- do not remove -->
 
+## 0.1.15
+- `process_env` embeds every chunk and package description with no embedding, in batches that each commit with their HNSW update, so an interrupted run resumes. Before, it filled the embedding column without updating the index, so the vectors were invisible to search. `kosha embed [--pkg] [--batch]` runs it. On a copy of a 304,000-row index it embedded 64,678 rows in 31 s.
+- `update_pkg` with embeddings on also embeds a package's leftover NULL chunks, including when the package is already indexed at its version. A sync run with `embed=False` had left them NULL for good.
+- `Kosha.prune_env(dry_run=False)` and `kosha prune [--dry-run]` remove a package's chunks when no known site-packages folder holds it at any version, and a `packages` row when none holds that exact version, then VACUUM and rebuild the HNSW index once. A chunk's `version` is the version it was first stored under, so it does not mark a stale chunk.
+- The notebooks set `XDG_DATA_HOME` to a temporary folder, so running the test suite no longer writes to the shared index in `~/.local/share/kosha`.
+
 ## 0.1.14
 - The package set comes from the pyproject of `Kosha.root`, read by the new `pyproject_deps(root)`. Before, `status`, `sync` and `env_pkg_versions` found the pyproject from the current folder, so `Kosha(dir=other)` run from elsewhere, as Leela's server does, indexed another project's packages or none.
 

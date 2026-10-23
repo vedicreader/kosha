@@ -11,7 +11,8 @@ Docs: https://vedicreader.github.io/kosha/core.html.md"""
 # %% auto #0
 __all__ = ['CODE_FORMAT', 'repo_skip_folder_re', 'strict_skip_file_re', 'parse', 'mv_skill_md', 'arun', 'env_path',
            'pkg_trans_deps', 'pyproject_deps', 'env_pkg_versions', 'cast_emb', 'Kosha', 'pkg_url', 'pkg_doc',
-           'has_init', 'imp_root', 'enrich_chunks', 'count_imp', 'parseq', 'filt2wh', 'fanout', 'code_row']
+           'has_init', 'imp_root', 'enrich_chunks', 'embed_missing', 'count_imp', 'installed_dists', 'parseq',
+           'filt2wh', 'fanout', 'code_row']
 
 # %% ../nbs/00_core.ipynb #d979fe142033f158
 import ast, os, re, tomllib
@@ -19,7 +20,7 @@ import numpy as np
 from ast import get_source_segment as gs
 from collections import defaultdict, Counter
 from functools import lru_cache
-from importlib.metadata import PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, PathDistribution
 from fastcore.all import (Path, first, patch, timed_cache, L, merge, AttrDict, bind, num_cpus,
                           listify, true, fdelegates, type2str, parallel_async, parallel as fcp)
 from fastcore.xdg import xdg_data_home
@@ -27,7 +28,7 @@ from tqdm import tqdm
 from json import loads as jl
 from litesearch.data import *
 from litesearch.utils import static_code_embedder, doc_encoder, query_encoder, encoder_id
-from litesearch.core import database, process_content, content_id, rerank_hits, RERANK_FANOUT
+from litesearch.core import database, process_content, content_id, rerank_hits, RERANK_FANOUT, write_txn, NP_DTYPE
 from litesearch.api import DTYPE, Index
 
 # %% ../nbs/00_core.ipynb #563987a46284072b
@@ -257,12 +258,44 @@ def _is_pkg_ingested(self:Kosha, pkg:str) -> bool:
 	pkg = _pkg_name(pkg)
 	return first(self.pkgs(select='name, version', where=f'name={pkg!r} and version={_dist(pkg, self.env_path).version!r}'))
 
+def embed_missing(st,                # hash-id store, HNSW-indexed or not
+				  emb_fn,            # list of texts -> vectors
+				  where:str=None,    # extra SQL condition on the rows
+				  where_args:dict=None, # named parameters for `where`
+				  reembed=False,     # embed rows that already have an embedding too
+				  batch:int=5_000,   # rows embedded, committed and indexed together
+				  progress=False,    # show a progress bar
+) -> int:
+	'Embed the rows of `st` that have no embedding, `batch` at a time, adding each batch to the HNSW index; returns how many were embedded.'
+	blank = "trim(content, ' '||char(9)||char(10)||char(13))<>''"  # the whitespace `sync` treats as empty
+	cond = ' AND '.join(c for c in ('embedding IS NULL' if not reembed else None, blank, where) if c)
+	m, args, last, n = st.db._ann_meta(st.name), where_args or {}, -1, 0
+	dt = NP_DTYPE.get(m['dtype'], np.float16) if m else np.float16
+	sel = f'SELECT rowid, id, content FROM [{st.name}] WHERE rowid>:last AND {cond} ORDER BY rowid LIMIT :batch'
+	total = first(st.db.q(f'SELECT count(*) c FROM [{st.name}] WHERE {cond}', args))['c']
+	with tqdm(total=total, desc=f'embedding {st.name}', disable=not progress) as pb:
+		while rows := st.db.q(sel, dict(args, last=last, batch=batch)):
+			vecs = emb_fn([r['content'] for r in rows])
+			with write_txn(st.db):
+				st.db.conn.executemany(f'UPDATE [{st.name}] SET embedding=? WHERE rowid=?',
+					[(np.asarray(v).tobytes(), r['rowid']) for v, r in zip(vecs, rows, strict=True)])
+				# inside the transaction: a batch whose index update fails is not committed, so a rerun picks it up again
+				if m: st._sync_index([r['id'] for r in rows], [], dt)
+			last, n = rows[-1]['rowid'], n+len(rows)
+			pb.update(len(rows))
+	return n
+
 @patch
-@fdelegates(process_content)
-def process_env(self:Kosha, content=None, reembed=False, **kwargs):
-	'Embed package chunks that have no embedding yet, or all of them with `reembed=True`.'
-	content = content or self.env_st(where=f'embedding is NULL' if not reembed else None)
-	return process_content(self.env_st, content, emb_fn=self.emb_doc, **kwargs)
+def process_env(self:Kosha,
+				pkg:str=None,    # only this package's chunks; None embeds every package
+				reembed=False,   # embed chunks that already have an embedding too
+				batch:int=5_000, # chunks embedded, committed and indexed together
+				progress=False,  # show a progress bar
+) -> int:
+	'Embed package chunks and descriptions that have no embedding yet, or all of them with `reembed=True`, and return how many chunks were embedded.'
+	kw, args = dict(reembed=reembed, batch=batch, progress=progress), dict(pkg=_pkg_name(pkg)) if pkg else None
+	embed_missing(self.pkg_st, self.emb_doc, "json_extract(metadata,'$.name')=:pkg" if pkg else None, args, **kw)
+	return embed_missing(self.env_st, self.emb_doc, 'package=:pkg' if pkg else None, args, **kw)
 
 def count_imp(files, own:str='') -> Counter:
 	'For a list of files, the number of files importing each top-level package other than `own`.'
@@ -293,7 +326,10 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, fo
     ep = self._is_pkg_ingested(pkg)
     if ep and len(self.env_st(where=f'package={pkg!r}')) > 0:
         if verbose: print(f'package {ep} already loaded.')
-        if not force: return
+        if not force:
+            # an earlier embed=False sync left these chunks for keyword search only
+            if embed: self.process_env(pkg)
+            return
         print(f'forcing an update to pkg {ep}')
     pkg_par = Path(o.origin).parent.parent if o.origin else Path(o.submodule_search_locations[0])
     mod_fn = lambda p, n: '.'.join(list(Path(p).relative_to(pkg_par).with_suffix('').parts) + ([n] if n else []))
@@ -312,6 +348,8 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, fo
             rows = [dict(from_pkg=pkg, to_pkg=dep, n_modules=n) for dep,n in counts.items() if _spec_cached(dep, self.env_path)]
             if rows: self.envdb.t.pkg_deps.insert_all(rows, replace=True)
         if verbose: print(res)
+        # `sync` embeds only chunks new to the package; unchanged ones stored by an embed=False sync stay NULL
+        if embed: self.process_env(pkg)
     return self.pkgs.insert(dict(name=pkg, version=ver, summary=_get(doc,'summary')), ignore=True)
 
 @patch
@@ -434,6 +472,66 @@ def pkgs_in_env(self:Kosha, pyproject=False, depth=1) -> list:
 	'Indexed packages whose indexed version is the one installed.'
 	st_pkgs, inst_pkgs = L(self.pkgs(select='name, version')), env_pkg_versions(pyproject, depth, path=self.env_path, root=self.root)
 	return st_pkgs.filter(lambda p: p['name'] in inst_pkgs and inst_pkgs[p['name']] == p['version'])
+
+# %% ../nbs/00_core.ipynb #99a94562
+def _sp_root(p) -> str|None:
+	'The site-packages folder holding path `p`, or None for a path outside one, such as an editable install.'
+	parts = Path(p).parts
+	return str(Path(*parts[:parts.index('site-packages')+1])) if 'site-packages' in parts else None
+
+def _venv_sps(p) -> list:
+	'The site-packages folders of the nearest `.venv` above path `p`.'
+	for d in Path(p).parents:
+		if sps := sorted(d.glob('.venv/lib/python*/site-packages')): return list(map(str, sps))
+	return []
+
+_norm_dist = lambda n: re.sub(r'[-_.]+', '-', n).lower()
+
+def installed_dists(root) -> dict:
+	'{normalized name: {version: metadata folder}} of the distributions installed in site-packages folder `root`; empty when it is gone.'
+	res = defaultdict(dict)
+	if not Path(root).is_dir(): return res
+	for d in Path(root).iterdir():
+		if d.suffix == '.dist-info': nm, _, ver = d.stem.rpartition('-')
+		elif d.suffix == '.egg-info': nm, ver = (d.stem.split('-') + [''])[:2]
+		else: continue
+		res[_norm_dist(nm)][ver] = d
+	return res
+
+def _holds(dists, name, ver) -> bool:
+	'Whether `dists`, from `installed_dists`, has `name` at version `ver`, reading the metadata when the folder name spells the version differently.'
+	def _ver(d):
+		# an interrupted install can leave a metadata folder without METADATA
+		try: return PathDistribution(d).version
+		except Exception: return None
+	vs = dists.get(_norm_dist(name), {})
+	return ver in vs or any(_ver(d) == ver for d in vs.values())
+
+@patch
+def prune_env(self:Kosha, dry_run=False) -> dict:
+	'Remove the packages no known site-packages folder holds and the versions none holds, compact env.db, and return what was removed.'
+	st, je = self.env_st, lambda k: f"json_extract(metadata,'$.{k}')"
+	sp = f"instr({je('path')}, '/site-packages/')"
+	chunks = st.db.q(f"""SELECT package name, min({je('path')}) path, count(*) rows,
+		sum(length(content) + ifnull(length(embedding), 0)) bytes FROM [{st.name}] GROUP BY 1""")
+	known = {r['root'] for r in st.db.q(f'SELECT DISTINCT substr({je("path")}, 1, {sp}+13) root FROM [{st.name}] WHERE {sp}>0')}
+	known |= {s for c in chunks if c['path'] and not _sp_root(c['path']) for s in _venv_sps(c['path'])} | set(self.env_path)
+	look = [installed_dists(r) for r in sorted(known)]
+	has = lambda n, v=None: any(_norm_dist(n) in d if v is None else _holds(d, n, v) for d in look)
+	res = dict(chunks=[c for c in chunks if not has(c['name'])],
+			   packages=[r for r in self.pkgs(select='name, version') if not has(r['name'], r['version'])])
+	if dry_run or not (res['chunks'] or res['packages']): return res
+	names, vers = [c['name'] for c in res['chunks']], [x for r in res['packages'] for x in (r['name'], r['version'])]
+	with write_txn(self.envdb):
+		if names: self.envdb.execute(f"DELETE FROM [{st.name}] WHERE package IN ({','.join('?'*len(names))})", names)
+		if vers: self.envdb.execute(f"DELETE FROM [{self.pkgs.name}] WHERE (name, version) IN (VALUES {','.join(['(?,?)']*(len(vers)//2))})", vers)
+		# only packages gone everywhere lose their description and imports; an upgraded one keeps them
+		for t, col in ((self.pkg_st.name, je('name')), (self.env_pd.name, 'from_pkg')):
+			if names: self.envdb.execute(f"DELETE FROM [{t}] WHERE {col} IN ({','.join('?'*len(names))})", names)
+	self.envdb.execute('VACUUM')
+	# after VACUUM, which may renumber the rowids the HNSW keys refer to
+	st.rebuild_index(); self.pkg_st.rebuild_index()
+	return res
 
 # %% ../nbs/00_core.ipynb #b57c6ce49a9c9fe5
 _filter_norm = {'files': 'file', 'paths': 'path', 'packages': 'package', 'langs': 'lang', 'types': 'type',

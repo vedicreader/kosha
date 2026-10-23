@@ -1,6 +1,6 @@
 """The `kosha` shell command: every index and graph query as a subcommand.
 
-Agents that work through a shell, and people at a terminal, need kosha without writing Python. This module provides one `kosha` command with a subcommand for each query: `sync`, `status`, `context`, `repo-context`, `env-context`, `ni`, `public-api`, `api-paths`, `dep-stack`, `top-nodes`, `where-to-add`, `watch`, `daemon`, `install` and `nuke`. Subcommand names use hyphens where the Python methods use underscores, and so do flags, as in `--as-json` and `--busy-timeout`. A flag that is on by default is turned off with `--no-` in front, as in `kosha sync --no-graph`.
+Agents that work through a shell, and people at a terminal, need kosha without writing Python. This module provides one `kosha` command with a subcommand for each query: `sync`, `status`, `context`, `repo-context`, `env-context`, `ni`, `public-api`, `api-paths`, `dep-stack`, `top-nodes`, `where-to-add`, `watch`, `daemon`, `install`, `nuke`, `embed` and `prune`. Subcommand names use hyphens where the Python methods use underscores, and so do flags, as in `--as-json` and `--busy-timeout`. A flag that is on by default is turned off with `--no-` in front, as in `kosha sync --no-graph`.
 
 Output is readable markdown. `--as-json` prints JSON instead, for piping into `jq` or another program. `kosha <subcommand> --help` lists a subcommand's flags.
 
@@ -10,7 +10,7 @@ Docs: https://vedicreader.github.io/kosha/cli.html.md"""
 
 # %% auto #0
 __all__ = ['CMDS', 'sync', 'context', 'repo_context', 'env_context', 'ni', 'watch', 'public_api', 'api_paths', 'dep_stack',
-           'top_nodes', 'status', 'where_to_add', 'nuke', 'daemon', 'install', 'main']
+           'top_nodes', 'status', 'where_to_add', 'nuke', 'embed', 'prune', 'daemon', 'install', 'main']
 
 # %% ../nbs/03_cli.ipynb #cell-imports
 import json, re, sys
@@ -264,6 +264,27 @@ def nuke(env=False # also delete the shared package and docs indexes
     Kosha().nuke(env=env)
     print("deleted kosha cache.")
 
+# %% ../nbs/03_cli.ipynb #73ab2b2c
+@call_parse
+def embed(
+    pkg:str=None,       # only this package; defaults to every package
+    batch:int=5_000,    # chunks embedded, committed and indexed together
+):
+    'Embed the package chunks that have no embedding yet and print how many were embedded.'
+    print(f'embedded {Kosha().process_env(pkg=pkg, batch=batch, progress=True)} chunks')
+
+@call_parse
+def prune(
+    dry_run:bool=False, # list what would be removed without removing it
+    as_json:bool=False, # output JSON
+):
+    'Remove the packages and versions no indexed environment still has installed, and print what was removed.'
+    r = Kosha().prune_env(dry_run=dry_run)
+    if as_json: return print(json.dumps(_to_json(r)))
+    print(f"{'would remove' if dry_run else 'removed'} {len(r['chunks'])} packages "
+          f"({sum(c['rows'] for c in r['chunks'])} chunks) and {len(r['packages'])} version records")
+    for c in r['chunks']: print(f"  {c['name']}  {c['rows']} chunks")
+
 # %% ../nbs/03_cli.ipynb #cell-daemon
 _DISPATCH = {
     'context':        lambda k, a: k.context(**a),
@@ -324,6 +345,8 @@ CMDS = {
     'where-to-add':   where_to_add,
     'install':        install,
 	'nuke':           nuke,
+    'embed':          embed,
+    'prune':          prune,
 }
 
 def main():
