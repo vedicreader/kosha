@@ -2,6 +2,10 @@
 
 <!-- do not remove -->
 
+## 0.1.17
+
+- Needs litesearch 0.1.59. Index writes commit in batches of 1,000 rows, and the WAL is truncated after each sync. Each connection sets its own busy timeout.
+
 ## 0.1.16
 
 - `update_repo(dir=...)` deletes index records only under `dir`. Before, indexing a subfolder deleted the records of the rest of the repository.
