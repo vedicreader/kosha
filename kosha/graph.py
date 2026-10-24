@@ -23,9 +23,12 @@ from tqdm import tqdm
 # %% ../nbs/01_graph.ipynb #af482cb1
 class CodeGraph:
 	'A call graph of Python code, stored in SQLite, with methods to build and query it.'
-	def __init__(self, path: str | Path = ':memory:'):
+	def __init__(self,
+				 path: str | Path = ':memory:',
+				 busy_timeout: int = None  # ms to wait for a locked database
+				 ):
 		self.path = path
-		self.db = database(path)
+		self.db = database(path, busy_timeout=busy_timeout)
 		ge, gn, cd, fi = self.db.t.graph_edges, self.db.t.graph_nodes, self.db.t.co_dispatch, self.db.t.file_index
 		pa, gm = self.db.t.pending_attr_calls, self.db.t.graph_meta
 		pa.create(caller=str, method=str, pkgs=str, if_not_exists=True, pk='caller,method')
@@ -99,7 +102,7 @@ def _co_edges(n, mod, top_fns):
 	return [_e(f"{mod}.{a}",f"{mod}.{b}",'co_dispatch',0.8) for i,a in enumerate(grp) for b in grp[i+1:]]
 
 def _patch_edges(n, mod):
-	'fastcore @patch: @patch def fn(self:Class) → Class gains fn as method.'
+	"Return a `patch` edge from the annotated class to each function decorated with fastcore's `@patch`."
 	if not any(('patch' in ast.unparse(d)) for d in n.decorator_list): return []
 	if not ((args := n.args.args) and (ann:=args[0].annotation)): return []
 	tgts = ([ast.unparse(ann.left), ast.unparse(ann.right)]
@@ -108,7 +111,7 @@ def _patch_edges(n, mod):
 	return [_e(f"{mod}.{t}", f"{mod}.{n.name}", 'patch', 0.9) for t in tgts]
 
 def _delegates_edges(n, mod):
-	'fastcore @delegates(target): fn wraps target\'s signature — structural dependency.'
+	"Return a `delegates` edge from a function decorated with fastcore's `@delegates` to its target."
 	is_nm, is_call = lambda d: isinstance(d, ast.Name) and d.id == 'delegates', lambda d: isinstance(d, ast.Call)
 	is_attr = lambda d: isinstance(d, ast.Attribute) and d.attr == 'delegates'
 	is_del = lambda d: is_call(d) and (is_nm(d.func) or is_attr(d.func))
@@ -123,7 +126,7 @@ def dyn_edges(src:str, module:str) -> list[dict]:
 	tree, imp, top, all_fns, *_ = parse(src)
 	if tree is None: return []
 	fns, reg = [], []
-	for n in ast.walk(tree):                          # one walk feeds both fns and registration
+	for n in ast.walk(tree):
 		if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)): fns.append(n)
 		reg += _reg_edges(n, module, imp, all_fns)
 	fns = L(fns)
@@ -318,8 +321,9 @@ ON CONFLICT(node) DO UPDATE SET in_degree=excluded.in_degree, out_degree=exclude
 
 @patch
 def _centrality(self: CodeGraph, nodes:set=None, force=False, tol=0.1):
-	'Refresh degrees; recompute PageRank only once the edge count has moved by more than `tol`.'
+	'Refresh degrees. Recompute PageRank when `force` is true, when no PageRank has run yet, or when the edge count differs from the count at the last run by more than the fraction `tol`.'
 	db = self.db
+	db.q('UPDATE graph_nodes SET in_degree=0, out_degree=0 WHERE in_degree<>0 OR out_degree<>0')
 	db.q(_DEG_SQL)
 	n = first(db.q('SELECT COUNT(*) n FROM graph_edges'))['n']
 	base = self._meta('pr_edges')
@@ -383,7 +387,7 @@ def _lambda_nodes(sources:dict[str,str]=None, filenames:list[str]=None, root:str
 			for t in n.targets if isinstance(t, ast.Name)}
 
 def _static_batch(kw:dict) -> tuple:
-	"One batch of files or sources: (meta, edges, attr-call hints). Module-level, so a process pool can pickle it."
+	"One batch of files or sources: (meta, edges, attr-call hints). A process pool can pickle it because it is module-level."
 	s_edges, meta = static_edges(**kw)
 	meta |= _lambda_nodes(**kw)
 	return meta, s_edges, _attr_call_hints(**kw, meta=meta)
@@ -502,13 +506,13 @@ def ranked(self: CodeGraph,
     k: int=10,          # number of top nodes to return
     module: str=None    # optional module prefix filter (e.g. 'fastcore.basics')
 ) -> L:
-    'Top-k nodes by pagerank, optionally filtered to a module prefix.'
+    'The `k` nodes with the highest PageRank, optionally only those whose name starts with `module` and a dot.'
     kw = dict(where='node LIKE ?', where_args=[f"{module}.%"]) if module else {}
     return L(self.db.t.graph_nodes(select='node,pagerank', order_by='pagerank DESC', limit=k, **kw))
 
 @patch
 def _bfs(self: CodeGraph, src:str, targets:set) -> dict:
-	'BFS from src; returns {tgt: L(path)} for each reachable target.'
+	'Breadth-first search from `src`. Returns {target: L(path)} for each reachable target.'
 	par, fnd, rem = {src: None}, {}, set(targets) - {src}
 	fro = [src]
 	_get = lambda f: self.ge(select='caller,callee', where=f'caller IN ({",".join("?" * len(f))})', where_args=f)
@@ -583,7 +587,7 @@ def node_infos(self: CodeGraph,
 # %% ../nbs/01_graph.ipynb #5965c060
 @patch
 def _drop_file(self: CodeGraph, path: str):
-    'Delete all graph_edges and graph_nodes belonging to this file path.'
+    'Delete the nodes defined in the file at `path`, the edges that touch them, their co_dispatch rows and the file_index row for `path`. Does nothing when the file has no nodes.'
     if not (nodes:=self.file2nodes(path)): return
     pl, nl = ','.join('?' * len(nodes)), list(nodes)
     self.db.q(f"DELETE FROM graph_edges WHERE caller IN ({pl}) OR callee IN ({pl})",nl*2)
@@ -599,7 +603,7 @@ def file2nodes(self: CodeGraph, path: str) -> set:
 # %% ../nbs/01_graph.ipynb #96a9e1eb2d5c17f3
 @patch
 def _index_files(self: CodeGraph, files, sc='repo'):
-	'Add or update file_index entries for these files. root is for grouping, e.g. by dir or pkg.'
+	'Add or update the file_index entries for `files`. `sc` is stored in the `root` column, to group files by directory or package.'
 	o = [dict(path=str(f), root=sc, last_analyzed_at=Path(f).stat().st_mtime) for f in files]
 	self.db.t.file_index.insert_all(o, replace=True)
 
@@ -616,7 +620,7 @@ from tqdm import tqdm
 @patch(as_prop=True)
 def graph(self: Kosha) -> CodeGraph:
 	'The call graph in `.kosha/graph.db`, opened once per Kosha object.'
-	if not hasattr(self, '_graph'): self._graph = CodeGraph(self.root.joinpath('.kosha','graph.db'))
+	if not hasattr(self, '_graph'): self._graph = CodeGraph(self.root.joinpath('.kosha','graph.db'), busy_timeout=self.busy_timeout)
 	return self._graph
 
 @patch(as_prop=True)
@@ -657,8 +661,8 @@ def short_paths(self:Kosha):
 # %% ../nbs/01_graph.ipynb #79635765
 @patch
 def public_api(self: Kosha,
-               pkg: str,                         # package or module
-               meta_cols: str = 'mod_name,docstring',
+               pkg: str,                         # package or module name, such as `fastcore` or `fastcore.basics`
+               meta_cols: str = 'mod_name,docstring',  # comma-separated metadata fields to return for each name
                limit: int = 200) -> L:
     'Public names of a package or module, with top-level names before nested methods.'
     get = lambda r, k: r.get('metadata', {}).get(k)
@@ -712,15 +716,15 @@ _EMBEDDED_SYMBOL_RE = re.compile(
     r")\b")
 _CAMEL_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|[0-9]+")
 
-_EMBEDDED_SYMBOL_BOOST_SCALE = 0.5  # embedded symbol may be incidental to the NL query
+_EMBEDDED_SYMBOL_BOOST_SCALE = 0.5  # an embedded symbol is weaker evidence than a query that is only a symbol
 _DEFINITION_KEYWORDS = ("class","module","defmodule","def","interface","struct","enum","trait","type","func",
     "function","object","abstract class","data class","fn","fun","package","namespace","protocol","record","typedef")
 _SQL_DEFINITION_KEYWORDS = ("CREATE TABLE","CREATE VIEW","CREATE PROCEDURE","CREATE FUNCTION")
 _KEYWORD_PREFIX = r"(?:^|(?<=\s))(?:"
 _DEFINITION_KEYWORD_BODY = "|".join(re.escape(k) for k in _DEFINITION_KEYWORDS)
 _SQL_KEYWORD_BODY = "|".join(re.escape(k) for k in _SQL_DEFINITION_KEYWORDS)
-_DEFINITION_BOOST_MULTIPLIER = 3.0  # additive boost for chunks defining a queried symbol
-_STEM_BOOST_MULTIPLIER = 1.0        # additive boost for NL queries when file stems match query words
+_DEFINITION_BOOST_MULTIPLIER = 3.0  # multiple of the top score, added to a chunk that defines a queried symbol
+_STEM_BOOST_MULTIPLIER = 1.0        # multiple of the top score, scaled by the share of query words that match the file name
 _FILE_COHERENCE_BOOST_FRAC = 0.2    # fraction of max_score added to a file's top chunk, scaled by aggregate score
 _STOPWORDS = frozenset(
     "a an and are as at be by do does for from has have how if in is it not of on or the to was"
@@ -753,7 +757,7 @@ def _split_ident(token:str) -> list:
     parts = [p for p in lower.split('_') if p] if '_' in token else [m.lower() for m in _CAMEL_RE.findall(token)]
     return [lower, *parts] if len(parts) >= 2 else [lower]
 
-# ── result-dict accessors ──
+# result-dict accessors
 def _rk_score(r): return float(r.get('_rrf_score') or r.get('_score') or 0.0)
 def _rk_fpath(r): return r.get('path') or (r.get('metadata') or {}).get('path') or ''
 def _rk_content(r): return r.get('content') or ''
@@ -897,13 +901,16 @@ import hashlib
 
 # %% ../nbs/01_graph.ipynb #9035c5d9
 def _source_hash(src): return hashlib.blake2b(src.encode(), digest_size=16).hexdigest()
+def _hash_files(files):
+	'{path: content hash} for the files that exist, read once so the hash stored later is the one that was compared.'
+	return {str(Path(f)): _source_hash(Path(f).read_text(errors='replace')) for f in files if Path(f).exists()}
 def _by_root(files, root=None):
-	'{root: [files]} — one group when `root` is given, else grouped by import root.'
+	'{root: [files]}. One group when `root` is given, otherwise one group per import root.'
 	return {Path(root): list(files)} if root else groupby(files, imp_root)
 
 @patch
 def _drop_file(self: CodeGraph, path: str, incoming=True):
-    'Delete graph rows generated by one source file.'
+    'Delete the nodes defined in the file at `path`, their outgoing edges, and their pending_attr_calls, co_dispatch and file_index rows. Also delete the incoming edges when `incoming` is true.'
     nodes = self.file2nodes(path)
     if nodes:
         pl = ','.join('?' * len(nodes)); args = list(nodes)
@@ -915,24 +922,15 @@ def _drop_file(self: CodeGraph, path: str, incoming=True):
     self.db.q('DELETE FROM file_index WHERE path=?', [path])
 
 @patch
-def _index_files(self: CodeGraph, files, sc='repo'):
-    rows = []
-    for f in files:
-        p = Path(f); src = p.read_text(errors='replace')
-        rows.append({'path': str(p), 'root': sc, 'source_hash': _source_hash(src), 'last_analyzed_at': p.stat().st_mtime})
+def _index_files(self: CodeGraph, hashes: dict, sc='repo'):
+    rows = [{'path': p, 'root': sc, 'source_hash': h, 'last_analyzed_at': Path(p).stat().st_mtime} for p, h in hashes.items()]
     if rows: self.db.t.file_index.insert_all(rows, replace=True)
 
 @patch
-def _stale(self: CodeGraph, files, sc=None, force=False):
+def _stale(self: CodeGraph, hashes: dict, sc=None, force=False):
     kw = dict(where='root=?', where_args=[sc]) if sc else {}
     known = {r['path']: r.get('source_hash') for r in self.db.t.file_index(**kw)}
-    out = []
-    for f in files:
-        p = Path(f)
-        if not p.exists(): continue
-        src = p.read_text(errors='replace')
-        if force or known.get(str(p)) != _source_hash(src): out.append(f)
-    return out
+    return [p for p, h in hashes.items() if force or known.get(p) != h]
 
 @patch
 def _fast_process_files(self: CodeGraph, files, root=None, full=False):
@@ -956,14 +954,15 @@ def _fast_process_files(self: CodeGraph, files, root=None, full=False):
 
 @patch
 def sync_dir(self: CodeGraph, dir: str | Path, force=False, mode='fast', root=None) -> 'CodeGraph':
-    'Update the graph for the .py files under `dir`, skipping files whose content hash is unchanged.'
+    'Update the graph for the .py files under `dir`. Skip files whose content hash is unchanged, and drop the rows of files that no longer exist. `force` reprocesses every file. `mode="full"` re-extracts changed files with `process_files`. `root` sets the module root.'
     if not dir: return self
     files = dir2files(dir, exts=['.py'], func=os.path.join)
     known = set(L(self.db.t.file_index(select='distinct path', where='root=?', where_args=[str(dir)])).attrgot('path'))
     removed = known - set(files)
     for f in removed: self._drop_file(f)
-    changed = self._stale(files, str(dir), force)
-    if changed: self._fast_process_files(changed, str(root) if root else None, full=mode == 'full'); self._index_files(changed, str(dir))
+    hashes = _hash_files(files)
+    changed = self._stale(hashes, str(dir), force)
+    if changed: self._fast_process_files(changed, str(root) if root else None, full=mode == 'full'); self._index_files({p: hashes[p] for p in changed}, str(dir))
     self._graph_changed = getattr(self, '_graph_changed', False) or bool(removed or changed)
     return self
 
@@ -979,7 +978,7 @@ def sync_pkgs(self: CodeGraph, pkgs: list[str], force=False, mode='fast', path: 
 
 @patch
 def sync(self: CodeGraph, dir=None, pkgs=None, force=False, mode='fast', metrics=True, path: list = None) -> 'CodeGraph':
-    'Update the graph for a directory and a list of packages, then refresh PageRank if anything changed.'
+    'Update the graph for a directory and a list of packages. If anything changed and `metrics` is true, update degrees, and update PageRank when the edge count changed by more than 10%. `force` clears the pending method-call hints and reprocesses every file.'
     self._graph_changed = force
     if force: self.pa.delete_where()
     if dir: self.sync_dir(dir, force=force, mode=mode)
@@ -996,11 +995,13 @@ def recompute_metrics(self: CodeGraph) -> 'CodeGraph':
 def resolve_attr_calls(self: CodeGraph) -> 'CodeGraph':
     'Turn pending `self.x.method()` hints into `attr_call` edges, now that the graph knows which methods exist.'
     existing = {(r['caller'], r['callee']) for r in self.ge(select='caller,callee')}
-    new_edges = []
-    for r in self.pa():
-        if not r['pkgs']: continue
+    new_edges, hints = [], [r for r in self.pa() if r['pkgs']]
+    nodes = defaultdict(list)
+    for ms in chunked({r['method'] for r in hints}, 500):
+        for x in self.gn(select='node,method', where=f"method IN ({','.join('?' * len(ms))})", where_args=ms): nodes[x['method']].append(x)
+    for r in hints:
         pkgs = {pkg: i for i, pkg in enumerate(r['pkgs'].split(','))}
-        candidates = [x for x in self.gn(where='method=?', where_args=[r['method']]) if x['node'].split('.')[0] in pkgs]
+        candidates = [x for x in nodes[r['method']] if x['node'].split('.')[0] in pkgs]
         if not candidates: continue
         callee = max((x['node'] for x in candidates), key=lambda n: pkgs.get(n.split('.')[0], -1))
         if (r['caller'], callee) not in existing:
@@ -1054,13 +1055,12 @@ def context(self: Kosha,
             columns:str='content,metadata',
             sys_wide=True,
             rerank: bool = False,     # reorder the boosted top-k with a flashrank cross-encoder
-            rerank_model: str = None, # flashrank model name (None -> fast default)
+            rerank_model: str = None, # flashrank model name; None uses the fast default
 			**kw                  # forwarded to env_context / repo_context
 ) -> L:
 	'Search the repo and the packages together, rerank the merged hits for code, and attach call-graph details.'
-	# self.update_repo()
 	def _tag(res,pref): return L(res).map(lambda r:r|dict(_source=pref,_src_id=f'{pref}:{r.get("rowid",id(r))}'))
-	# Embed the query exactly once and pass via emb_q= so repo/env don't each re-embed.
+	# Embed the query once. Pass it as `emb_q` so `repo_context` and `env_context` do not embed it again.
 	from kosha.core import parseq
 	raw, fs = parseq(q)
 	if pkg:= fs.get('package', []): repo = False
@@ -1088,7 +1088,7 @@ def is_sys_pkg(pkg:str, path:list=None) -> bool:
 
 @patch
 def dep_stack(self:Kosha, seeds:list=None, depth:int=1, no_sys_pkg=True, allow:list=None) -> list:
-	'Layers of package imports from the pkg_deps table, breadth first from `seeds`.'
+	'Layers of package imports from the pkg_deps table, breadth first from `seeds`. Layer 0 is `seeds`. `depth` is the maximum number of layers after it. `no_sys_pkg` keeps only installed packages. A non-empty `allow` keeps only the packages it lists.'
 	seen, frontier, layers = set(seeds), set(seeds), [list(seeds)]
 	fn=lambda p: p['tgt'] not in seen and (not no_sys_pkg or is_sys_pkg(p['tgt'], self.env_path)) and (not allow or p['tgt'] in allow)
 	for _ in range(depth):
@@ -1104,7 +1104,7 @@ def dep_stack(self:Kosha, seeds:list=None, depth:int=1, no_sys_pkg=True, allow:l
 
 @patch
 def top_nodes(self:Kosha, pkg:str, k:int=5) -> L:
-	'Top-k public API nodes for pkg ranked by pagerank in the code graph.'
+	'The `k` public API nodes of `pkg` with the highest PageRank in the code graph.'
 	mods = self.public_api(pkg, meta_cols='mod_name').attrgot('mod_name')
 	if not mods: return L()
 	pl = ','.join('?'*len(mods))

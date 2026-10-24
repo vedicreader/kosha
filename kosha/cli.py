@@ -1,6 +1,6 @@
 """The `kosha` shell command: every index and graph query as a subcommand.
 
-Agents that work through a shell, and people at a terminal, need kosha without writing Python. This module provides one `kosha` command with a subcommand for each query: `sync`, `status`, `context`, `repo-context`, `env-context`, `ni`, `public-api`, `api-paths`, `dep-stack`, `top-nodes`, `where-to-add`, `watch`, `daemon`, `install`, `nuke`, `embed` and `prune`. Subcommand names use hyphens where the Python methods use underscores, and so do flags, as in `--as-json` and `--busy-timeout`. A flag that is on by default is turned off with `--no-` in front, as in `kosha sync --no-graph`.
+This module provides one `kosha` command, for agents that work through a shell and for people at a terminal. Each query has a subcommand: `sync`, `status`, `context`, `repo-context`, `env-context`, `ni`, `public-api`, `api-paths`, `dep-stack`, `top-nodes`, `where-to-add`, `watch`, `daemon`, `install`, `nuke`, `embed` and `prune`. Subcommand names and flags use hyphens where the Python methods use underscores, as in `--as-json` and `--busy-timeout`. A flag that is on by default turns off with `--no-` in front, as in `kosha sync --no-graph`.
 
 Output is readable markdown. `--as-json` prints JSON instead, for piping into `jq` or another program. `kosha <subcommand> --help` lists a subcommand's flags.
 
@@ -72,7 +72,8 @@ def sync(
     k = Kosha(busy_timeout=busy_timeout)
     pkg_list = _split_pkgs(pkgs) if pkgs else None
     k.sync(dir=dir, pkgs=pkg_list, repo=repo, env=env, graph=graph, in_parallel=parallel, embed=embed,
-           graph_mode=graph_mode, graph_metrics=graph_metrics, force=force, pkg_parallel=pkg_parallel)
+           graph_mode=graph_mode, graph_metrics=graph_metrics, force=force, pkg_parallel=pkg_parallel,
+           verbose=not as_json)
     s = k.status()
     print(json.dumps(_to_json(s)) if as_json else
           '\n'.join(f'{k2}: {v}' for k2, v in s.items() if k2 != 'stale_pkgs'))
@@ -358,7 +359,7 @@ def main():
 	cmd = sys.argv.pop(1)
 	func = CMDS[cmd]
 	raw  = getattr(func, '__wrapped__', func)      # unwrap @call_parse
-	args = anno_parser(raw).parse_args().__dict__  # parse remaining argv
+	args = anno_parser(raw).parse_args().__dict__
 	args.pop('xtra', None); args.pop('pdb', None)  # fastcore-injected extras
 	raw(**args)
 

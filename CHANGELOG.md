@@ -2,17 +2,31 @@
 
 <!-- do not remove -->
 
+## 0.1.16
+
+- `update_repo(dir=...)` deletes index records only under `dir`. Before, indexing a subfolder deleted the records of the rest of the repository.
+- Graph sync stores the hash of the source it parsed. A file edited during a sync is parsed again on the next sync.
+- `extract` inserts a new method into the class that holds the selection, also when another class has a method of the same name.
+- `extract` finds parameters by scope. Lambda and nested-function parameters, comprehension variables, imports, exception targets and match captures are no longer turned into arguments. A walrus target in a comprehension binds in the enclosing scope. Match captures used after the selection are returned.
+- `inline` refuses an unsafe inline: a name with another binding (parameters and match captures included), a value whose names are rebound, and a call or computed value that is not used once in the next statement. It also refuses to move a value into a later operand of a chained comparison.
+- Each file's imports are stored, and `repo_deps` is recounted from them on every update. `CODE_FORMAT` is 2, so an existing index parses its files once again on its next update. `update_pkg` replaces its old dependency rows.
+- `CodeGraph` takes `busy_timeout`, and `Kosha.graph` passes its own.
+- Degrees of nodes that lost all their edges are reset to zero.
+- `kosha sync --as-json` prints only the JSON result.
+- `resolve_attr_calls` loads method nodes in batches.
+- Notebook prose is rewritten in plain technical English.
+
 ## 0.1.15
-- `process_env` embeds every chunk and package description with no embedding, in batches that each commit with their HNSW update, so an interrupted run resumes. Before, it filled the embedding column without updating the index, so the vectors were invisible to search. `kosha embed [--pkg] [--batch]` runs it. On a copy of a 304,000-row index it embedded 64,678 rows in 31 s.
+- `process_env` embeds every chunk and package description with no embedding, in batches that each commit with their HNSW update. An interrupted run resumes. Before, it filled the embedding column without updating the index, and search could not see the vectors. `kosha embed [--pkg] [--batch]` runs it. On a copy of a 304,000-row index it embedded 64,678 rows in 31 s.
 - `update_pkg` with embeddings on also embeds a package's leftover NULL chunks, including when the package is already indexed at its version. A sync run with `embed=False` had left them NULL for good.
-- `Kosha.prune_env(dry_run=False)` and `kosha prune [--dry-run]` remove a package's chunks when no known site-packages folder holds it at any version, and a `packages` row when none holds that exact version, then VACUUM and rebuild the HNSW index once. A chunk's `version` is the version it was first stored under, so it does not mark a stale chunk.
-- The notebooks set `XDG_DATA_HOME` to a temporary folder, so running the test suite no longer writes to the shared index in `~/.local/share/kosha`.
+- `Kosha.prune_env(dry_run=False)` and `kosha prune [--dry-run]` remove a package's chunks when no known site-packages folder holds it at any version, and a `packages` row when none holds that exact version, then run `VACUUM` once and rebuild the chunk index and the package-description index once each. A chunk's `version` is the version it was first stored under. It does not mark a stale chunk.
+- The notebooks set `XDG_DATA_HOME` to a temporary folder. Running the test suite no longer writes to the shared index in `~/.local/share/kosha`.
 
 ## 0.1.14
-- The package set comes from the pyproject of `Kosha.root`, read by the new `pyproject_deps(root)`. Before, `status`, `sync` and `env_pkg_versions` found the pyproject from the current folder, so `Kosha(dir=other)` run from elsewhere, as Leela's server does, indexed another project's packages or none.
+- The package set comes from the pyproject of `Kosha.root`, read by the new `pyproject_deps(root)`. Before, `status`, `sync` and `env_pkg_versions` found the pyproject from the current folder. `Kosha(dir=other)` run from elsewhere, as Leela's server does, then indexed another project's packages or none.
 
 ## 0.1.13
-- Installed packages are looked up in the project's own environment: the repo's `.venv`, else a `$VIRTUAL_ENV` inside the repo, plus folders its `.pth` files name. `env_path(root)` finds it and `Kosha.env_path` keeps it. Before, kosha used the interpreter it ran in, so `kosha sync` from the uv tool, or Leela's sync, failed on a project dependency with `pkg fastai is not in environment`. With no project environment, behaviour is as before.
+- Installed packages are looked up in the project's own environment: the repo's `.venv`, else a `$VIRTUAL_ENV` inside the repo, plus folders its `.pth` files name. `env_path(root)` finds it and `Kosha.env_path` keeps it. Before, kosha used the interpreter it ran in. `kosha sync` from the uv tool, or Leela's sync, then failed on a project dependency with `pkg fastai is not in environment`. With no project environment, behaviour is as before.
 - A symlink loop, dangling link or unreadable folder in the repo no longer stops `sync` or `status`, through litesearch 0.1.53.
 - Needs litesearch 0.1.53.
 
@@ -146,7 +160,7 @@ skip folder re, skip file re, find stale files, graph sync optionalstale fixes
 
 ## 0.0.28
 mcp server (`kosha-mcp`), mcp as a core dep
-- new `kosha-mcp` console script — exposes the index over MCP (stdio, or `--http` for Streamable HTTP)
+- new `kosha-mcp` console script that serves the index over MCP (stdio, or `--http` for Streamable HTTP)
 - 14 tools: `status`, `sync`, `context`, `repo_context`, `env_context`, `where_to_add`, `node_info`, `neighbors`, `short_path`, `public_api`, `top_nodes`, `api_paths`, `dep_stack`, `pkg_url`
 - `mcp` promoted from optional extra to a core dependency
 

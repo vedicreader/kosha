@@ -1,8 +1,8 @@
 """Index your repository and its installed packages, then search them by meaning or by keyword.
 
-Before you write a helper, it pays to know whether your code or one of your dependencies already has one. This module builds the index that answers that question. It splits source files into chunks, one per function, class or method, and stores each chunk with its metadata and an embedding: a vector of numbers computed from the code, so that chunks with similar meaning have similar vectors. A search then combines two methods. Keyword search (SQLite's FTS5) finds chunks that contain the words of the query, and vector search finds chunks whose embedding is close to the query's. No language model is involved, and everything runs locally.
+This module builds the index that shows whether your code or one of your dependencies already has a helper you need. It splits source files into chunks, one per function, class or method. It stores each chunk with its metadata and an embedding. An embedding is a vector of numbers computed from the code, and chunks with similar meaning have similar vectors. A search combines two methods. Keyword search (SQLite's FTS5) finds chunks that contain the words of the query. Vector search finds chunks whose embedding is close to the query's embedding. No language model is involved, and everything runs locally.
 
-There are two indexes. The repo index covers your own code and lives in `.kosha/code.db` inside the repository. The package index covers installed packages and lives in your user data directory (`~/.local/share/kosha/env.db` on most systems), so every project on the machine shares it and a package version is indexed once. The `Kosha` class owns both. The call graph that sits on top of them is in the `graph` module.
+There are two indexes. The repo index covers your own code and lives in `.kosha/code.db` inside the repository. The package index covers installed packages and lives in your user data directory (`~/.local/share/kosha/env.db` on most systems). Every project on the machine shares it, and a package version is indexed once. The `Kosha` class owns both indexes. The `graph` module holds the call graph built from them.
 
 Docs: https://vedicreader.github.io/kosha/core.html.md"""
 
@@ -43,7 +43,6 @@ def parse(code=None, p=None):
     is_fn  = lambda n: isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef))
     is_nm  = lambda n: isinstance(n, ast.Name)
     imp, imp2mod, top = {}, {}, set()
-    # Single pass: imports + top-level fn names
     for n in ast.walk(tree):
         if is_fn(n) and is_top(n): top.add(n.name)
         elif isinstance(n, ast.Import):
@@ -102,7 +101,7 @@ def env_path(root) -> list:
 	'The site-packages folders of the environment in `root`: its `.venv`, else `$VIRTUAL_ENV` when that lies inside `root`; empty when there is none.'
 	root, ve = Path(root).resolve(), os.environ.get('VIRTUAL_ENV')
 	for venv in [root/'.venv'] + ([Path(ve)] if ve and Path(ve).resolve().is_relative_to(root) else []):
-		if sps := sorted(venv.glob('lib/python*/site-packages')):
+		if sps := sorted(venv.glob('lib/python*/site-packages')): 
 			return [str(p) for p in sps + [d for sp in sps for d in _pth_dirs(sp)] if p.is_dir()]
 	return []
 
@@ -145,7 +144,7 @@ def cast_emb(f, dtype=DTYPE):
 	'Wrap encoder `f` so the vectors it returns have the dtype the store reads back.'
 	return lambda txts, **kw: np.asarray(f(txts, **kw), dtype=dtype)
 
-CODE_FORMAT = 1
+CODE_FORMAT = 2
 
 class Kosha:
 	'Search index over a repository and its installed packages.'
@@ -163,17 +162,17 @@ class Kosha:
 		kw['encoder'] = encoder_id(self.efn)
 		self.code_st,self.env_st = self.codedb.get_store(path=str,**kw),self.envdb.get_store(package=str,**kw)
 		self.pkg_st, self.pkgs = self.envdb.get_store('pkg_store', **kw), self.envdb.t.packages
-		self.env_pd, self.code_rd = self.envdb.t.pkg_deps, self.codedb.t.repo_deps
+		self.env_pd, self.code_rd, self.code_fi = self.envdb.t.pkg_deps, self.codedb.t.repo_deps, self.codedb.t.repo_file_imports
 		self.pkgs.create(name=str, version=str, summary=str, uploaded_at=float, pk=['name','version'],
 			 defaults=dict(uploaded_at='CURRENT_TIMESTAMP'), if_not_exists=True)
 		self.env_pd.create(from_pkg=str, to_pkg=str, n_modules=int, if_not_exists=True, pk=['from_pkg','to_pkg'])
 		self.code_rd.create(from_module=str, to_pkg=str, n_files=int, if_not_exists=True, pk=['from_module','to_pkg'])
+		self.code_fi.create(path=str, to_pkg=str, if_not_exists=True, pk=['path','to_pkg'])
 		for st in (self.code_st, self.env_st, self.pkg_st):
-			# a locked or read-only env.db only costs the name lookups their index
 			try: st.db.execute(f"create index if not exists [{st.name}_name] on [{st.name}](json_extract(metadata,'$.name'))")
 			except Exception: pass
 		if first(self.codedb.q('pragma user_version'))['user_version'] < CODE_FORMAT:
-			# before format 1 a moved but unchanged chunk kept its old lineno; re-parse every file once
+			# before format 1 a moved but unchanged chunk kept its old lineno, and before format 2 the imports of each file were not stored; re-parse every file once
 			self.codedb.execute(f'update [{self.code_st.name}] set uploaded_at=0')
 			self.codedb.execute(f'pragma user_version={CODE_FORMAT}')
 
@@ -300,7 +299,7 @@ def process_env(self:Kosha,
 def count_imp(files, own:str='') -> Counter:
 	'For a list of files, the number of files importing each top-level package other than `own`.'
 	c, fn = Counter(), lambda p: p and p!=own and p[0]!='_'
-	def do(f): c.update(set(L(parse(p=f)[1].values()).filter(fn)))
+	def do(f): c.update(set(L(parse.__wrapped__(p=f)[1].values()).filter(fn)))  # `parse` caches by path, and a rewritten file must be read again
 	L(files).map(do)
 	return c
 
@@ -330,7 +329,7 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, fo
             # an earlier embed=False sync left these chunks for keyword search only
             if embed: self.process_env(pkg)
             return
-        print(f'forcing an update to pkg {ep}')
+        if verbose: print(f'forcing an update to pkg {ep}')
     pkg_par = Path(o.origin).parent.parent if o.origin else Path(o.submodule_search_locations[0])
     mod_fn = lambda p, n: '.'.join(list(Path(p).relative_to(pkg_par).with_suffix('').parts) + ([n] if n else []))
     _get = lambda o,k1=None: o.get('metadata').get(k1,'')
@@ -346,7 +345,8 @@ def update_pkg(self:Kosha, pkg:str, embed=True, exts=code_exts, verbose=True, fo
             pyf = L(files).filter(lambda f: str(f).endswith('.py'))
             counts = count_imp(pyf, pkg.replace('-','_').split('.')[0])
             rows = [dict(from_pkg=pkg, to_pkg=dep, n_modules=n) for dep,n in counts.items() if _spec_cached(dep, self.env_path)]
-            if rows: self.envdb.t.pkg_deps.insert_all(rows, replace=True)
+            self.env_pd.delete_where(where=f'from_pkg={pkg!r}')
+            if rows: self.env_pd.insert_all(rows, replace=True)
         if verbose: print(res)
         # `sync` embeds only chunks new to the package; unchanged ones stored by an embed=False sync stay NULL
         if embed: self.process_env(pkg)
@@ -399,6 +399,18 @@ def process_repo(self:Kosha, content=None, reembed=False, **kwargs):
 	return process_content(self.code_st, content, emb_fn=self.emb_doc, **kwargs)
 
 @patch
+def _repo_deps(self:Kosha, dir:Path, files, gone):
+    'Store the imports of `files`, forget those of `gone`, and recount the packages that the files under `dir` import.'
+    own = dir.resolve().name
+    self.code_fi.delete_where(where=f'path in ({",".join(map(repr, map(str, [*files, *gone])))})')
+    rows = [dict(path=str(f), to_pkg=p) for f in files for p in count_imp([f], own) if _spec_cached(p, self.env_path)]
+    if rows: self.code_fi.insert_all(rows, replace=True)
+    dirs = {dir, dir.resolve()}
+    cnt = Counter(r['to_pkg'] for r in self.code_fi() if any(Path(r['path']).is_relative_to(d) for d in dirs))
+    self.code_rd.delete_where(where='from_module=?', where_args=[own])
+    if cnt: self.code_rd.insert_all([dict(from_module=own, to_pkg=p, n_files=n) for p, n in cnt.items()], replace=True)
+
+@patch
 @fdelegates(dir2files)
 def update_repo(self:Kosha,
                 dir:Path=None,    # directory to index; defaults to repo root
@@ -416,12 +428,15 @@ def update_repo(self:Kosha,
     inf = lambda f: fs is None or str(Path(f).resolve()) in fs
     all_files = L(dir2files(str(dir), strict_skip_file_re, repo_skip_folder_re,exts=exts, **kwargs)).filter(inf)
     all_str = set(map(str, all_files))
-    rm = L(known.keys()).filter(lambda k: k not in all_str and inf(k))
+    dirs = {dir, dir.resolve()}
+    rm = L(known.keys()).filter(lambda k: k not in all_str and inf(k) and any(Path(k).is_relative_to(d) for d in dirs))
     ch = all_files if force else L(all_files).filter(lambda f: str(f) not in known or known[str(f)] != f.stat().st_mtime)
     if rm:
         self.code_st.delete_where(where=f'path in ({",".join(rm.map(repr))})')
         self.code_st.rebuild_index()  # drop ANN entries orphaned by deleted files
-    if not ch: return
+    if not ch:
+        if rm: self._repo_deps(dir, [], rm)
+        return
     if verbose: print(f'syncing files {ch} .....')
     # read before parsing: an edit made during the parse then stays newer than the stamp
     mt = {str(f): f.stat().st_mtime for f in ch}
@@ -441,13 +456,11 @@ def update_repo(self:Kosha,
     if empty := set(map(str, ch)) - {d.get('path') for d in content}:
         self.code_st.delete_where(where=f'path in ({",".join(map(repr, sorted(empty)))})')
         self.code_st.rebuild_index()
-    if not content: return
+    if not content: return self._repo_deps(dir, ch, rm)
     res = self.code_st.sync(content, key_col='path', emb_fn=self.emb_doc, embed=embed, force=force)
     for f in ch: self.codedb.q(f'update {self.code_st.name} set uploaded_at=? where path=?',[mt[str(f)], str(f)])
     if verbose: print(res)
-    own = Path(dir).resolve().name
-    rows = [dict(from_module=own, to_pkg=dep, n_files=n) for dep,n in count_imp(ch,own).items() if spec(dep, self.env_path)]
-    if rows: self.code_rd.insert_all(rows, replace=True)
+    self._repo_deps(dir, ch, rm)
     if verbose: print('synced repo')
 
 # %% ../nbs/00_core.ipynb #d91bbf7a5f17e3d0

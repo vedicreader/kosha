@@ -21,7 +21,7 @@ _BUILTINS = frozenset(dir(builtins))
 
 @dataclass
 class FileEdit:
-    "One file's whole text before and after, so a plan can be shown, applied, and undone."
+    "The whole text of one file before and after an edit, and the number of changes. `before` is `None` for a new file."
     path: str
     before: str
     after: str
@@ -139,10 +139,15 @@ def _expr(text):
     try: return ast.parse(text, mode='eval').body
     except SyntaxError as e: raise ValueError('select one complete Python expression') from e
 
+def _capture(node):
+    "The name a match pattern captures into, or `None`: `MatchAs` and `MatchStar` name it, `MatchMapping` calls it `rest`."
+    if isinstance(node, (ast.MatchAs, ast.MatchStar)): return node.name
+    if isinstance(node, ast.MatchMapping): return node.rest
+
 def _writes(nodes):
-    "Every name the selection binds."
-    return {n.id for node in nodes for n in ast.walk(node)
-            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
+    "Every name the selection binds, match captures included."
+    return {n.id if isinstance(n, ast.Name) else _capture(n) for node in nodes for n in ast.walk(node)
+            if (isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)) or _capture(n)}
 
 def _reads(text):
     """Every name the text loads, so a name still wanted afterwards can be told from a dead one.
@@ -166,36 +171,77 @@ _EVAL_ORDER = {ast.Assign: ('value', 'targets'), ast.AugAssign: ('value', 'targe
                ast.ListComp: ('generators', 'elt'), ast.SetComp: ('generators', 'elt'),
                ast.GeneratorExp: ('generators', 'elt'), ast.DictComp: ('generators', 'key', 'value')}
 
+def _arg_names(args):
+    return {a.arg for a in [*args.posonlyargs, *args.args, *args.kwonlyargs, args.vararg, args.kwarg] if a}
+
 def _children(value):
     if isinstance(value, list): return [x for x in value if isinstance(x, ast.AST)]
     return [value] if isinstance(value, ast.AST) else []
+
+def _walrus(node):
+    "Targets of the walrus expressions in `node`, not looking inside a lambda, function or class: those keep theirs."
+    if isinstance(node, (ast.Lambda, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)): return set()
+    found = {node.target.id} if isinstance(node, ast.NamedExpr) else set()
+    for child in ast.iter_child_nodes(node): found |= _walrus(child)
+    return found
 
 def _reads_before_writes(nodes):
     """Names the selection reads before it binds them: those have to arrive as parameters.
 
     A name both read and bound, as in `total = total + n`, is a parameter as well as a result.
     Subtracting the bound names from the read ones would miss it."""
-    bound, params = set(), []
-    def visit(node):
+    params = []
+    def visit(node, bound):
         if isinstance(node, ast.Name):
             if isinstance(node.ctx, ast.Load):
                 if node.id not in bound and node.id not in params: params.append(node.id)
             else: bound.add(node.id)
             return
+        if isinstance(node, ast.alias): return bound.add((node.asname or node.name).split('.')[0])
+        if isinstance(node, ast.ExceptHandler):
+            for child in _children(node.type): visit(child, bound)
+            if node.name: bound.add(node.name)
+            for child in node.body: visit(child, bound)
+            return
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
+            for name, value in ast.iter_fields(node):
+                if name != 'body':
+                    for child in _children(value): visit(child, bound)
+            body = node.body if isinstance(node.body, list) else [node.body]
+            inner = set(bound)
+            if not isinstance(node, ast.Lambda): bound.add(node.name); inner.add(node.name)
+            if not isinstance(node, ast.ClassDef): inner |= _arg_names(node.args) | _writes(body)
+            for child in body: visit(child, inner)
+            return
+        if isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp)):
+            inner = set(bound)
+            for name in _EVAL_ORDER[type(node)]:
+                for child in _children(getattr(node, name)): visit(child, inner)
+            bound |= _walrus(node)
+            return
+        if isinstance(node, ast.match_case):
+            captured = {c for n in ast.walk(node.pattern) if (c := _capture(n))}
+            fresh = captured - bound
+            visit(node.pattern, bound)
+            bound |= captured
+            for child in [*_children(node.guard), *node.body]: visit(child, bound)
+            bound -= fresh
+            return
         if (order := _EVAL_ORDER.get(type(node))) is not None:
             for field in order:
-                for child in _children(getattr(node, field, None)): visit(child)
+                for child in _children(getattr(node, field, None)): visit(child, bound)
             for name, value in ast.iter_fields(node):
                 if name in order: continue
-                for child in _children(value): visit(child)
+                for child in _children(value): visit(child, bound)
             return
-        for child in ast.iter_child_nodes(node): visit(child)
-    for node in nodes: visit(node)
+        for child in ast.iter_child_nodes(node): visit(child, bound)
+    bound = set()
+    for node in nodes: visit(node, bound)
     return sorted(params)
 
 # %% ../nbs/02_refactor.ipynb #5a247fcc
 def _enclosing_method(source, pos):
-    "The method `pos` sits in and the indent its siblings use, or a reason there is none."
+    "The method that holds `pos` and the indent of its sibling methods. Raises `ValueError` when `pos` is in no method."
     tree, starts = ast.parse(source), _starts(source)
     for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
         for fn in [n for n in cls.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
@@ -204,12 +250,8 @@ def _enclosing_method(source, pos):
     raise ValueError("extract a method from inside one of a class's own methods")
 
 def _offset_after(source, node):
-    "Where a sibling of `node` goes: the end of the statement it follows."
-    starts = _starts(source)
-    for fn in [n for n in ast.walk(ast.parse(source))
-               if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == node.name]:
-        return _at(source, starts, fn)[1]
-    return len(source)
+    "Where a sibling of `node`, a node parsed from `source`, goes: the end of the statement it follows."
+    return _at(source, _starts(source), node)[1]
 
 # %% ../nbs/02_refactor.ipynb #0551774f
 def extract(path, source, start, end, kind, name):
@@ -265,24 +307,77 @@ def extract(path, source, start, end, kind, name):
     body = textwrap.indent(textwrap.dedent(body), member + '    ')
     definition = f'\n\n{member}def {name}(self{", " if args else ""}{", ".join(args)}):\n{body.rstrip()}\n'
     after = source[:start] + indent + call + '\n' + source[end:]
-    at = _offset_after(after, holder)
+    at = _offset_after(source, holder) + len(after) - len(source)
     return FileEdit(path, source, after[:at] + definition + after[at:], 1)
 
 # %% ../nbs/02_refactor.ipynb #56badaec
 _ATOMIC = (ast.Name, ast.Constant, ast.Attribute, ast.Subscript, ast.Call,
            ast.List, ast.Dict, ast.Set, ast.ListComp, ast.DictComp, ast.SetComp, ast.JoinedStr)
 
+#: Values whose evaluation has an effect, depends on mutable state, or builds a fresh object each time.
+_IMPURE = (ast.Call, ast.Await, ast.Yield, ast.YieldFrom, ast.NamedExpr, ast.Attribute, ast.Subscript, ast.Lambda,
+          ast.List, ast.Dict, ast.Set, ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)
+#: Operators compute a new value from the names they read, so a later mutation of those names changes what they mean.
+_COMPUTED = (ast.BinOp, ast.UnaryOp, ast.Compare, ast.BoolOp, ast.IfExp, ast.JoinedStr)
+_STRAIGHT = (ast.Expr, ast.Assign, ast.AugAssign, ast.AnnAssign, ast.Return)
+_DEFERRED = (ast.Lambda, ast.IfExp, ast.BoolOp, ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)
+_SCOPES = (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef,
+           ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)
+
+def _binds(node):
+    "The names `node` binds: assignment targets, parameters, imports, definitions, exception targets and match captures."
+    if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)): return [node.id]
+    if isinstance(node, ast.arg): return [node.arg]
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)): return [node.name]
+    if isinstance(node, ast.ExceptHandler): return [node.name] if node.name else []
+    if isinstance(node, ast.alias): return [(node.asname or node.name).split('.')[0]]
+    if isinstance(node, (ast.MatchAs, ast.MatchStar)): return [node.name] if node.name else []
+    if isinstance(node, ast.MatchMapping): return [node.rest] if node.rest else []
+    return []
+
 def _binding(tree, name):
     "The one plain `name = value` statement that defines `name`, or a reason there isn't one."
     if any(name in n.names for n in ast.walk(tree) if isinstance(n, (ast.Global, ast.Nonlocal))):
         raise ValueError(f'{name} is declared global or nonlocal')
-    stores = [n for n in ast.walk(tree) if isinstance(n, ast.Name) and n.id == name
-              and isinstance(n.ctx, (ast.Store, ast.Del))]
+    binds = [n for n in ast.walk(tree) if name in _binds(n)]
     plain = [n for n in ast.walk(tree) if isinstance(n, ast.Assign) and len(n.targets) == 1
              and isinstance(n.targets[0], ast.Name) and n.targets[0].id == name]
-    if len(plain) != 1 or len(stores) != 1:
+    if len(plain) != 1 or len(binds) != 1:
         raise ValueError(f'inline needs {name} assigned exactly once, as a plain `{name} = value`')
     return plain[0]
+
+def _ancestors(node, parents):
+    while node in parents: node = parents[node]; yield node
+
+def _next_stmt(node, parents):
+    for _, value in ast.iter_fields(parents[node]):
+        if isinstance(value, list) and node in value:
+            i = value.index(node) + 1
+            return value[i] if i < len(value) else None
+
+def _refuse_unsafe(tree, assign, used):
+    "Raise `ValueError` when replacing the `used` names with the value of `assign` would change what the value means or how often it runs."
+    parents = {c: p for p in ast.walk(tree) for c in ast.iter_child_nodes(p)}
+    scope = lambda n: first(p for p in _ancestors(n, parents) if isinstance(p, _SCOPES))
+    where = (assign.lineno, assign.col_offset)
+    if free := {n.id for n in ast.walk(assign.value) if isinstance(n, ast.Name)}:
+        if any(scope(u) is not scope(assign) for u in used): raise ValueError('a use sits in another scope, where the value could mean something else')
+        for n in free:
+            owners = [b for b in ast.walk(tree) if n in _binds(b)]
+            if len(owners) > 1 or any((b.lineno, b.col_offset) > where for b in owners):
+                raise ValueError(f'{n} is bound more than once or after the assignment, so inlining would change the value')
+    nodes = list(ast.walk(assign.value))
+    reads = any(isinstance(n, ast.Name) for n in nodes)
+    if not any(isinstance(n, _IMPURE) or reads and isinstance(n, _COMPUTED) for n in nodes): return
+    nxt, ups = _next_stmt(assign, parents), list(_ancestors(used[0], parents))
+    if len(used) != 1 or not isinstance(nxt, _STRAIGHT) or nxt not in ups:
+        raise ValueError('the value can have effects or identity: inline it only into one use in the next statement')
+    chain = ups[:ups.index(nxt)]
+    calls = [n for n in ast.walk(nxt) if isinstance(n, (ast.Call, ast.Await, ast.Yield, ast.YieldFrom))]
+    path = [used[0], *chain]
+    lazy = any(isinstance(p, ast.Compare) and c is not p.left and c is not p.comparators[0] for c, p in zip(path, path[1:]))
+    if lazy or any(isinstance(a, _DEFERRED) for a in chain) or any(c not in chain for c in calls):
+        raise ValueError('the use is conditional, repeated or follows another call, so the value would run differently')
 
 def inline(path, source, pos):
     "Replace a variable's uses with its value and delete the assignment."
@@ -300,9 +395,11 @@ def inline(path, source, pos):
         raise ValueError('inline needs the assignment on lines of its own')
     value = source[slice(*at(assign.value))]
     if not isinstance(assign.value, _ATOMIC): value = f'({value})'
-    uses = [span for n, span in spans.items() if n.id == here.id and isinstance(n.ctx, ast.Load)]
+    used = [n for n in spans if n.id == here.id and isinstance(n.ctx, ast.Load)]
+    uses = [spans[n] for n in used]
     if not uses: raise ValueError(f'{here.id} is never read, so there is nothing to inline')
     if any(a < aend for a, _ in uses): raise ValueError(f'{here.id} is read before it is assigned')
+    _refuse_unsafe(tree, assign, used)
     after = source
     for a, b in sorted(uses, reverse=True): after = after[:a] + value + after[b:]
     return FileEdit(path, source, after[:lstart] + after[lend:], len(uses))
@@ -368,7 +465,7 @@ def _apply(text, edits):
 
 # %% ../nbs/02_refactor.ipynb #6e680cc3
 def _all_edit(text, starts, tree, add=(), drop=()):
-    "An edit rewriting a module's `__all__`, or None when it has none this can read."
+    "An edit that rewrites `__all__`, or None when the module has no `__all__` that this function can read."
     node = first(n for n in tree.body if _is_all(n))
     if node is None or not isinstance(node.value, (ast.List, ast.Tuple)): return None
     cur = [e.value for e in node.value.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)]
@@ -378,7 +475,7 @@ def _all_edit(text, starts, tree, add=(), drop=()):
     return (*_at(text, starts, node.value), '[' + ', '.join(repr(x) for x in new) + ']')
 
 def _carry(froms, plains, node, name, here):
-    "Record the import that gave `name` to the source file, so the destination gains it too."
+    "Record the import that binds `name` in the source file, so that `_add_imports` adds it to the destination."
     alias = first(a for a in node.names if (a.asname or a.name).split('.')[0] == name)
     if isinstance(node, ast.ImportFrom): froms.setdefault(_absolute(node, here), set()).add(_spec(alias))
     else: plains.add(f'import {_spec(alias)}')
@@ -445,7 +542,7 @@ def move_plan(src, names, dest, others=(), shim=True, read=_read):
     spans = sorted(_span(source, starts, n) for n in moved)
     block = ''.join(source[a:b] for a, b in spans).strip('\n') + '\n'
     rest = _apply(source, [(a, b, '') for a, b in spans])
-    if rest.strip(): rest = rest.rstrip('\n') + '\n'   # what a definition leaves behind should not end in blank lines
+    if rest.strip(): rest = rest.rstrip('\n') + '\n'
     bound, froms, plains, back = _bound(tree), {}, set(), []
     for name in sorted(_free(moved) - set(names)):
         node = bound.get(name)
@@ -468,8 +565,8 @@ def move_plan(src, names, dest, others=(), shim=True, read=_read):
     rtree, rstarts = _parse(src, rest), _starts(rest)
     used = sorted(n for n in names if n in _free([rtree], _BUILTINS - set(names)))
     want = names if shim else used
-    # A re-export the source does not otherwise need is dropped rather than refused: keeping it
-    # would import the two modules into each other for nothing.
+    # `move_plan` drops a re-export that the source does not otherwise need. It does not refuse the move.
+    # Keeping the re-export would make the two modules import each other for no reason.
     if want and back:
         if used: raise ValueError(f'{src_mod} and {dest_mod} would import each other over '
                                   f'{", ".join(back)}; move those as well')

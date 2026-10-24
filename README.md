@@ -7,11 +7,11 @@
 
 > Find the code you need before you write it.
 
-kosha (कोश, “treasury”) keeps a searchable index of your repository and of the Python packages it depends on. Ask it in plain words, such as “atomic write to a temp file”, and it returns the functions and classes that do that, from your code and from your dependencies, with their file, line and source. Ask it about a function and it tells you what calls it, what it calls, and how much code depends on it, so you can judge what a change will touch.
+kosha (कोश, “treasury”) keeps a searchable index of your repository and of the Python packages it depends on. Ask it in plain words, such as “atomic write to a temp file”, and it returns the functions and classes that do that, from your code and from your dependencies, with their file, line and source. Ask it about a function and it tells you what calls it, what it calls, and how much code depends on it. This shows what a change will touch.
 
-It is built for coding agents as much as for people. An agent that searches before it writes reuses the helper your project already has instead of adding a second one. kosha runs locally, uses no language model, and returns real code you can read.
+kosha serves coding agents and people. An agent that searches before it writes reuses the helper your project already has instead of adding a second one. kosha runs locally, uses no language model, and returns real code you can read.
 
-Three ideas recur on this page. A chunk is one function, class or method cut out of a source file and stored with its metadata. The index finds chunks in two ways at once: keyword search, which matches the words of the query, and vector search, which compares embeddings, lists of numbers computed from text so that code with similar meaning gets similar numbers. The call graph records which function uses which, across your code and your packages.
+This page uses three terms. A chunk is one function, class or method cut out of a source file and stored with its metadata. The index finds chunks with two searches at once. Keyword search matches the words of the query. Vector search compares embeddings. An embedding is a list of numbers computed from text, and code with similar meaning gets similar numbers. The call graph records which function uses which, across your code and your packages.
 
 ## Install
 
@@ -21,7 +21,7 @@ kosha is a development tool, so add it as a dev dependency. The package is publi
 uv add --dev koshas
 ```
 
-kosha ships a skill file, `SKILL.md`, that tells coding agents how to use it. Install it once per project:
+The package includes a skill file, `SKILL.md`, that tells coding agents how to use kosha. Install it once per project:
 
 ``` python
 Kosha(install_skill=True)   # writes .agents/skills/kosha/SKILL.md and .claude/skills/kosha/SKILL.md
@@ -38,7 +38,7 @@ k = Kosha()
 k.sync()
 ```
 
-`k.sync(graph=False)` skips the call graph when you only need search. `graph_mode='full'` re-extracts the graph in worker processes. `graph_metrics=False` skips recomputing PageRank (explained below); call `k.graph.recompute_metrics()` once you are done updating. The example below syncs only two packages.
+`k.sync(graph=False)` skips the call graph when you only need search. `graph_mode='full'` re-extracts the graph in worker processes. `graph_metrics=False` skips recomputing PageRank, which is defined below. Call `k.graph.recompute_metrics()` after your last update. The example below syncs only two packages.
 
 ``` python
 k = Kosha()
@@ -365,9 +365,9 @@ kosha also registers itself as a [pyskill](https://github.com/AnswerDotAI/pyskil
 
 ## MCP server
 
-`kosha-mcp` serves the index over the Model Context Protocol (MCP), so Claude Code, Claude Desktop, Codex and other MCP clients can call it as a set of tools: `status`, `sync`, `context`, `repo_context`, `env_context`, `where_to_add`, `node_info`, `neighbors`, `short_path`, `public_api`, `top_nodes`, `api_paths`, `dep_stack` and `pkg_url`.
+`kosha-mcp` serves the index over the Model Context Protocol (MCP), as a set of tools that Claude Code, Claude Desktop, Codex and other MCP clients can call: `status`, `sync`, `context`, `repo_context`, `env_context`, `where_to_add`, `node_info`, `neighbors`, `short_path`, `public_api`, `top_nodes`, `api_paths`, `dep_stack` and `pkg_url`.
 
-The server comes with the package. It indexes the repository it starts in and that repository’s environment, so it must start at the project root inside the project’s environment, and `uv run` takes care of both:
+The server comes with the package. It indexes the repository it starts in and that repository’s environment. It must start at the project root inside the project’s environment, and `uv run` does both:
 
 ``` sh
 uv add --dev koshas
@@ -393,4 +393,4 @@ Claude Desktop does not start in your project, so name the project in `claude_de
 {"mcpServers": {"kosha": {"command": "uv", "args": ["run", "--project", "/path/to/your/repo", "kosha-mcp"]}}}
 ```
 
-The server talks over standard input and output by default; `kosha-mcp --http` serves Streamable HTTP instead. The [MCP page](https://vedicreader.github.io/kosha/mcp.html) describes each tool.
+The server uses standard input and output by default. `kosha-mcp --http` serves Streamable HTTP instead. The [MCP page](https://vedicreader.github.io/kosha/mcp.html) describes each tool.
