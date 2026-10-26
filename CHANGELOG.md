@@ -2,6 +2,9 @@
 
 <!-- do not remove -->
 
+## 0.1.20
+- only show packages and versions that are in the venv
+
 ## 0.1.18
 - Needs litesearch>=0.1.61. litesearch 0.1.61 loads adhara, a native SQLite extension. A search with a filter now ranks its vectors with adhara on all cores.
 - Kosha creates the index `idx_store_lang` on `json_extract(metadata, '$.lang')` in the code store and the package store. SQLite answers a `lang:` filter from this index. Before, it read the metadata JSON of every row.
@@ -84,7 +87,7 @@
 kosha code rows
 
 ## 0.1.6
-page ranks can be small. bumping rounding error from 5 to 12 
+page ranks can be small. bumping rounding error from 5 to 12
 
 ## 0.1.5
 fixes page rank
@@ -299,7 +302,7 @@ tqdm and prune pkgs
 
 
 ## 0.0.3
-doc fix 
+doc fix
 
 
 

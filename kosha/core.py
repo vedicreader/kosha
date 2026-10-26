@@ -627,7 +627,7 @@ def pkgs2consider(self: Kosha, sys_wide=True) -> set:
 	ex_pkgs = {d['name']: d['version'] for d in self.pkgs(select='name, version')}
 	if sys_wide: return ex_pkgs.keys()
 	env_pkgs = env_pkg_versions(path=self.env_path, root=self.root)
-	return {p for p in env_pkgs if p in ex_pkgs and env_pkgs[p] == ex_pkgs[p]}
+	return {p for p, v in env_pkgs.items() if (p, v) in ex_pkgs}
 
 # %% ../nbs/00_core.ipynb #d395d7d7c6bd2fae
 @patch
