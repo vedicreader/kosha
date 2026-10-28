@@ -2,6 +2,10 @@
 
 <!-- do not remove -->
 
+## 0.1.21
+- `pkgs2consider(sys_wide=False)` returns the packages that are indexed at the version the project has installed. In 0.1.20 it always returned an empty set, so a search limited to the project's packages found none. It also works when the index holds two versions of one package.
+- `filt2wh` writes each filter value as one SQLite string literal. A value with a quote in it no longer causes an SQL error and can no longer leave its string.
+
 ## 0.1.20
 - only show packages and versions that are in the venv
 
