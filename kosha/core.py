@@ -630,8 +630,8 @@ def env_context(self:Kosha,
 @patch
 def pkgs2consider(self: Kosha, sys_wide=True) -> set:
 	'Names of indexed packages, or with `sys_wide=False` only those indexed at the installed version.'
-	ex_pkgs = {d['name']: d['version'] for d in self.pkgs(select='name, version')}
-	if sys_wide: return ex_pkgs.keys()
+	ex_pkgs = {(d['name'], d['version']) for d in self.pkgs(select='name, version')}
+	if sys_wide: return {p for p, _ in ex_pkgs}
 	env_pkgs = env_pkg_versions(path=self.env_path, root=self.root)
 	return {p for p, v in env_pkgs.items() if (p, v) in ex_pkgs}
 
