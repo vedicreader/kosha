@@ -12,7 +12,7 @@ Docs: https://vedicreader.github.io/kosha/core.html.md"""
 __all__ = ['CODE_FORMAT', 'LANG_INDEX', 'repo_skip_folder_re', 'strict_skip_file_re', 'parse', 'mv_skill_md', 'arun', 'env_path',
            'pkg_trans_deps', 'pyproject_deps', 'env_pkg_versions', 'cast_emb', 'Kosha', 'pkg_url', 'pkg_doc',
            'has_init', 'imp_root', 'enrich_chunks', 'embed_missing', 'count_imp', 'installed_dists', 'parseq',
-           'filt2wh', 'fanout', 'code_row']
+           'sql_str', 'filt2wh', 'fanout', 'code_row']
 
 # %% ../nbs/00_core.ipynb #d979fe142033f158
 import ast, os, re, tomllib
@@ -579,17 +579,23 @@ _ext = {'py': '.py', 'js': '.js', 'ts': '.ts', 'jsx': '.jsx', 'tsx': '.tsx', 'rb
         'java':'.java','cs':'.cs', 'swift':'.swift','kt':'.kt','lua':'.lua','php':'.php','python':'.py',
         'javascript':'.js','typescript':'.ts','ruby':'.rb','rust':'.rs','golang':'.go'}
 
+def sql_str(v) -> str:
+	'`v` as an SQLite string literal: single-quoted, with each internal quote doubled.'
+	v = str(v)
+	if '\x00' in v: raise ValueError('NUL character in SQL string value')
+	return "'" + v.replace("'", "''") + "'"
+
 def filt2wh(filters: dict, store: str = 'code') -> str | None:
 	'An SQL WHERE clause for `filters` (from `parseq`) on the `code` or `env` store, or None if nothing applies.'
-	_get, je = lambda k: filters.get(k,[]), lambda k, o='=', v='': f"json_extract(metadata, '$.{k}') {o} {v!r}"
+	_get, je = lambda k: filters.get(k,[]), lambda k, o='=', v='': f"json_extract(metadata, '$.{k}') {o} {sql_str(v)}"
 	list_or = lambda it: ['(%s)'%' OR '.join(ls)] if (ls:=listify(it)) else []
 	c, files, paths, langs = [], _get('file'), _get('path'), _get('lang')
 	path_wh, lang_chk = list(map(_glob_to_like, files + paths)), list(map(lambda l: _ext.get(l, f'.{l}'), langs))
 	lang_wh = list_or(map(lambda lc: je('lang',v=lc), lang_chk))
-	if store == 'code': c = list_or(map(lambda p: f'path LIKE {p!r}',path_wh)) + lang_wh
+	if store == 'code': c = list_or(map(lambda p: f'path LIKE {sql_str(p)}',path_wh)) + lang_wh
 	elif store == 'env':
 		c = list_or(map(lambda p: je('path','like',p),path_wh)) + lang_wh
-		if pkgs:=_get('package'): c += list_or(map(lambda p: f'package={p!r}',pkgs))
+		if pkgs:=_get('package'): c += list_or(map(lambda p: f'package={sql_str(p)}',pkgs))
 	c += list_or(map(lambda r: je('type',v=r), _get('type')))
 	return ' AND '.join(c) if c else None
 
