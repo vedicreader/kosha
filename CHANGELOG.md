@@ -2,6 +2,13 @@
 
 <!-- do not remove -->
 
+## 0.1.22
+
+Needs litesearch 0.1.63.
+
+- A store whose encoder or vector size changed is re-encoded as a whole, with a note on stderr. Before, an encoder change raised, and a size change left two vector sizes in one store. Then each sync failed in the index rebuild, and every file stayed stale.
+- `update_repo` and `update_pkgs` heal a store that holds two vector sizes, then finish the sync, so `status()` shows 0 stale files again.
+
 ## 0.1.21
 - `pkgs2consider(sys_wide=False)` returns the packages that are indexed at the version the project has installed. In 0.1.20 it always returned an empty set, so a search limited to the project's packages found none. It also works when the index holds two versions of one package.
 - `filt2wh` writes each filter value as one SQLite string literal. A value with a quote in it no longer causes an SQL error and can no longer leave its string.
