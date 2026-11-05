@@ -15,7 +15,7 @@ __all__ = ['CODE_FORMAT', 'LANG_INDEX', 'repo_skip_folder_re', 'strict_skip_file
            'sql_str', 'filt2wh', 'fanout', 'code_row']
 
 # %% ../nbs/00_core.ipynb #d979fe142033f158
-import ast, os, re, tomllib
+import ast, os, re, sys, tomllib
 import numpy as np
 from ast import get_source_segment as gs
 from collections import defaultdict, Counter
@@ -161,6 +161,8 @@ class Kosha:
 		self.busy_timeout, _dbkw = busy_timeout, dict(busy_timeout=busy_timeout)
 		self.codedb, self.envdb, kw = database(self.cp, **_dbkw), database(self.ce, **_dbkw), dict(hash=True,ann=True)
 		kw['encoder'] = encoder_id(self.efn)
+		# `get_store` refuses a store another encoder filled, so such a store is re-encoded first
+		for db, nm in ((self.codedb, 'store'), (self.envdb, 'store'), (self.envdb, 'pkg_store')): self._heal(db.t[nm], sizes=False)
 		self.code_st,self.env_st = self.codedb.get_store(path=str,**kw),self.envdb.get_store(package=str,**kw)
 		for db in (self.codedb, self.envdb): db.execute(LANG_INDEX)   # a `lang:` filter reads the index, not every row's JSON
 		self.pkg_st, self.pkgs = self.envdb.get_store('pkg_store', **kw), self.envdb.t.packages
@@ -177,6 +179,22 @@ class Kosha:
 			# before format 1 a moved but unchanged chunk kept its old lineno, and before format 2 the imports of each file were not stored; re-parse every file once
 			self.codedb.execute(f'update [{self.code_st.name}] set uploaded_at=0')
 			self.codedb.execute(f'pragma user_version={CODE_FORMAT}')
+
+@patch
+def _heal(self:Kosha, st, sizes=True):
+	'Re-encode every chunk of store `st` when another encoder filled it or, with `sizes`, when a vector has another size; return how many.'
+	if not st.exists(): return 0
+	enc, was = encoder_id(self.efn), st.db._store_meta(st.name)
+	why = 'encoder' if was and was['encoder'] and enc and was['encoder'] != enc else None
+	if not why and sizes:
+		nd, m = len(self.emb_doc(['x'])[0]), st.db._ann_meta(st.name)
+		odd = st.db.q(f'select 1 from [{st.name}] where length(embedding)<>? limit 1', [nd*np.dtype(DTYPE).itemsize])
+		if odd or (m and m['ndim'] and m['ndim'] != nd): why = 'vector size'
+	if not why: return 0
+	st.reset_vecs(encoder=enc or None)
+	n = embed_missing(st, self.emb_doc)
+	print(f'kosha: re-encoded {n} chunks of {st.db.conn.filename} [{st.name}]: the {why} changed', file=sys.stderr)
+	return n
 
 # %% ../nbs/00_core.ipynb #6a562e8f73eab276
 def pkg_url(pkg: str, path: list = None) -> str | None:
@@ -379,6 +397,7 @@ def update_pkgs(self:Kosha,
     'Index each package in `pkgs`, in turn or in parallel threads.'
     if verbose: print(f'loading pkgs {pkgs} ...' if pkgs else 'No packages to load.')
     if not pkgs: return
+    for st in (self.env_st, self.pkg_st): self._heal(st)
     if parallel and not self.busy_timeout: raise ValueError(
         'update_pkgs(parallel=True) requires a busy timeout: build Kosha(busy_timeout=30_000) '
         'or run `kosha sync --busy_timeout 30000 --pkg_parallel`.')
@@ -425,6 +444,7 @@ def update_repo(self:Kosha,
                 ):
     'Index new and changed repo files under `dir` and drop the chunks of deleted ones.'
     dir = Path(dir or self.root)
+    self._heal(self.code_st)
     known = {r['path']: r['uploaded_at'] for r in self.code_st(select='path, uploaded_at') if r['path']}
     fs = None if files is None else {str(Path(f).resolve()) for f in files}
     inf = lambda f: fs is None or str(Path(f).resolve()) in fs
