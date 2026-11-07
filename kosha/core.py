@@ -10,9 +10,9 @@ Docs: https://vedicreader.github.io/kosha/core.html.md"""
 
 # %% auto #0
 __all__ = ['CODE_FORMAT', 'LANG_INDEX', 'repo_skip_folder_re', 'strict_skip_file_re', 'parse', 'mv_skill_md', 'arun', 'env_path',
-           'pkg_trans_deps', 'pyproject_deps', 'env_pkg_versions', 'cast_emb', 'Kosha', 'pkg_url', 'pkg_doc',
-           'has_init', 'imp_root', 'enrich_chunks', 'embed_missing', 'count_imp', 'installed_dists', 'parseq',
-           'sql_str', 'filt2wh', 'fanout', 'code_row']
+           'pkg_trans_deps', 'pyproject_deps', 'env_pkg_versions', 'cast_emb', 'ignore_all', 'Kosha', 'pkg_url',
+           'pkg_doc', 'has_init', 'imp_root', 'enrich_chunks', 'embed_missing', 'count_imp', 'installed_dists',
+           'parseq', 'sql_str', 'filt2wh', 'fanout', 'code_row']
 
 # %% ../nbs/00_core.ipynb #d979fe142033f158
 import ast, os, re, sys, tomllib
@@ -147,6 +147,11 @@ def cast_emb(f, dtype=DTYPE):
 CODE_FORMAT = 2
 LANG_INDEX = "create index if not exists idx_store_lang on store(json_extract(metadata, '$.lang'))"
 
+def ignore_all(d):
+	'Write `d/.gitignore` with `*` unless it exists, so git does not list the folder as untracked.'
+	if not (g := Path(d)/'.gitignore').exists(): g.write_text('*\n')
+	return g
+
 class Kosha:
 	'Search index over a repository and its installed packages.'
 	def __init__(self, dir: Path = None, install_skill: bool = False, xdg_dir: Path = None, efn=static_code_embedder,
@@ -158,6 +163,7 @@ class Kosha:
 		self.cp, self.ce = self.root.joinpath('.kosha','code.db'), self.xdg.joinpath('kosha','env.db')
 		self.dp, self._docs = self.xdg.joinpath('kosha','docs.db'), None
 		for p in (self.cp, self.ce, self.dp): p.parent.mkdir(parents=True, exist_ok=True)
+		ignore_all(self.cp.parent)
 		self.busy_timeout, _dbkw = busy_timeout, dict(busy_timeout=busy_timeout)
 		self.codedb, self.envdb, kw = database(self.cp, **_dbkw), database(self.ce, **_dbkw), dict(hash=True,ann=True)
 		kw['encoder'] = encoder_id(self.efn)

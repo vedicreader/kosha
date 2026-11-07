@@ -2,6 +2,10 @@
 
 <!-- do not remove -->
 
+## 0.1.23
+
+- `Kosha()` writes `.kosha/.gitignore` with `*`, so the index no longer shows as untracked in the repo. A `.kosha/` folder from an older kosha gets the file the next time it opens. A `.gitignore` that is already there stays. `ignore_all(d)` does this for any folder.
+
 ## 0.1.22
 
 Needs litesearch 0.1.63.
