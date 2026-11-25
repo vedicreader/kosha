@@ -1824,7 +1824,7 @@ dev = [{ name = "koshas", extras = ["dev"] }]
 
 [[package]]
 name = "laghu"
-version = "0.4.0"
+version = "0.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastcore" },
@@ -1835,22 +1835,22 @@ dependencies = [
     { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/df/57/37bb07a0d8df778ab7681dca3c28009bd26e5cd4caf4a2df75f773d2370c/laghu-0.4.0.tar.gz", hash = "sha256:bf804c9942a363b787ce05b1f6eae855eca164246bb1147ff34e9d06d1d01d51", size = 29131, upload-time = "2026-10-24T03:06:42.46Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/56/da/edfcecf737df7c71f208c84a1562fec64830a32fc698498e3c538397f7c5/laghu-0.4.2.tar.gz", hash = "sha256:07c80b85878fce17e582a33eda6891780606a1a766baa72f18394ccdcc2c7205", size = 29596, upload-time = "2026-11-25T05:09:06.442Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/97/eb/97cb91b8150d93e6d5fc71d4b2b4fe2d1be081d0f70de8cac73605909ac6/laghu-0.4.0-py3-none-any.whl", hash = "sha256:c2c4ec967fdec6c487febbfd61a55d7c007fcd2e55ccc6d41e4e0919020776d4", size = 30981, upload-time = "2026-10-24T03:06:40.981Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/20/bbe9621880c6b3653fd7266246344dc533a96a0eca868e2801b7d0080513/laghu-0.4.2-py3-none-any.whl", hash = "sha256:4bfdc45f34b9f15abac3dcd7d8cf61d9769a5bc02d4b6ee27528e93cd7839c7c", size = 31473, upload-time = "2026-11-25T05:09:05.256Z" },
 ]
 
 [[package]]
 name = "laghu-rs"
-version = "0.2.0"
+version = "0.2.3"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/bf/f5/e565b781fa87b1c71dd97cec9d9a3defb85beb043029227e5326d30ee1a6/laghu_rs-0.2.0.tar.gz", hash = "sha256:a34de11e4577aae19cf117cb75f51d811d054b3f954e2f86aa206dcdc63974b1", size = 17774, upload-time = "2026-10-24T02:58:48.47Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b9/20/b094c50616802853b107b7e9c4754aaff83dea528b63f984e4ae369e7c36/laghu_rs-0.2.3.tar.gz", hash = "sha256:95cfb2537520ccef301365629bb8c4ddd0f49a7effbbc304c3606e1401116356", size = 18469, upload-time = "2026-11-25T05:05:54.777Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/60/6e/8f4b2ef71990d9584f051def1951313c3ade44a987f834e8b0b7d3a6eda9/laghu_rs-0.2.0-cp311-abi3-macosx_10_12_x86_64.whl", hash = "sha256:46038afeff5a0c8c78854522bb3ce6b34a73ac3bc2afae91b9d6ee8155e60073", size = 1482530, upload-time = "2026-10-24T02:58:40.227Z" },
-    { url = "https://files.pythonhosted.org/packages/0f/b4/9481124246688b8e1ac67e7fa2a9b954af92524504c30baa6eeb9ebd5694/laghu_rs-0.2.0-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:c7db60bf98ad4d3e0558fd2f81738485279696a240825038070998f3c4d354cb", size = 1418977, upload-time = "2026-10-24T02:58:42.089Z" },
-    { url = "https://files.pythonhosted.org/packages/6c/dc/7ade43399f6169c31e64e3950d0aee0ba87864f331921b6a8b8b29030cc3/laghu_rs-0.2.0-cp311-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:53f97e9fef8ad15f22c7ae30375a664b837313620706b7cf9a42be82ce412c9e", size = 1548255, upload-time = "2026-10-24T02:58:43.641Z" },
-    { url = "https://files.pythonhosted.org/packages/fd/42/1f07009831b87eb507a6bd8acfa7f1993926c41913fed5944cc6f4236280/laghu_rs-0.2.0-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:240c8caa3e83a082ba5e8987be5fd499ca1462ddb4c992347c1089ba7c4de232", size = 1581576, upload-time = "2026-10-24T02:58:45.278Z" },
-    { url = "https://files.pythonhosted.org/packages/f8/74/73fd27e9d1cb8d42e430750f07a78778373aeb9f96e4d7c9beb6ef6abdfd/laghu_rs-0.2.0-cp311-abi3-win_amd64.whl", hash = "sha256:7df92820d1c3fc6b3c8fdf09d3a147099df1bad6ada7e1682e9598fddd87d71a", size = 1429690, upload-time = "2026-10-24T02:58:47.002Z" },
+    { url = "https://files.pythonhosted.org/packages/08/f1/ec8ea53e5392ae74f57fcfeaa084f574f65a192d0c7d8d0dbcd303238567/laghu_rs-0.2.3-cp311-abi3-macosx_10_12_x86_64.whl", hash = "sha256:b50acbea4e5cbb199e103b9860ffa20e9bd32ca8728cd903961d066a2660e9e7", size = 1484434, upload-time = "2026-11-25T05:05:48.458Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/86/b15bf5508f3e7ee0eb3cdc7e9515dd2488bd8594a08da8c48494da13edb6/laghu_rs-0.2.3-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:362743e35183e63d19ea6ad606417853c39f44e53fb74afcf1784d59e84c7423", size = 1422986, upload-time = "2026-11-25T05:05:49.531Z" },
+    { url = "https://files.pythonhosted.org/packages/0b/4a/8a13591e4097697967687a111eaa72ef6caa87cb0281d95f61b1f4622b64/laghu_rs-0.2.3-cp311-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:d363202089a10793dce4289f2ecf324fb8d727ccbabe18fa8402fcb593bba3e8", size = 1554704, upload-time = "2026-11-25T05:05:51.115Z" },
+    { url = "https://files.pythonhosted.org/packages/72/86/01abfcfcaf089bbd717bf0f2dc0c94dc950dc411430133dcfefde49b5a07/laghu_rs-0.2.3-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:6bbc886bdc93fe86e16cce7b6c07ac42695d1a152f0e6a49bd6977e88be416b3", size = 1586908, upload-time = "2026-11-25T05:05:52.281Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/99/cbcf49de934e055418d65983415dd9b1af58574aa7ef28173c5d5790001b/laghu_rs-0.2.3-cp311-abi3-win_amd64.whl", hash = "sha256:399b5f4afb74060e6ac3012d82eceb991a8bcb148cd92ca436ed71ca0bd58707", size = 1436504, upload-time = "2026-11-25T05:05:53.395Z" },
 ]
 
 [[package]]
